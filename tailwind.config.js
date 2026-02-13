@@ -5,6 +5,7 @@ export default {
     "./resources/**/*.js",
     "./resources/**/*.vue",
   ],
+  darkMode: 'class', // Siap untuk dark mode
   theme: {
     extend: {
       colors: {
@@ -19,6 +20,7 @@ export default {
           700: '#334e68',
           800: '#243b53',
           900: '#1a2332',
+          950: '#0f172a',
         },
         'gold': {
           50: '#fffbeb',
@@ -33,7 +35,42 @@ export default {
           900: '#78350f',
         },
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-in': 'slideIn 0.3s ease-out',
+        'bounce-slow': 'bounce 2s infinite',
+        'pulse-slow': 'pulse 3s infinite',
+        'spin-slow': 'spin 3s linear infinite',
+        'gradient': 'gradient 6s ease infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideIn: {
+          '0%': { transform: 'translateX(-10px)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        gradient: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+      },
+      backgroundSize: {
+        '300%': '300%',
+      },
+      backdropBlur: {
+        xs: '2px',
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms')({
+      strategy: 'class', // Hanya terapkan class forms
+    }),
+  ],
 }

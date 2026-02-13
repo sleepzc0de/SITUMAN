@@ -9,10 +9,6 @@ use Illuminate\Validation\Rule;
 
 class UserManagementController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('role:superadmin,admin');
-    }
 
     public function index(Request $request)
     {
