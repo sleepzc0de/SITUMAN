@@ -565,7 +565,7 @@ class SPPController extends Controller
                 ->whereNotNull('kode_akun')
                 ->where('kode_akun', '!=', '')
                 ->orderBy('kode_akun')
-                ->get(['kode_akun', 'kode_kegiatan', 'kro', 'program_kegiatan']);
+                ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan']);
 
             Log::info('getAkun result', [
                 'count' => $akuns->count(),
