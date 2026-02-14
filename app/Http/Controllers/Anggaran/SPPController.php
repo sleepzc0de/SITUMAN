@@ -189,7 +189,7 @@ class SPPController extends Controller
         $akunList = Anggaran::where('ro', $spp->ro)
             ->where('kode_subkomponen', $spp->sub_komponen)
             ->whereNotNull('kode_akun')
-            ->get(['kode_akun', 'kode_kegiatan', 'kro', 'program_kegiatan']);
+            ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan']);
 
         return view('anggaran.spp.edit', compact(
             'spp',
