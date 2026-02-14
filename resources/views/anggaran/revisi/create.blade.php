@@ -72,15 +72,16 @@
 
                     <div class="input-group">
                         <label class="input-label">Pagu Sebelum</label>
-                        <input type="number" id="pagu_sebelum" class="input-field bg-gray-100 dark:bg-navy-700"
-                            placeholder="Otomatis terisi" step="0.01" readonly>
+                        <input type="text" id="pagu_sebelum_display" class="input-field bg-gray-100 dark:bg-navy-700"
+                            placeholder="Otomatis terisi" readonly>
+                        <input type="hidden" id="pagu_sebelum" name="pagu_sebelum_hidden">
                     </div>
 
                     <div class="input-group">
                         <label class="input-label">Pagu Sesudah <span class="text-red-500">*</span></label>
-                        <input type="number" name="pagu_sesudah" id="pagu_sesudah" value="{{ old('pagu_sesudah') }}"
-                            class="input-field @error('pagu_sesudah') border-red-500 @enderror" placeholder="0"
-                            step="0.01" required>
+                        <input type="text" id="pagu_sesudah_display"
+                            class="input-field @error('pagu_sesudah') border-red-500 @enderror" placeholder="0" required>
+                        <input type="hidden" name="pagu_sesudah" id="pagu_sesudah" value="{{ old('pagu_sesudah') }}">
                         @error('pagu_sesudah')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
@@ -142,82 +143,98 @@
         </form>
     </div>
 
-    @push('scripts')
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                const anggaranSelect = document.getElementById('anggaran_id');
-                const paguSebelumInput = document.getElementById('pagu_sebelum');
-                const paguSesudahInput = document.getElementById('pagu_sesudah');
-                const selisihInput = document.getElementById('selisih');
+   @push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const anggaranSelect = document.getElementById('anggaran_id');
+    const paguSebelumDisplay = document.getElementById('pagu_sebelum_display');
+    const paguSebelumHidden = document.getElementById('pagu_sebelum');
+    const paguSesudahDisplay = document.getElementById('pagu_sesudah_display');
+    const paguSesudahHidden = document.getElementById('pagu_sesudah');
 
-                // Set pagu sebelum when anggaran is selected
-                anggaranSelect.addEventListener('change', function() {
-                    const selectedOption = this.options[this.selectedIndex];
-                    const pagu = selectedOption.dataset.pagu || 0;
-                    paguSebelumInput.value = parseFloat(pagu).toFixed(2);
-                    calculateSelisih();
-                });
+    // Format number with thousand separator
+    function formatRupiah(angka) {
+        return new Intl.NumberFormat('id-ID').format(angka);
+    }
 
-                // Calculate selisih when pagu sesudah changes
-                paguSesudahInput.addEventListener('input', calculateSelisih);
+    // Remove thousand separator
+    function unformatRupiah(rupiah) {
+        return parseFloat(rupiah.replace(/[^0-9]/g, '')) || 0;
+    }
 
-                function calculateSelisih() {
-                    const paguSebelum = parseFloat(paguSebelumInput.value) || 0;
-                    const paguSesudah = parseFloat(paguSesudahInput.value) || 0;
-                    const selisih = paguSesudah - paguSebelum;
+    // Set pagu sebelum when anggaran is selected
+    anggaranSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const pagu = selectedOption.dataset.pagu || 0;
 
-                    const selisihDisplay = document.getElementById('selisih_display');
-                    const selisihBadge = document.getElementById('selisih_badge');
-                    const selisihInfo = document.getElementById('selisih_info');
+        paguSebelumHidden.value = parseFloat(pagu).toFixed(2);
+        paguSebelumDisplay.value = 'Rp ' + formatRupiah(pagu);
 
-                    if (paguSesudah === 0 || paguSebelum === 0) {
-                        selisihDisplay.value = '';
-                        selisihBadge.classList.add('hidden');
-                        selisihInfo.textContent = 'Masukkan pagu sesudah untuk melihat selisih';
-                        return;
-                    }
+        calculateSelisih();
+    });
 
-                    // Format selisih
-                    const formatter = new Intl.NumberFormat('id-ID', {
-                        style: 'currency',
-                        currency: 'IDR',
-                        minimumFractionDigits: 0
-                    });
+    // Handle pagu sesudah input with thousand separator
+    paguSesudahDisplay.addEventListener('input', function(e) {
+        let value = unformatRupiah(this.value);
+        paguSesudahHidden.value = value;
+        this.value = formatRupiah(value);
+        calculateSelisih();
+    });
 
-                    if (selisih === 0) {
-                        selisihDisplay.value = 'Rp 0';
-                        selisihBadge.classList.add('hidden');
-                        selisihInfo.textContent = 'Tidak ada perubahan pagu';
-                        selisihInfo.className = 'text-xs text-gray-500 mt-1';
-                    } else if (selisih > 0) {
-                        selisihDisplay.value = formatter.format(selisih);
-                        selisihBadge.textContent = '↑ Naik';
-                        selisihBadge.className =
-                            'px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-                        selisihBadge.classList.remove('hidden');
+    function calculateSelisih() {
+        const paguSebelum = parseFloat(paguSebelumHidden.value) || 0;
+        const paguSesudah = parseFloat(paguSesudahHidden.value) || 0;
+        const selisih = paguSesudah - paguSebelum;
 
-                        const persentase = ((selisih / paguSebelum) * 100).toFixed(2);
-                        selisihInfo.textContent = `Kenaikan sebesar ${formatter.format(selisih)} (${persentase}%)`;
-                        selisihInfo.className = 'text-xs text-green-600 dark:text-green-400 mt-1 font-medium';
-                    } else {
-                        selisihDisplay.value = formatter.format(Math.abs(selisih));
-                        selisihBadge.textContent = '↓ Turun';
-                        selisihBadge.className =
-                            'px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-                        selisihBadge.classList.remove('hidden');
+        const selisihDisplay = document.getElementById('selisih_display');
+        const selisihBadge = document.getElementById('selisih_badge');
+        const selisihInfo = document.getElementById('selisih_info');
 
-                        const persentase = ((Math.abs(selisih) / paguSebelum) * 100).toFixed(2);
-                        selisihInfo.textContent =
-                            `Penurunan sebesar ${formatter.format(Math.abs(selisih))} (${persentase}%)`;
-                        selisihInfo.className = 'text-xs text-red-600 dark:text-red-400 mt-1 font-medium';
-                    }
-                }
+        if (paguSesudah === 0 || paguSebelum === 0) {
+            selisihDisplay.value = '';
+            selisihBadge.classList.add('hidden');
+            selisihInfo.textContent = 'Masukkan pagu sesudah untuk melihat selisih';
+            return;
+        }
 
-                // Trigger change if anggaran already selected (old value)
-                if (anggaranSelect.value) {
-                    anggaranSelect.dispatchEvent(new Event('change'));
-                }
-            });
-        </script>
-    @endpush
+        // Format selisih
+        const formatter = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        });
+
+        if (selisih === 0) {
+            selisihDisplay.value = 'Rp 0';
+            selisihBadge.classList.add('hidden');
+            selisihInfo.textContent = 'Tidak ada perubahan pagu';
+            selisihInfo.className = 'text-xs text-gray-500 mt-1';
+        } else if (selisih > 0) {
+            selisihDisplay.value = formatter.format(selisih);
+            selisihBadge.textContent = '↑ Naik';
+            selisihBadge.className = 'px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+            selisihBadge.classList.remove('hidden');
+
+            const persentase = ((selisih / paguSebelum) * 100).toFixed(2);
+            selisihInfo.textContent = `Kenaikan sebesar ${formatter.format(selisih)} (${persentase}%)`;
+            selisihInfo.className = 'text-xs text-green-600 dark:text-green-400 mt-1 font-medium';
+        } else {
+            selisihDisplay.value = formatter.format(Math.abs(selisih));
+            selisihBadge.textContent = '↓ Turun';
+            selisihBadge.className = 'px-3 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            selisihBadge.classList.remove('hidden');
+
+            const persentase = ((Math.abs(selisih) / paguSebelum) * 100).toFixed(2);
+            selisihInfo.textContent = `Penurunan sebesar ${formatter.format(Math.abs(selisih))} (${persentase}%)`;
+            selisihInfo.className = 'text-xs text-red-600 dark:text-red-400 mt-1 font-medium';
+        }
+    }
+
+    // Trigger change if anggaran already selected (old value)
+    if (anggaranSelect.value) {
+        anggaranSelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+@endpush
 @endsection

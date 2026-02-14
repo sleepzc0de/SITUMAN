@@ -7,6 +7,7 @@ use App\Models\UsulanPenarikan;
 use App\Models\Anggaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class UsulanPenarikanController extends Controller
 {
@@ -51,13 +52,25 @@ class UsulanPenarikanController extends Controller
     // Tambahkan method baru untuk AJAX
     public function getSubkomponen(Request $request)
     {
-        $subkomponens = Anggaran::where('ro', $request->ro)
-            ->whereNotNull('kode_subkomponen')
-            ->whereNull('kode_akun')
-            ->distinct()
-            ->get(['kode_subkomponen', 'program_kegiatan']);
+        try {
+            Log::info('Usulan getSubkomponen called', ['ro' => $request->ro]);
 
-        return response()->json($subkomponens);
+            if (!$request->ro) {
+                return response()->json(['error' => 'RO harus diisi'], 400);
+            }
+
+            $subkomponens = Anggaran::where('ro', $request->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->distinct()
+                ->orderBy('kode_subkomponen')
+                ->get(['kode_subkomponen', 'program_kegiatan']);
+
+            return response()->json($subkomponens);
+        } catch (\Exception $e) {
+            Log::error('Usulan getSubkomponen error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function store(Request $request)

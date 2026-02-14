@@ -19,7 +19,6 @@ Route::middleware('guest')->group(function () {
 
 // Authenticated routes
 Route::middleware(['auth', 'has.role'])->group(function () {
-
     // Dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard', [DashboardController::class, 'index']);
@@ -47,9 +46,8 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::get('mutasi/{pegawai}', [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
     });
 
-    // Di dalam group anggaran
+    // Anggaran
     Route::prefix('anggaran')->name('anggaran.')->middleware(['auth', 'has.role'])->group(function () {
-
         // Monitoring Anggaran
         Route::get('monitoring', [App\Http\Controllers\Anggaran\MonitoringAnggaranController::class, 'index'])
             ->name('monitoring.index');
@@ -57,17 +55,16 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         // SPP Management
         Route::resource('spp', App\Http\Controllers\Anggaran\SPPController::class);
 
-        // AJAX routes untuk SPP (Tambahkan ini)
-        Route::get('ajax/get-subkomponen', [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
-            ->name('ajax.get-subkomponen');
-        Route::get('ajax/get-akun', [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
-            ->name('ajax.get-akun');
-        // Di dalam group anggaran
-        Route::get('usulan/ajax/get-subkomponen', [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
-            ->name('usulan.ajax.get-subkomponen');
+        // AJAX routes untuk SPP - DIPERBAIKI
+        Route::get('spp/ajax/subkomponen', [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
+            ->name('spp.ajax.subkomponen');
+        Route::get('spp/ajax/akun', [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
+            ->name('spp.ajax.akun');
 
         // Usulan Penarikan Dana
         Route::resource('usulan', App\Http\Controllers\Anggaran\UsulanPenarikanController::class);
+        Route::get('usulan/ajax/subkomponen', [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
+            ->name('usulan.ajax.subkomponen');
         Route::post('usulan/{usulan}/approve', [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'approve'])
             ->name('usulan.approve')
             ->middleware('role:superadmin,admin');
@@ -77,6 +74,8 @@ Route::middleware(['auth', 'has.role'])->group(function () {
 
         // Dokumen Capaian Output
         Route::resource('dokumen', App\Http\Controllers\Anggaran\DokumenCapaianController::class);
+        Route::get('dokumen/ajax/subkomponen', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen'])
+            ->name('dokumen.ajax.subkomponen');
         Route::get('dokumen/{dokumen}/download', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'download'])
             ->name('dokumen.download');
 
@@ -87,6 +86,11 @@ Route::middleware(['auth', 'has.role'])->group(function () {
 
         // Data Anggaran Management
         Route::resource('data', App\Http\Controllers\Anggaran\DataAnggaranController::class);
+
+        // AJAX untuk Data Anggaran
+        Route::get('data/ajax/subkomponen', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'getSubkomponen'])
+            ->name('data.ajax.subkomponen');
+
         Route::get('data-import', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'importForm'])
             ->name('data.import-form');
         Route::post('data-import', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'import'])

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Anggaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DataAnggaranController extends Controller
 {
@@ -32,17 +33,17 @@ class DataAnggaranController extends Controller
         // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('program_kegiatan', 'like', "%{$search}%")
-                  ->orWhere('kode_akun', 'like', "%{$search}%")
-                  ->orWhere('kode_subkomponen', 'like', "%{$search}%");
+                    ->orWhere('kode_akun', 'like', "%{$search}%")
+                    ->orWhere('kode_subkomponen', 'like', "%{$search}%");
             });
         }
 
         $anggarans = $query->orderBy('ro')
-                          ->orderBy('kode_subkomponen')
-                          ->orderBy('kode_akun')
-                          ->paginate(20);
+            ->orderBy('kode_subkomponen')
+            ->orderBy('kode_akun')
+            ->paginate(20);
 
         // Get RO list for filter
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
@@ -100,8 +101,22 @@ class DataAnggaranController extends Controller
             $validated['tagihan_outstanding'] = 0;
 
             // Set bulan to 0
-            foreach (['januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                     'juli', 'agustus', 'september', 'oktober', 'november', 'desember'] as $bulan) {
+            foreach (
+                [
+                    'januari',
+                    'februari',
+                    'maret',
+                    'april',
+                    'mei',
+                    'juni',
+                    'juli',
+                    'agustus',
+                    'september',
+                    'oktober',
+                    'november',
+                    'desember'
+                ] as $bulan
+            ) {
                 $validated[$bulan] = 0;
             }
 
@@ -376,5 +391,40 @@ class DataAnggaranController extends Controller
         // TODO: Implement Excel export
 
         return back()->with('info', 'Fitur export Excel akan segera tersedia');
+    }
+
+    /**
+     * Get subkomponen list berdasarkan RO (untuk AJAX)
+     */
+    public function getSubkomponen(Request $request)
+    {
+        try {
+            Log::info('DataAnggaran getSubkomponen called', ['ro' => $request->ro]);
+
+            if (!$request->ro) {
+                return response()->json(['error' => 'RO harus diisi'], 400);
+            }
+
+            $subkomponens = Anggaran::where('ro', $request->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->where('kode_subkomponen', '!=', '')
+                ->whereNull('kode_akun')
+                ->distinct()
+                ->orderBy('kode_subkomponen')
+                ->get(['kode_subkomponen', 'program_kegiatan']);
+
+            Log::info('DataAnggaran getSubkomponen result', [
+                'count' => $subkomponens->count(),
+                'data' => $subkomponens->toArray()
+            ]);
+
+            return response()->json($subkomponens);
+        } catch (\Exception $e) {
+            Log::error('DataAnggaran getSubkomponen error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

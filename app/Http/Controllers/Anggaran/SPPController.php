@@ -7,6 +7,7 @@ use App\Models\SPP;
 use App\Models\Anggaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SPPController extends Controller
 {
@@ -32,10 +33,10 @@ class SPPController extends Controller
         // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('no_spp', 'like', "%{$search}%")
-                  ->orWhere('uraian_spp', 'like', "%{$search}%")
-                  ->orWhere('nama_pic', 'like', "%{$search}%");
+                    ->orWhere('uraian_spp', 'like', "%{$search}%")
+                    ->orWhere('nama_pic', 'like', "%{$search}%");
             });
         }
 
@@ -46,12 +47,11 @@ class SPPController extends Controller
             'januari', 'februari', 'maret', 'april', 'mei', 'juni',
             'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
         ];
-
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
         // Calculate statistics
-        $totalBruto = $spps->sum('bruto');
-        $totalNetto = $spps->sum('netto');
+        $totalBruto = SPP::sum('bruto');
+        $totalNetto = SPP::sum('netto');
         $totalSP2D = SPP::where('status', 'Tagihan Telah SP2D')->sum('netto');
         $totalBelumSP2D = SPP::where('status', 'Tagihan Belum SP2D')->sum('netto');
 
@@ -143,6 +143,7 @@ class SPPController extends Controller
                 ->with('success', 'Data SPP berhasil ditambahkan');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error creating SPP: ' . $e->getMessage());
             return back()
                 ->withInput()
                 ->with('error', 'Gagal menambahkan data SPP: ' . $e->getMessage());
@@ -180,6 +181,7 @@ class SPPController extends Controller
         $subkomponenList = Anggaran::where('ro', $spp->ro)
             ->whereNotNull('kode_subkomponen')
             ->where('kode_subkomponen', '!=', '')
+            ->whereNull('kode_akun')
             ->distinct()
             ->get(['kode_subkomponen', 'program_kegiatan']);
 
@@ -187,7 +189,7 @@ class SPPController extends Controller
         $akunList = Anggaran::where('ro', $spp->ro)
             ->where('kode_subkomponen', $spp->sub_komponen)
             ->whereNotNull('kode_akun')
-            ->get(['kode_akun', 'program_kegiatan']);
+            ->get(['kode_akun', 'kode_kegiatan', 'kro', 'program_kegiatan']);
 
         return view('anggaran.spp.edit', compact(
             'spp',
@@ -266,6 +268,7 @@ class SPPController extends Controller
                 ->with('success', 'Data SPP berhasil diupdate');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error updating SPP: ' . $e->getMessage());
             return back()
                 ->withInput()
                 ->with('error', 'Gagal mengupdate data SPP: ' . $e->getMessage());
@@ -292,6 +295,7 @@ class SPPController extends Controller
                 ->with('success', 'Data SPP berhasil dihapus');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error deleting SPP: ' . $e->getMessage());
             return back()->with('error', 'Gagal menghapus data SPP: ' . $e->getMessage());
         }
     }
@@ -301,10 +305,11 @@ class SPPController extends Controller
      */
     private function updateAnggaran(SPP $spp)
     {
-        // Cari anggaran berdasarkan COA
+        // Cari anggaran berdasarkan komponen COA
         $anggaran = Anggaran::where('kegiatan', $spp->kode_kegiatan)
             ->where('kro', $spp->kro)
             ->where('ro', $spp->ro)
+            ->where('kode_subkomponen', $spp->sub_komponen)
             ->where('kode_akun', $spp->mak)
             ->first();
 
@@ -315,8 +320,10 @@ class SPPController extends Controller
         $bulan = strtolower($spp->bulan);
 
         // Validasi bulan
-        $validBulans = ['januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                        'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+        $validBulans = [
+            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+        ];
 
         if (!in_array($bulan, $validBulans)) {
             throw new \Exception('Bulan tidak valid: ' . $bulan);
@@ -333,7 +340,6 @@ class SPPController extends Controller
 
         // Update total penyerapan dan sisa
         $this->recalculateAnggaranTotals($anggaran);
-
         $anggaran->save();
 
         // Update parent rows (aggregate)
@@ -360,8 +366,10 @@ class SPPController extends Controller
         $bulan = strtolower($bulan);
 
         // Validasi bulan
-        $validBulans = ['januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                        'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+        $validBulans = [
+            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+        ];
 
         if (!in_array($bulan, $validBulans)) {
             return; // Silently return if bulan not valid
@@ -384,7 +392,6 @@ class SPPController extends Controller
 
         // Recalculate totals
         $this->recalculateAnggaranTotals($anggaran);
-
         $anggaran->save();
 
         // Update parent rows
@@ -400,7 +407,7 @@ class SPPController extends Controller
         // kegiatan: 4753 (4 char)
         // kro: EBA (3 char)
         // ro: Z06 atau 403 atau 405 atau 994 (3 char)
-        // subkomp: AA (2 char) - optional
+        // subkomp: AA (2 char)
         // mak: 521211 (6 char)
 
         $kegiatan = substr($coa, 0, 4);
@@ -459,8 +466,10 @@ class SPPController extends Controller
                 ->whereNotNull('kode_akun')
                 ->get();
 
-            $bulans = ['januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                      'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+            $bulans = [
+                'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+                'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            ];
 
             foreach ($bulans as $bulan) {
                 $subkomp->$bulan = $children->sum($bulan);
@@ -486,8 +495,10 @@ class SPPController extends Controller
                 ->whereNull('kode_akun')
                 ->get();
 
-            $bulans = ['januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                      'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+            $bulans = [
+                'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+                'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            ];
 
             foreach ($bulans as $bulan) {
                 $ro->$bulan = $children->sum($bulan);
@@ -504,14 +515,34 @@ class SPPController extends Controller
      */
     public function getSubkomponen(Request $request)
     {
-        $subkomponens = Anggaran::where('ro', $request->ro)
-            ->whereNotNull('kode_subkomponen')
-            ->where('kode_subkomponen', '!=', '')
-            ->whereNull('kode_akun')
-            ->distinct()
-            ->get(['kode_subkomponen', 'program_kegiatan']);
+        try {
+            Log::info('getSubkomponen called', ['ro' => $request->ro]);
 
-        return response()->json($subkomponens);
+            if (!$request->ro) {
+                return response()->json(['error' => 'RO harus diisi'], 400);
+            }
+
+            $subkomponens = Anggaran::where('ro', $request->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->where('kode_subkomponen', '!=', '')
+                ->whereNull('kode_akun')
+                ->distinct()
+                ->orderBy('kode_subkomponen')
+                ->get(['kode_subkomponen', 'program_kegiatan']);
+
+            Log::info('getSubkomponen result', [
+                'count' => $subkomponens->count(),
+                'data' => $subkomponens->toArray()
+            ]);
+
+            return response()->json($subkomponens);
+        } catch (\Exception $e) {
+            Log::error('getSubkomponen error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -519,11 +550,35 @@ class SPPController extends Controller
      */
     public function getAkun(Request $request)
     {
-        $akuns = Anggaran::where('ro', $request->ro)
-            ->where('kode_subkomponen', $request->subkomponen)
-            ->whereNotNull('kode_akun')
-            ->get(['kode_akun', 'kode_kegiatan', 'kro', 'program_kegiatan']);
+        try {
+            Log::info('getAkun called', [
+                'ro' => $request->ro,
+                'subkomponen' => $request->subkomponen
+            ]);
 
-        return response()->json($akuns);
+            if (!$request->ro || !$request->subkomponen) {
+                return response()->json(['error' => 'RO dan Subkomponen harus diisi'], 400);
+            }
+
+            $akuns = Anggaran::where('ro', $request->ro)
+                ->where('kode_subkomponen', $request->subkomponen)
+                ->whereNotNull('kode_akun')
+                ->where('kode_akun', '!=', '')
+                ->orderBy('kode_akun')
+                ->get(['kode_akun', 'kode_kegiatan', 'kro', 'program_kegiatan']);
+
+            Log::info('getAkun result', [
+                'count' => $akuns->count(),
+                'data' => $akuns->toArray()
+            ]);
+
+            return response()->json($akuns);
+        } catch (\Exception $e) {
+            Log::error('getAkun error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

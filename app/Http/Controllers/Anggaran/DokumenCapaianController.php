@@ -107,8 +107,9 @@ class DokumenCapaianController extends Controller
         return Storage::disk('public')->download($dokumen->file_path, $dokumen->nama_dokumen);
     }
 
-    public function destroy(DokumenCapaian $dokumen)
-    {
+   public function destroy(DokumenCapaian $dokumen)
+{
+    try {
         // Check if file_path exists before trying to delete
         if ($dokumen->file_path && Storage::disk('public')->exists($dokumen->file_path)) {
             Storage::disk('public')->delete($dokumen->file_path);
@@ -116,9 +117,14 @@ class DokumenCapaianController extends Controller
 
         $dokumen->delete();
 
+        // Redirect ke halaman pertama untuk memastikan data terupdate
         return redirect()->route('anggaran.dokumen.index')
             ->with('success', 'Dokumen capaian output berhasil dihapus');
+    } catch (\Exception $e) {
+        \Log::error('Error deleting dokumen: ' . $e->getMessage());
+        return back()->with('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
     }
+}
 
     public function edit(DokumenCapaian $dokumen)
     {
@@ -170,5 +176,21 @@ class DokumenCapaianController extends Controller
 
         return redirect()->route('anggaran.dokumen.index')
             ->with('success', 'Dokumen capaian output berhasil diupdate');
+    }
+
+    public function getSubkomponen(Request $request)
+    {
+        try {
+            $subkomponens = Anggaran::where('ro', $request->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->distinct()
+                ->orderBy('kode_subkomponen')
+                ->get(['kode_subkomponen', 'program_kegiatan']);
+
+            return response()->json($subkomponens);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

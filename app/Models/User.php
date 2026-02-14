@@ -60,8 +60,24 @@ class User extends Authenticatable
             $protectedNips = ['199609102018011005'];
 
             return !in_array($this->email, $protectedEmails) &&
-                   !in_array($this->nip, $protectedNips);
+                !in_array($this->nip, $protectedNips);
         }
         return true;
+    }
+
+    // Tambahkan relasi ini
+    public function usulanPenarikan()
+    {
+        return $this->hasMany(UsulanPenarikan::class);
+    }
+
+    public function dokumenCapaian()
+    {
+        return $this->hasMany(DokumenCapaian::class);
+    }
+
+    public function revisiAnggaran()
+    {
+        return $this->hasMany(RevisiAnggaran::class);
     }
 }

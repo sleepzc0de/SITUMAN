@@ -111,33 +111,53 @@
         </form>
     </div>
     @push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const roSelect = document.getElementById('ro');
-    const subKomponenSelect = document.getElementById('sub_komponen');
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const roSelect = document.getElementById('ro');
+                const subKomponenSelect = document.getElementById('sub_komponen');
 
-    roSelect.addEventListener('change', function() {
-        const ro = this.value;
-        subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
+                roSelect.addEventListener('change', function() {
+                    const ro = this.value;
+                    subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
 
-        if (ro) {
-            fetch(`/anggaran/usulan/ajax/get-subkomponen?ro=${ro}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.kode_subkomponen;
-                        option.textContent = `${item.kode_subkomponen} - ${item.program_kegiatan}`;
-                        subKomponenSelect.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Gagal memuat data sub komponen');
+                    if (ro) {
+                        subKomponenSelect.innerHTML = '<option value="">Loading...</option>';
+
+                        // ✅ PERBAIKAN: Template literal yang benar
+                        fetch(`{{ route('anggaran.usulan.ajax.subkomponen') }}?ro=${ro}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                subKomponenSelect.innerHTML =
+                                '<option value="">Pilih Sub Komponen</option>';
+
+                                if (data.error) {
+                                    console.error('Error:', data.error);
+                                    return;
+                                }
+
+                                if (data.length === 0) {
+                                    subKomponenSelect.innerHTML =
+                                        '<option value="">Tidak ada sub komponen</option>';
+                                    return;
+                                }
+
+                                data.forEach(item => {
+                                    const option = document.createElement('option');
+                                    option.value = item.kode_subkomponen;
+                                    option.textContent =
+                                        `${item.kode_subkomponen} - ${item.program_kegiatan}`;
+                                    subKomponenSelect.appendChild(option);
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                subKomponenSelect.innerHTML =
+                                '<option value="">Error loading data</option>';
+                                alert('Gagal memuat data sub komponen');
+                            });
+                    }
                 });
-        }
-    });
-});
-</script>
-@endpush
+            });
+        </script>
+    @endpush
 @endsection

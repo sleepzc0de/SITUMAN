@@ -453,161 +453,215 @@
         </form>
     </div>
 
-  @push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const roSelect = document.getElementById('ro');
-    const subKomponenSelect = document.getElementById('sub_komponen');
-    const makSelect = document.getElementById('mak');
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const roSelect = document.getElementById('ro');
+                const subKomponenSelect = document.getElementById('sub_komponen');
+                const makSelect = document.getElementById('mak');
 
-    // Nilai & Pajak elements
-    const brutoDisplay = document.getElementById('bruto_display');
-    const brutoHidden = document.getElementById('bruto');
-    const ppnPercent = document.getElementById('ppn_percent');
-    const ppnHidden = document.getElementById('ppn');
-    const ppnDisplay = document.getElementById('ppn_display');
-    const pphPercent = document.getElementById('pph_percent');
-    const pphHidden = document.getElementById('pph');
-    const pphDisplay = document.getElementById('pph_display');
-    const nettoDisplay = document.getElementById('netto_display');
-    const nettoHidden = document.getElementById('netto');
+                // Nilai & Pajak elements
+                const brutoDisplay = document.getElementById('bruto_display');
+                const brutoHidden = document.getElementById('bruto');
+                const ppnPercent = document.getElementById('ppn_percent');
+                const ppnHidden = document.getElementById('ppn');
+                const ppnDisplay = document.getElementById('ppn_display');
+                const pphPercent = document.getElementById('pph_percent');
+                const pphHidden = document.getElementById('pph');
+                const pphDisplay = document.getElementById('pph_display');
+                const nettoDisplay = document.getElementById('netto_display');
+                const nettoHidden = document.getElementById('netto');
 
-    const statusSelect = document.getElementById('status');
-    const sp2dFields = document.getElementById('sp2d_fields');
-    const tglSp2dFields = document.getElementById('tgl_sp2d_fields');
-    const tglSelesaiFields = document.getElementById('tgl_selesai_fields');
+                const statusSelect = document.getElementById('status');
+                const sp2dFields = document.getElementById('sp2d_fields');
+                const tglSp2dFields = document.getElementById('tgl_sp2d_fields');
+                const tglSelesaiFields = document.getElementById('tgl_selesai_fields');
 
-    // Load sub komponen when RO changes
-    roSelect.addEventListener('change', function() {
-        const ro = this.value;
-        subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
-        makSelect.innerHTML = '<option value="">Pilih MAK</option>';
+                // Load sub komponen when RO changes
+                roSelect.addEventListener('change', function() {
+                    const ro = this.value;
+                    subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
+                    makSelect.innerHTML = '<option value="">Pilih MAK</option>';
 
-        if (ro) {
-            fetch(`/anggaran/ajax/get-subkomponen?ro=${ro}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.kode_subkomponen;
-                        option.textContent = `${item.kode_subkomponen} - ${item.program_kegiatan}`;
-                        subKomponenSelect.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Gagal memuat data sub komponen');
+                    if (ro) {
+                        subKomponenSelect.innerHTML = '<option value="">Loading...</option>';
+
+                        // ✅ PERBAIKAN: Gunakan template literal yang benar
+                        fetch(`{{ route('anggaran.spp.ajax.subkomponen') }}?ro=${ro}`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                subKomponenSelect.innerHTML =
+                                '<option value="">Pilih Sub Komponen</option>';
+
+                                if (data.error) {
+                                    console.error('Error:', data.error);
+                                    alert('Error: ' + data.error);
+                                    return;
+                                }
+
+                                if (data.length === 0) {
+                                    subKomponenSelect.innerHTML =
+                                        '<option value="">Tidak ada sub komponen</option>';
+                                    return;
+                                }
+
+                                data.forEach(item => {
+                                    const option = document.createElement('option');
+                                    option.value = item.kode_subkomponen;
+                                    option.textContent =
+                                        `${item.kode_subkomponen} - ${item.program_kegiatan}`;
+                                    subKomponenSelect.appendChild(option);
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                subKomponenSelect.innerHTML =
+                                '<option value="">Error loading data</option>';
+                                alert('Gagal memuat data sub komponen. Silakan coba lagi.');
+                            });
+                    }
                 });
-        }
-    });
 
-    // Load MAK when sub komponen changes
-    subKomponenSelect.addEventListener('change', function() {
-        const ro = roSelect.value;
-        const subkomponen = this.value;
-        makSelect.innerHTML = '<option value="">Pilih MAK</option>';
+                // Load MAK when sub komponen changes
+                subKomponenSelect.addEventListener('change', function() {
+                    const ro = roSelect.value;
+                    const subkomponen = this.value;
 
-        if (ro && subkomponen) {
-            fetch(`/anggaran/ajax/get-akun?ro=${ro}&subkomponen=${subkomponen}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.forEach(item => {
-                        const option = document.createElement('option');
-                        option.value = item.kode_akun;
-                        option.textContent = `${item.kode_akun} - ${item.program_kegiatan}`;
-                        option.dataset.kegiatan = item.kode_kegiatan;
-                        option.dataset.kro = item.kro;
-                        makSelect.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Gagal memuat data akun');
+                    makSelect.innerHTML = '<option value="">Pilih MAK</option>';
+
+                    if (ro && subkomponen) {
+                        makSelect.innerHTML = '<option value="">Loading...</option>';
+
+                        // ✅ PERBAIKAN: Gunakan template literal yang benar
+                        fetch(`{{ route('anggaran.spp.ajax.akun') }}?ro=${ro}&subkomponen=${subkomponen}`)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                makSelect.innerHTML = '<option value="">Pilih MAK</option>';
+
+                                if (data.error) {
+                                    console.error('Error:', data.error);
+                                    alert('Error: ' + data.error);
+                                    return;
+                                }
+
+                                if (data.length === 0) {
+                                    makSelect.innerHTML = '<option value="">Tidak ada akun</option>';
+                                    console.log('No data returned for RO:', ro, 'Subkomponen:',
+                                    subkomponen);
+                                    return;
+                                }
+
+                                console.log('Data loaded:', data.length, 'items');
+                                data.forEach(item => {
+                                    const option = document.createElement('option');
+                                    option.value = item.kode_akun;
+                                    option.textContent =
+                                        `${item.kode_akun} - ${item.program_kegiatan}`;
+                                    option.dataset.kegiatan = item.kode_kegiatan;
+                                    option.dataset.kro = item.kro;
+                                    makSelect.appendChild(option);
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                makSelect.innerHTML = '<option value="">Error loading data</option>';
+                                alert('Gagal memuat data akun. Silakan coba lagi.');
+                            });
+                    }
                 });
-        }
-    });
 
-    // Auto fill kode kegiatan and kro when MAK is selected
-    makSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        if (selectedOption.dataset.kegiatan) {
-            document.querySelector('[name="kode_kegiatan"]').value = selectedOption.dataset.kegiatan;
-            document.querySelector('[name="kro"]').value = selectedOption.dataset.kro;
-        }
-    });
+                // Auto fill kode kegiatan and kro when MAK is selected
+                makSelect.addEventListener('change', function() {
+                    const selectedOption = this.options[this.selectedIndex];
+                    if (selectedOption.dataset.kegiatan) {
+                        document.querySelector('[name="kode_kegiatan"]').value = selectedOption.dataset
+                        .kegiatan;
+                        document.querySelector('[name="kro"]').value = selectedOption.dataset.kro;
+                    }
+                });
 
-    // Format number with thousand separator
-    function formatRupiah(angka) {
-        return new Intl.NumberFormat('id-ID').format(angka);
-    }
+                // Format number with thousand separator
+                function formatRupiah(angka) {
+                    return new Intl.NumberFormat('id-ID').format(angka);
+                }
 
-    // Remove thousand separator
-    function unformatRupiah(rupiah) {
-        return parseFloat(rupiah.replace(/[^0-9]/g, '')) || 0;
-    }
+                // Remove thousand separator
+                function unformatRupiah(rupiah) {
+                    return parseFloat(rupiah.replace(/[^0-9]/g, '')) || 0;
+                }
 
-    // Handle bruto input with thousand separator
-    brutoDisplay.addEventListener('input', function(e) {
-        let value = unformatRupiah(this.value);
-        brutoHidden.value = value;
-        this.value = formatRupiah(value);
-        calculateNetto();
-    });
+                // Handle bruto input with thousand separator
+                brutoDisplay.addEventListener('input', function(e) {
+                    let value = unformatRupiah(this.value);
+                    brutoHidden.value = value;
+                    this.value = formatRupiah(value);
+                    calculateNetto();
+                });
 
-    // Handle PPN percentage input
-    ppnPercent.addEventListener('input', function() {
-        calculateNetto();
-    });
+                // Handle PPN percentage input
+                ppnPercent.addEventListener('input', function() {
+                    calculateNetto();
+                });
 
-    // Handle PPh percentage input
-    pphPercent.addEventListener('input', function() {
-        calculateNetto();
-    });
+                // Handle PPh percentage input
+                pphPercent.addEventListener('input', function() {
+                    calculateNetto();
+                });
 
-    // Calculate netto automatically
-    function calculateNetto() {
-        const bruto = parseFloat(brutoHidden.value) || 0;
-        const ppnPercentValue = parseFloat(ppnPercent.value) || 0;
-        const pphPercentValue = parseFloat(pphPercent.value) || 0;
+                // Calculate netto automatically
+                function calculateNetto() {
+                    const bruto = parseFloat(brutoHidden.value) || 0;
+                    const ppnPercentValue = parseFloat(ppnPercent.value) || 0;
+                    const pphPercentValue = parseFloat(pphPercent.value) || 0;
 
-        // Calculate PPN and PPh values
-        const ppnValue = (bruto * ppnPercentValue) / 100;
-        const pphValue = (bruto * pphPercentValue) / 100;
+                    // Calculate PPN and PPh values
+                    const ppnValue = (bruto * ppnPercentValue) / 100;
+                    const pphValue = (bruto * pphPercentValue) / 100;
 
-        // Calculate netto
-        const netto = bruto - ppnValue - pphValue;
+                    // Calculate netto
+                    const netto = bruto - ppnValue - pphValue;
 
-        // Update hidden fields
-        ppnHidden.value = ppnValue.toFixed(2);
-        pphHidden.value = pphValue.toFixed(2);
-        nettoHidden.value = netto.toFixed(2);
+                    // Update hidden fields
+                    ppnHidden.value = ppnValue.toFixed(2);
+                    pphHidden.value = pphValue.toFixed(2);
+                    nettoHidden.value = netto.toFixed(2);
 
-        // Update displays
-        ppnDisplay.textContent = 'Rp ' + formatRupiah(ppnValue.toFixed(0));
-        pphDisplay.textContent = 'Rp ' + formatRupiah(pphValue.toFixed(0));
-        nettoDisplay.value = formatRupiah(netto.toFixed(0));
-    }
+                    // Update displays
+                    ppnDisplay.textContent = 'Rp ' + formatRupiah(ppnValue.toFixed(0));
+                    pphDisplay.textContent = 'Rp ' + formatRupiah(pphValue.toFixed(0));
+                    nettoDisplay.value = formatRupiah(netto.toFixed(0));
+                }
 
-    // Show/hide SP2D fields based on status
-    statusSelect.addEventListener('change', function() {
-        if (this.value === 'Tagihan Telah SP2D') {
-            sp2dFields.style.display = 'block';
-            tglSp2dFields.style.display = 'block';
-            tglSelesaiFields.style.display = 'block';
-        } else {
-            sp2dFields.style.display = 'none';
-            tglSp2dFields.style.display = 'none';
-            tglSelesaiFields.style.display = 'none';
-        }
-    });
+                // Show/hide SP2D fields based on status
+                statusSelect.addEventListener('change', function() {
+                    if (this.value === 'Tagihan Telah SP2D') {
+                        sp2dFields.style.display = 'block';
+                        tglSp2dFields.style.display = 'block';
+                        tglSelesaiFields.style.display = 'block';
+                    } else {
+                        sp2dFields.style.display = 'none';
+                        tglSp2dFields.style.display = 'none';
+                        tglSelesaiFields.style.display = 'none';
+                    }
+                });
 
-    // Trigger on page load
-    if (statusSelect.value === 'Tagihan Telah SP2D') {
-        sp2dFields.style.display = 'block';
-        tglSp2dFields.style.display = 'block';
-        tglSelesaiFields.style.display = 'block';
-    }
-});
-</script>
-@endpush
+                // Trigger on page load
+                if (statusSelect.value === 'Tagihan Telah SP2D') {
+                    sp2dFields.style.display = 'block';
+                    tglSp2dFields.style.display = 'block';
+                    tglSelesaiFields.style.display = 'block';
+                }
+            });
+        </script>
+    @endpush
 @endsection

@@ -9,8 +9,13 @@ class DokumenCapaian extends Model
     protected $table = 'dokumen_capaian';
 
     protected $fillable = [
-        'ro', 'sub_komponen', 'bulan', 'nama_dokumen',
-        'file_path', 'keterangan', 'user_id'
+        'ro',
+        'sub_komponen',
+        'bulan',
+        'nama_dokumen',
+        'file_path',
+        'keterangan',
+        'user_id'
     ];
 
     public function user()
