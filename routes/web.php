@@ -62,6 +62,9 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('ajax.get-subkomponen');
         Route::get('ajax/get-akun', [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
             ->name('ajax.get-akun');
+        // Di dalam group anggaran
+        Route::get('usulan/ajax/get-subkomponen', [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
+            ->name('usulan.ajax.get-subkomponen');
 
         // Usulan Penarikan Dana
         Route::resource('usulan', App\Http\Controllers\Anggaran\UsulanPenarikanController::class);

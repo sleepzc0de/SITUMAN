@@ -109,7 +109,8 @@ class DokumenCapaianController extends Controller
 
     public function destroy(DokumenCapaian $dokumen)
     {
-        if (Storage::disk('public')->exists($dokumen->file_path)) {
+        // Check if file_path exists before trying to delete
+        if ($dokumen->file_path && Storage::disk('public')->exists($dokumen->file_path)) {
             Storage::disk('public')->delete($dokumen->file_path);
         }
 
@@ -117,5 +118,57 @@ class DokumenCapaianController extends Controller
 
         return redirect()->route('anggaran.dokumen.index')
             ->with('success', 'Dokumen capaian output berhasil dihapus');
+    }
+
+    public function edit(DokumenCapaian $dokumen)
+    {
+        $roList = Anggaran::select('ro')->distinct()->pluck('ro');
+        $bulanList = [
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
+        ];
+
+        return view('anggaran.dokumen.edit', compact('dokumen', 'roList', 'bulanList'));
+    }
+
+    public function update(Request $request, DokumenCapaian $dokumen)
+    {
+        $validated = $request->validate([
+            'ro' => 'required|string|max:50',
+            'sub_komponen' => 'required|string|max:255',
+            'bulan' => 'required|string',
+            'nama_dokumen' => 'required|string|max:255',
+            'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            'keterangan' => 'nullable|string',
+        ]);
+
+        // Handle file upload if new file provided
+        if ($request->hasFile('file')) {
+            // Delete old file
+            if ($dokumen->file_path && Storage::disk('public')->exists($dokumen->file_path)) {
+                Storage::disk('public')->delete($dokumen->file_path);
+            }
+
+            $file = $request->file('file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('dokumen-capaian', $filename, 'public');
+
+            $validated['file_path'] = $path;
+        }
+
+        $dokumen->update($validated);
+
+        return redirect()->route('anggaran.dokumen.index')
+            ->with('success', 'Dokumen capaian output berhasil diupdate');
     }
 }

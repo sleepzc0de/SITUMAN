@@ -25,7 +25,7 @@
             <div>
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $dokumen->nama_dokumen }}</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Upload oleh {{ $dokumen->user->nama }}
+                    Upload oleh {{ $dokumen->user ? $dokumen->user->nama : 'Unknown' }}
                 </p>
             </div>
 
@@ -71,7 +71,7 @@
             </div>
             <div class="flex justify-between py-2">
                 <span class="text-gray-600 dark:text-gray-400">Upload Oleh</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $dokumen->user->nama }}</span>
+                <span class="font-semibold text-gray-900 dark:text-white">{{ $dokumen->user ? $dokumen->user->nama : 'Unknown' }}</span>
             </div>
             <div class="flex justify-between py-2">
                 <span class="text-gray-600 dark:text-gray-400">Tanggal Upload</span>

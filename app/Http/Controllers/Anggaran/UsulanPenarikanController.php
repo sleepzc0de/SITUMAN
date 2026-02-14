@@ -31,11 +31,33 @@ class UsulanPenarikanController extends Controller
     {
         $roList = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.usulan.create', compact('roList', 'bulanList'));
+    }
+
+    // Tambahkan method baru untuk AJAX
+    public function getSubkomponen(Request $request)
+    {
+        $subkomponens = Anggaran::where('ro', $request->ro)
+            ->whereNotNull('kode_subkomponen')
+            ->whereNull('kode_akun')
+            ->distinct()
+            ->get(['kode_subkomponen', 'program_kegiatan']);
+
+        return response()->json($subkomponens);
     }
 
     public function store(Request $request)
@@ -71,8 +93,18 @@ class UsulanPenarikanController extends Controller
 
         $roList = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.usulan.edit', compact('usulan', 'roList', 'bulanList'));

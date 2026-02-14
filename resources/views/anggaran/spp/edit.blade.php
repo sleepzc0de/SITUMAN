@@ -318,8 +318,10 @@
 
                     <div class="input-group">
                         <label class="input-label">PPN</label>
-                        <input type="number" name="ppn" id="ppn" value="{{ old('ppn', $spp->ppn) }}"
-                            class="input-field @error('ppn') border-red-500 @enderror" placeholder="0" step="0.01">
+                        <input type="number" id="ppn_percent"
+                            class="input-field @error('ppn') border-red-500 @enderror" placeholder="0" step="0.01"
+                            min="0" max="100"
+                            value="{{ old('ppn_percent', $spp->bruto > 0 ? ($spp->ppn / $spp->bruto) * 100 : 0) }}">
                         @error('ppn')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
@@ -327,8 +329,10 @@
 
                     <div class="input-group">
                         <label class="input-label">PPh</label>
-                        <input type="number" name="pph" id="pph" value="{{ old('pph', $spp->pph) }}"
-                            class="input-field @error('pph') border-red-500 @enderror" placeholder="0" step="0.01">
+                        <input type="number" id="pph_percent"
+                            class="input-field @error('pph') border-red-500 @enderror" placeholder="0" step="0.01"
+                            min="0" max="100"
+                            value="{{ old('pph_percent', $spp->bruto > 0 ? ($spp->pph / $spp->bruto) * 100 : 0) }}">
                         @error('pph')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
@@ -470,10 +474,19 @@
                 const roSelect = document.getElementById('ro');
                 const subKomponenSelect = document.getElementById('sub_komponen');
                 const makSelect = document.getElementById('mak');
-                const brutoInput = document.getElementById('bruto');
-                const ppnInput = document.getElementById('ppn');
-                const pphInput = document.getElementById('pph');
-                const nettoInput = document.getElementById('netto');
+
+                // Nilai & Pajak elements
+                const brutoDisplay = document.getElementById('bruto_display');
+                const brutoHidden = document.getElementById('bruto');
+                const ppnPercent = document.getElementById('ppn_percent');
+                const ppnHidden = document.getElementById('ppn');
+                const ppnDisplay = document.getElementById('ppn_display');
+                const pphPercent = document.getElementById('pph_percent');
+                const pphHidden = document.getElementById('pph');
+                const pphDisplay = document.getElementById('pph_display');
+                const nettoDisplay = document.getElementById('netto_display');
+                const nettoHidden = document.getElementById('netto');
+
                 const statusSelect = document.getElementById('status');
                 const sp2dFields = document.getElementById('sp2d_fields');
                 const tglSp2dFields = document.getElementById('tgl_sp2d_fields');
@@ -482,36 +495,22 @@
                 // Load sub komponen when RO changes
                 roSelect.addEventListener('change', function() {
                     const ro = this.value;
-                    const currentSubkomp = '{{ old('sub_komponen', $spp->sub_komponen) }}';
-
                     subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
                     makSelect.innerHTML = '<option value="">Pilih MAK</option>';
 
                     if (ro) {
-                        fetch(`{{ route('anggaran.ajax.get-subkomponen') }}?ro=${ro}`)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error('Network response was not ok');
-                                }
-                                return response.json();
-                            })
+                        fetch(`/anggaran/ajax/get-subkomponen?ro=${ro}`)
+                            .then(response => response.json())
                             .then(data => {
                                 data.forEach(item => {
                                     const option = document.createElement('option');
                                     option.value = item.kode_subkomponen;
                                     option.textContent =
                                         `${item.kode_subkomponen} - ${item.program_kegiatan}`;
-                                    if (item.kode_subkomponen === currentSubkomp) {
-                                        option.selected = true;
-                                    }
                                     subKomponenSelect.appendChild(option);
                                 });
-
-                                // Trigger change to load MAK if subkomponen is selected
-                                if (currentSubkomp) {
-                                    subKomponenSelect.dispatchEvent(new Event('change'));
-                                }
-                            }).catch(error => {
+                            })
+                            .catch(error => {
                                 console.error('Error:', error);
                                 alert('Gagal memuat data sub komponen');
                             });
@@ -522,12 +521,10 @@
                 subKomponenSelect.addEventListener('change', function() {
                     const ro = roSelect.value;
                     const subkomponen = this.value;
-                    const currentMak = '{{ old('mak', $spp->mak) }}';
-
                     makSelect.innerHTML = '<option value="">Pilih MAK</option>';
 
                     if (ro && subkomponen) {
-                        fetch(`{{ route('anggaran.ajax.get-akun') }}?ro=${ro}&subkomponen=${subkomponen}`)
+                        fetch(`/anggaran/ajax/get-akun?ro=${ro}&subkomponen=${subkomponen}`)
                             .then(response => response.json())
                             .then(data => {
                                 data.forEach(item => {
@@ -537,11 +534,12 @@
                                         `${item.kode_akun} - ${item.program_kegiatan}`;
                                     option.dataset.kegiatan = item.kode_kegiatan;
                                     option.dataset.kro = item.kro;
-                                    if (item.kode_akun === currentMak) {
-                                        option.selected = true;
-                                    }
                                     makSelect.appendChild(option);
                                 });
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Gagal memuat data akun');
                             });
                     }
                 });
@@ -551,23 +549,62 @@
                     const selectedOption = this.options[this.selectedIndex];
                     if (selectedOption.dataset.kegiatan) {
                         document.querySelector('[name="kode_kegiatan"]').value = selectedOption.dataset
-                            .kegiatan;
+                        .kegiatan;
                         document.querySelector('[name="kro"]').value = selectedOption.dataset.kro;
                     }
                 });
 
-                // Calculate netto automatically
-                function calculateNetto() {
-                    const bruto = parseFloat(brutoInput.value) || 0;
-                    const ppn = parseFloat(ppnInput.value) || 0;
-                    const pph = parseFloat(pphInput.value) || 0;
-                    const netto = bruto - ppn - pph;
-                    nettoInput.value = netto.toFixed(2);
+                // Format number with thousand separator
+                function formatRupiah(angka) {
+                    return new Intl.NumberFormat('id-ID').format(angka);
                 }
 
-                brutoInput.addEventListener('input', calculateNetto);
-                ppnInput.addEventListener('input', calculateNetto);
-                pphInput.addEventListener('input', calculateNetto);
+                // Remove thousand separator
+                function unformatRupiah(rupiah) {
+                    return parseFloat(rupiah.replace(/[^0-9]/g, '')) || 0;
+                }
+
+                // Handle bruto input with thousand separator
+                brutoDisplay.addEventListener('input', function(e) {
+                    let value = unformatRupiah(this.value);
+                    brutoHidden.value = value;
+                    this.value = formatRupiah(value);
+                    calculateNetto();
+                });
+
+                // Handle PPN percentage input
+                ppnPercent.addEventListener('input', function() {
+                    calculateNetto();
+                });
+
+                // Handle PPh percentage input
+                pphPercent.addEventListener('input', function() {
+                    calculateNetto();
+                });
+
+                // Calculate netto automatically
+                function calculateNetto() {
+                    const bruto = parseFloat(brutoHidden.value) || 0;
+                    const ppnPercentValue = parseFloat(ppnPercent.value) || 0;
+                    const pphPercentValue = parseFloat(pphPercent.value) || 0;
+
+                    // Calculate PPN and PPh values
+                    const ppnValue = (bruto * ppnPercentValue) / 100;
+                    const pphValue = (bruto * pphPercentValue) / 100;
+
+                    // Calculate netto
+                    const netto = bruto - ppnValue - pphValue;
+
+                    // Update hidden fields
+                    ppnHidden.value = ppnValue.toFixed(2);
+                    pphHidden.value = pphValue.toFixed(2);
+                    nettoHidden.value = netto.toFixed(2);
+
+                    // Update displays
+                    ppnDisplay.textContent = 'Rp ' + formatRupiah(ppnValue.toFixed(0));
+                    pphDisplay.textContent = 'Rp ' + formatRupiah(pphValue.toFixed(0));
+                    nettoDisplay.value = formatRupiah(netto.toFixed(0));
+                }
 
                 // Show/hide SP2D fields based on status
                 statusSelect.addEventListener('change', function() {
@@ -581,6 +618,13 @@
                         tglSelesaiFields.style.display = 'none';
                     }
                 });
+
+                // Trigger on page load
+                if (statusSelect.value === 'Tagihan Telah SP2D') {
+                    sp2dFields.style.display = 'block';
+                    tglSp2dFields.style.display = 'block';
+                    tglSelesaiFields.style.display = 'block';
+                }
             });
         </script>
     @endpush
