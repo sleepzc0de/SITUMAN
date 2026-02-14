@@ -27,8 +27,18 @@ class DokumenCapaianController extends Controller
 
         $roList = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.dokumen.index', compact('dokumens', 'roList', 'bulanList'));
@@ -38,8 +48,18 @@ class DokumenCapaianController extends Controller
     {
         $roList = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.dokumen.create', compact('roList', 'bulanList'));
@@ -48,11 +68,11 @@ class DokumenCapaianController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'ro' => 'required|string',
-            'sub_komponen' => 'required|string',
-            'bulan' => 'required|string',
+            'ro' => 'required|string|max:50',
+            'sub_komponen' => 'required|string|max:255',
+            'bulan' => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
             'nama_dokumen' => 'required|string|max:255',
-            'file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            'file' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240', // 10MB
             'keterangan' => 'nullable|string',
         ]);
 

@@ -344,6 +344,10 @@ window.addEventListener('scroll', () => isScrolled = window.scrollY > 20);" :cla
                         </button>
 
                         <div x-show="open" x-collapse class="ml-8 space-y-1">
+                            <a href="{{ route('anggaran.data.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('anggaran.data.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Kelola Data Anggaran
+                            </a>
                             <a href="{{ route('anggaran.monitoring.index') }}"
                                 class="block px-4 py-2 text-sm {{ request()->routeIs('anggaran.monitoring.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
                                 Monitoring Anggaran

@@ -44,10 +44,15 @@ return new class extends Migration
             $table->string('status', 50);
             $table->string('coa', 100);
             $table->string('posisi_uang', 255)->nullable();
-
+            $table->softDeletes();
             $table->timestamps();
 
-            $table->index(['coa', 'bulan', 'status']);
+            // Tambahkan index
+            $table->index(['coa']);
+            $table->index(['bulan']);
+            $table->index(['status']);
+            $table->index(['ro']);
+            $table->index(['created_at']);
         });
     }
 

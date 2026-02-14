@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SPP extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'spp';
 
     protected $fillable = [
@@ -30,6 +33,9 @@ class SPP extends Model
         'pph' => 'decimal:2',
         'netto' => 'decimal:2',
     ];
+
+    protected $dates = ['deleted_at'];
+
 
     protected static function boot()
     {

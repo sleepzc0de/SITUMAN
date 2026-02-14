@@ -47,19 +47,21 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::get('mutasi/{pegawai}', [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
     });
 
-    // Anggaran Routes
-    Route::prefix('anggaran')->name('anggaran.')->group(function () {
+    // Di dalam group anggaran
+    Route::prefix('anggaran')->name('anggaran.')->middleware(['auth', 'has.role'])->group(function () {
 
         // Monitoring Anggaran
-        Route::get('monitoring', [MonitoringAnggaranController::class, 'index'])
+        Route::get('monitoring', [App\Http\Controllers\Anggaran\MonitoringAnggaranController::class, 'index'])
             ->name('monitoring.index');
 
         // SPP Management
-        Route::resource('spp', SPPController::class);
-        Route::get('spp/get-subkomponen', [SPPController::class, 'getSubkomponen'])
-            ->name('spp.get-subkomponen');
-        Route::get('spp/get-akun', [SPPController::class, 'getAkun'])
-            ->name('spp.get-akun');
+        Route::resource('spp', App\Http\Controllers\Anggaran\SPPController::class);
+
+        // AJAX routes untuk SPP (Tambahkan ini)
+        Route::get('ajax/get-subkomponen', [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
+            ->name('ajax.get-subkomponen');
+        Route::get('ajax/get-akun', [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
+            ->name('ajax.get-akun');
 
         // Usulan Penarikan Dana
         Route::resource('usulan', App\Http\Controllers\Anggaran\UsulanPenarikanController::class);
@@ -79,6 +81,15 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::resource('revisi', App\Http\Controllers\Anggaran\RevisiAnggaranController::class);
         Route::get('revisi/{revisi}/download-dokumen', [App\Http\Controllers\Anggaran\RevisiAnggaranController::class, 'downloadDokumen'])
             ->name('revisi.download-dokumen');
+
+        // Data Anggaran Management
+        Route::resource('data', App\Http\Controllers\Anggaran\DataAnggaranController::class);
+        Route::get('data-import', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'importForm'])
+            ->name('data.import-form');
+        Route::post('data-import', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'import'])
+            ->name('data.import');
+        Route::get('data-export', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'export'])
+            ->name('data.export');
     });
 
     // User Management (Admin & Superadmin only)
