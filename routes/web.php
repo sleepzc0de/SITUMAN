@@ -76,7 +76,10 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::resource('dokumen', App\Http\Controllers\Anggaran\DokumenCapaianController::class);
         Route::get('dokumen/ajax/subkomponen', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen'])
             ->name('dokumen.ajax.subkomponen');
-        Route::get('dokumen/{dokumen}/download', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'download'])->name('dokumen.download');
+        Route::get('dokumen/{dokumen}/download', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'download'])
+            ->name('dokumen.download');
+        Route::get('dokumen/{dokumen}/download/{file}', [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'downloadSingle'])
+            ->name('dokumen.download-single');
 
         // Revisi Anggaran
         Route::resource('revisi', App\Http\Controllers\Anggaran\RevisiAnggaranController::class);

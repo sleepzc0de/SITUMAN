@@ -44,9 +44,9 @@
 
                 <div class="input-group">
                     <label class="input-label">Sub Komponen <span class="text-red-500">*</span></label>
-                    <input type="text" name="sub_komponen" value="{{ old('sub_komponen', $dokumen->sub_komponen) }}"
-                           class="input-field @error('sub_komponen') border-red-500 @enderror"
-                           placeholder="Kode atau nama sub komponen" required>
+                    <select name="sub_komponen" id="sub_komponen" class="input-field @error('sub_komponen') border-red-500 @enderror" required>
+                        <option value="">Pilih Sub Komponen</option>
+                    </select>
                     @error('sub_komponen')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
@@ -78,26 +78,70 @@
                 </div>
 
                 <div class="input-group md:col-span-2">
-                    <label class="input-label">File Dokumen (Kosongkan jika tidak ingin mengganti)</label>
-                    <input type="file" name="file"
-                           class="input-field @error('file') border-red-500 @enderror"
-                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
-                    <p class="text-xs text-gray-500 mt-1">File saat ini: {{ basename($dokumen->file_path) }}</p>
-                    <p class="text-xs text-gray-500">Format: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (Max: 10MB)</p>
-                    @error('file')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div class="input-group md:col-span-2">
                     <label class="input-label">Keterangan</label>
-                    <textarea name="keterangan" rows="4"
-                              class="input-field @error('keterangan') border-red-500 @enderror"
+                    <textarea name="keterangan" rows="4" class="input-field @error('keterangan') border-red-500 @enderror"
                               placeholder="Keterangan dokumen">{{ old('keterangan', $dokumen->keterangan) }}</textarea>
                     @error('keterangan')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
                 </div>
+            </div>
+        </div>
+
+        <!-- Existing Files -->
+        @php
+            $existingFiles = $dokumen->getAllFiles();
+        @endphp
+
+        @if(count($existingFiles) > 0)
+        <div class="card">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">File yang Sudah Ada ({{ count($existingFiles) }})</h3>
+
+            <div class="space-y-2">
+                @foreach($existingFiles as $index => $file)
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-navy-800 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" name="remove_files[]" value="{{ $index }}"
+                               class="w-4 h-4 text-red-600 rounded">
+                        <svg class="w-5 h-5 {{ file_icon_class($file['path']) }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-sm text-gray-900 dark:text-white">{{ $file['name'] }}</span>
+                    </div>
+                    <a href="{{ route('anggaran.dokumen.download-single', [$dokumen->id, $index]) }}"
+                       class="text-green-600 hover:text-green-800">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </a>
+                </div>
+                @endforeach
+            </div>
+            <p class="text-xs text-red-500 mt-2">
+                <strong>Centang file yang ingin dihapus</strong>
+            </p>
+        </div>
+        @endif
+
+        <!-- Upload New Files -->
+        <div class="card">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Tambah File Baru (Opsional)</h3>
+
+            <div class="input-group">
+                <label class="input-label">Upload File Baru</label>
+                <input type="file" name="files[]"
+                       class="input-field @error('files.*') border-red-500 @enderror"
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                       multiple
+                       id="file-input">
+                <p class="text-xs text-gray-500 mt-1">
+                    Format: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (Max: 10MB per file)
+                </p>
+                @error('files.*')
+                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                @enderror
+
+                <div id="file-preview" class="mt-3 space-y-2"></div>
             </div>
         </div>
 
@@ -120,11 +164,13 @@
         </div>
     </form>
 </div>
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const roSelect = document.getElementById('ro');
     const subKomponenSelect = document.getElementById('sub_komponen');
+    const currentSubkomp = '{{ old('sub_komponen', $dokumen->sub_komponen) }}';
 
     roSelect.addEventListener('change', function() {
         const ro = this.value;
@@ -133,25 +179,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ro) {
             subKomponenSelect.innerHTML = '<option value="">Loading...</option>';
 
-            fetch(`{{ route('anggaran.dokumen.ajax.get-subkomponen') }}?ro=${ro}`)
+            fetch(`{{ route('anggaran.dokumen.ajax.subkomponen') }}?ro=${ro}`)
                 .then(response => response.json())
                 .then(data => {
                     subKomponenSelect.innerHTML = '<option value="">Pilih Sub Komponen</option>';
-
-                    if (data.error) {
-                        console.error('Error:', data.error);
-                        return;
-                    }
-
-                    if (data.length === 0) {
-                        subKomponenSelect.innerHTML = '<option value="">Tidak ada sub komponen</option>';
-                        return;
-                    }
 
                     data.forEach(item => {
                         const option = document.createElement('option');
                         option.value = item.kode_subkomponen;
                         option.textContent = `${item.kode_subkomponen} - ${item.program_kegiatan}`;
+                        if (item.kode_subkomponen === currentSubkomp) {
+                            option.selected = true;
+                        }
                         subKomponenSelect.appendChild(option);
                     });
                 })
@@ -159,6 +198,37 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Error:', error);
                     subKomponenSelect.innerHTML = '<option value="">Error loading data</option>';
                 });
+        }
+    });
+
+    // Trigger on load
+    if (roSelect.value) {
+        roSelect.dispatchEvent(new Event('change'));
+    }
+
+    // File preview
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const preview = document.getElementById('file-preview');
+        preview.innerHTML = '';
+
+        if (this.files.length > 0) {
+            const title = document.createElement('p');
+            title.className = 'text-sm font-semibold text-gray-700 dark:text-gray-300';
+            title.textContent = `${this.files.length} file baru dipilih:`;
+            preview.appendChild(title);
+
+            Array.from(this.files).forEach((file, index) => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-200 dark:border-blue-700';
+                fileDiv.innerHTML = `
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                    <span class="text-blue-900 dark:text-blue-300">${file.name}</span>
+                    <span class="text-xs text-blue-600">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                `;
+                preview.appendChild(fileDiv);
+            });
         }
     });
 });

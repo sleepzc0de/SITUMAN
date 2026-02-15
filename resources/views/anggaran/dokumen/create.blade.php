@@ -81,14 +81,50 @@
 
                     <div class="input-group md:col-span-2">
                         <label class="input-label">File Dokumen <span class="text-red-500">*</span></label>
-                        <input type="file" name="file" class="input-field @error('file') border-red-500 @enderror"
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" required>
-                        <p class="text-xs text-gray-500 mt-1">Format: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (Max: 10MB)
+                        <input type="file" name="files[]" class="input-field @error('files.*') border-red-500 @enderror"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" multiple required id="file-input">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Format: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG (Max: 10MB per file)
+                            <br>
+                            <strong>Anda dapat memilih beberapa file sekaligus (multiple files)</strong>
                         </p>
-                        @error('file')
+                        @error('files.*')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
+
+                        <!-- Preview selected files -->
+                        <div id="file-preview" class="mt-3 space-y-2"></div>
                     </div>
+                    @push('scripts')
+                        <script>
+                            document.getElementById('file-input').addEventListener('change', function(e) {
+                                const preview = document.getElementById('file-preview');
+                                preview.innerHTML = '';
+
+                                if (this.files.length > 0) {
+                                    const title = document.createElement('p');
+                                    title.className = 'text-sm font-semibold text-gray-700 dark:text-gray-300';
+                                    title.textContent = `${this.files.length} file dipilih:`;
+                                    preview.appendChild(title);
+
+                                    Array.from(this.files).forEach((file, index) => {
+                                        const fileDiv = document.createElement('div');
+                                        fileDiv.className =
+                                            'flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-navy-800 p-2 rounded';
+                                        fileDiv.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+                <span>${file.name}</span>
+                <span class="text-xs text-gray-500">(${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+            `;
+                                        preview.appendChild(fileDiv);
+                                    });
+                                }
+                            });
+                        </script>
+                    @endpush
+
 
                     <div class="input-group md:col-span-2">
                         <label class="input-label">Keterangan</label>
@@ -141,7 +177,7 @@
                             .then(response => response.json())
                             .then(data => {
                                 subKomponenSelect.innerHTML =
-                                '<option value="">Pilih Sub Komponen</option>';
+                                    '<option value="">Pilih Sub Komponen</option>';
 
                                 if (data.error) {
                                     console.error('Error:', data.error);
@@ -165,7 +201,7 @@
                             .catch(error => {
                                 console.error('Error:', error);
                                 subKomponenSelect.innerHTML =
-                                '<option value="">Error loading data</option>';
+                                    '<option value="">Error loading data</option>';
                             });
                     }
                 });
