@@ -8,6 +8,7 @@ use App\Models\Anggaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class DokumenCapaianController extends Controller
 {
@@ -97,34 +98,75 @@ class DokumenCapaianController extends Controller
         return view('anggaran.dokumen.show', compact('dokumen'));
     }
 
+    // ✅ PERBAIKAN: Method download yang benar
     public function download(DokumenCapaian $dokumen)
     {
-        if (!Storage::disk('public')->exists($dokumen->file_path)) {
+        try {
+            // Cek apakah file_path ada
+            if (!$dokumen->file_path) {
+                Log::error('File path kosong untuk dokumen ID: ' . $dokumen->id);
+                return redirect()->route('anggaran.dokumen.index')
+                    ->with('error', 'File path tidak ditemukan');
+            }
+
+            // Cek apakah file exists di storage
+            if (!Storage::disk('public')->exists($dokumen->file_path)) {
+                Log::error('File tidak ditemukan di storage: ' . $dokumen->file_path);
+                return redirect()->route('anggaran.dokumen.index')
+                    ->with('error', 'File tidak ditemukan di server');
+            }
+
+            // Get file path lengkap
+            $filePath = Storage::disk('public')->path($dokumen->file_path);
+
+            // Get extension
+            $extension = pathinfo($dokumen->file_path, PATHINFO_EXTENSION);
+
+            // Buat nama file yang akan didownload (gunakan nama dokumen + extension)
+            $downloadName = $dokumen->nama_dokumen . '.' . $extension;
+
+            // Download file
+            return response()->download($filePath, $downloadName);
+
+        } catch (\Exception $e) {
+            Log::error('Error downloading dokumen: ' . $e->getMessage(), [
+                'dokumen_id' => $dokumen->id,
+                'file_path' => $dokumen->file_path ?? 'null'
+            ]);
+
             return redirect()->route('anggaran.dokumen.index')
-                ->with('error', 'File tidak ditemukan');
+                ->with('error', 'Gagal mendownload file: ' . $e->getMessage());
         }
-
-        return Storage::disk('public')->download($dokumen->file_path, $dokumen->nama_dokumen);
     }
 
-   public function destroy(DokumenCapaian $dokumen)
-{
-    try {
-        // Check if file_path exists before trying to delete
-        if ($dokumen->file_path && Storage::disk('public')->exists($dokumen->file_path)) {
-            Storage::disk('public')->delete($dokumen->file_path);
+    // ✅ PERBAIKAN: Method destroy yang benar dengan redirect
+    public function destroy(DokumenCapaian $dokumen)
+    {
+        try {
+            // Hapus file dari storage jika ada
+            if ($dokumen->file_path && Storage::disk('public')->exists($dokumen->file_path)) {
+                Storage::disk('public')->delete($dokumen->file_path);
+                Log::info('File deleted: ' . $dokumen->file_path);
+            }
+
+            // Hapus record dari database
+            $dokumen->delete();
+
+            Log::info('Dokumen capaian deleted successfully', ['id' => $dokumen->id]);
+
+            // ✅ PENTING: Redirect ke halaman pertama untuk refresh data
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('success', 'Dokumen capaian output berhasil dihapus');
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting dokumen: ' . $e->getMessage(), [
+                'dokumen_id' => $dokumen->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
         }
-
-        $dokumen->delete();
-
-        // Redirect ke halaman pertama untuk memastikan data terupdate
-        return redirect()->route('anggaran.dokumen.index')
-            ->with('success', 'Dokumen capaian output berhasil dihapus');
-    } catch (\Exception $e) {
-        \Log::error('Error deleting dokumen: ' . $e->getMessage());
-        return back()->with('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
     }
-}
 
     public function edit(DokumenCapaian $dokumen)
     {
@@ -181,15 +223,31 @@ class DokumenCapaianController extends Controller
     public function getSubkomponen(Request $request)
     {
         try {
+            Log::info('Dokumen getSubkomponen called', ['ro' => $request->ro]);
+
+            if (!$request->ro) {
+                return response()->json(['error' => 'RO harus diisi'], 400);
+            }
+
             $subkomponens = Anggaran::where('ro', $request->ro)
                 ->whereNotNull('kode_subkomponen')
+                ->where('kode_subkomponen', '!=', '')
                 ->whereNull('kode_akun')
                 ->distinct()
                 ->orderBy('kode_subkomponen')
                 ->get(['kode_subkomponen', 'program_kegiatan']);
 
+            Log::info('Dokumen getSubkomponen result', [
+                'count' => $subkomponens->count(),
+                'data' => $subkomponens->toArray()
+            ]);
+
             return response()->json($subkomponens);
         } catch (\Exception $e) {
+            Log::error('Dokumen getSubkomponen error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }

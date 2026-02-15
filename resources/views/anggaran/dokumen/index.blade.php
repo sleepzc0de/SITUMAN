@@ -140,7 +140,7 @@
                                             </svg>
                                         </a>
 
-                                        <a href="{{ route('anggaran.dokumen.download', $dokumen->id) }}"
+                                        <a href="{{ route('anggaran.dokumen.download', $dokumen) }}"
                                             class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
                                             title="Download">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,11 +151,11 @@
                                         </a>
 
                                         <form action="{{ route('anggaran.dokumen.destroy', $dokumen) }}" method="POST"
-                                            class="inline">
+                                            class="inline"
+                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus dokumen ini?')">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
-                                                onclick="return confirm('Apakah Anda yakin ingin menghapus dokumen ini?')"
                                                 class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                                                 title="Hapus">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor"
