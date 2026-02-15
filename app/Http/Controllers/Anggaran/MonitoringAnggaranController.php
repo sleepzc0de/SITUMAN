@@ -48,11 +48,24 @@ class MonitoringAnggaranController extends Controller
                 return [$item->kode_subkomponen => $item->program_kegiatan];
             });
 
-        // Calculate totals
-        $totalPagu = $anggarans->sum('pagu_anggaran');
-        $totalRealisasi = $anggarans->sum('total_penyerapan');
-        $totalSisa = $anggarans->sum('sisa');
-        $totalOutstanding = $anggarans->sum('tagihan_outstanding');
+        // PERBAIKAN: Calculate totals HANYA dari level RO (parent level)
+        // whereNull('kode_subkomponen') = Level RO
+        // whereNull('kode_akun') = Bukan level Akun
+        $roLevelQuery = Anggaran::query()
+            ->whereNull('kode_subkomponen')  // Level RO saja (parent tertinggi)
+            ->whereNull('kode_akun');         // Pastikan bukan level Akun
+
+        if ($ro !== 'all') {
+            $roLevelQuery->where('ro', $ro);
+        }
+
+        $roLevelData = $roLevelQuery->get();
+
+        // Hitung total dari level RO saja
+        $totalPagu = $roLevelData->sum('pagu_anggaran');
+        $totalRealisasi = $roLevelData->sum('total_penyerapan');
+        $totalSisa = $roLevelData->sum('sisa');
+        $totalOutstanding = $roLevelData->sum('tagihan_outstanding');
 
         return view('anggaran.monitoring.index', compact(
             'groupedData',

@@ -23,6 +23,15 @@
         @csrf
         @method('PUT')
 
+        <!-- PERBAIKAN: Hidden inputs untuk kode_subkomponen dan kode_akun -->
+        @if($data->kode_subkomponen)
+            <input type="hidden" name="kode_subkomponen" value="{{ $data->kode_subkomponen }}">
+        @endif
+
+        @if($data->kode_akun)
+            <input type="hidden" name="kode_akun" value="{{ $data->kode_akun }}">
+        @endif
+
         <!-- Informasi Kode -->
         <div class="card">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Informasi Kode</h3>
@@ -72,24 +81,20 @@
                 @if($data->kode_subkomponen)
                 <div class="input-group">
                     <label class="input-label">Kode Sub Komponen</label>
-                    <input type="text" name="kode_subkomponen" value="{{ old('kode_subkomponen', $data->kode_subkomponen) }}"
-                           class="input-field @error('kode_subkomponen') border-red-500 @enderror"
-                           placeholder="Contoh: AA, AB, AC">
-                    @error('kode_subkomponen')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
+                    <input type="text" class="input-field bg-gray-100 dark:bg-navy-700"
+                           value="{{ $data->kode_subkomponen }}"
+                           readonly>
+                    <p class="text-xs text-gray-500 mt-1">Kode sub komponen tidak dapat diubah</p>
                 </div>
                 @endif
 
                 @if($data->kode_akun)
                 <div class="input-group">
                     <label class="input-label">Kode Akun</label>
-                    <input type="text" name="kode_akun" value="{{ old('kode_akun', $data->kode_akun) }}"
-                           class="input-field @error('kode_akun') border-red-500 @enderror"
-                           placeholder="Contoh: 521211, 524111">
-                    @error('kode_akun')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
+                    <input type="text" class="input-field bg-gray-100 dark:bg-navy-700"
+                           value="{{ $data->kode_akun }}"
+                           readonly>
+                    <p class="text-xs text-gray-500 mt-1">Kode akun tidak dapat diubah</p>
                 </div>
                 @endif
             </div>
@@ -119,29 +124,44 @@
                     @enderror
                 </div>
 
+                <!-- Pagu Anggaran conditional -->
                 <div class="input-group">
-                    <label class="input-label">Pagu Anggaran <span class="text-red-500">*</span></label>
+                    <label class="input-label">Pagu Anggaran
+                        @if($data->kode_akun)
+                            <span class="text-red-500">*</span>
+                        @endif
+                    </label>
+
                     @if(!$data->kode_akun)
+                        {{-- RO atau SubKomponen: readonly --}}
                         <input type="number" class="input-field bg-gray-100 dark:bg-navy-700"
                                value="{{ old('pagu_anggaran', $data->pagu_anggaran) }}"
                                placeholder="0" step="0.01" readonly>
-                        <p class="text-xs text-gray-500 mt-1">
-                            Pagu otomatis dihitung dari child items. Edit pagu pada level Akun (Detail).
+                        <p class="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                            <strong>Pagu dihitung otomatis dari child items.</strong>
+                            @if(!$data->kode_subkomponen)
+                                Edit pagu pada level Sub Komponen atau Akun di bawahnya.
+                            @else
+                                Edit pagu pada level Akun di bawahnya.
+                            @endif
                         </p>
-                        <input type="hidden" name="pagu_anggaran" value="{{ $data->pagu_anggaran }}">
                     @else
+                        {{-- Level Akun: editable --}}
                         <input type="number" name="pagu_anggaran" value="{{ old('pagu_anggaran', $data->pagu_anggaran) }}"
                                class="input-field @error('pagu_anggaran') border-red-500 @enderror"
                                placeholder="0" step="0.01" required>
                         @error('pagu_anggaran')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
+                        <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                            <strong>Input pagu anggaran untuk akun ini</strong>
+                        </p>
                     @endif
                 </div>
             </div>
         </div>
 
-        <!-- Info Warning -->
+        <!-- Info Warning jika ada realisasi -->
         @if($data->total_penyerapan > 0 || $data->tagihan_outstanding > 0)
         <div class="card bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700">
             <div class="flex items-start gap-3">

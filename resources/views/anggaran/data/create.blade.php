@@ -72,7 +72,7 @@
                     <p class="text-xs text-gray-500 mt-1">Tentukan level hierarki item anggaran</p>
                 </div>
 
-                <!-- Sub Komponen - DIPERBAIKI: Sekarang Dropdown -->
+                <!-- Sub Komponen -->
                 <div class="input-group" id="subkomponen_group" style="display: none;">
                     <label class="input-label">Kode Sub Komponen <span class="text-red-500">*</span></label>
 
@@ -136,11 +136,15 @@
                     @enderror
                 </div>
 
-                <div class="input-group">
-                    <label class="input-label">Pagu Anggaran <span class="text-red-500">*</span></label>
-                    <input type="number" name="pagu_anggaran" value="{{ old('pagu_anggaran') }}"
+                <!-- PERBAIKAN: Pagu Anggaran dengan dynamic requirement -->
+                <div class="input-group" id="pagu_group">
+                    <label class="input-label">Pagu Anggaran <span class="text-red-500" id="pagu_required">*</span></label>
+                    <input type="number" name="pagu_anggaran" id="pagu_anggaran" value="{{ old('pagu_anggaran') }}"
                            class="input-field @error('pagu_anggaran') border-red-500 @enderror"
-                           placeholder="0" step="0.01" required>
+                           placeholder="0" step="0.01">
+                    <p class="text-xs text-gray-500 mt-1" id="pagu_hint">
+                        Masukkan pagu anggaran
+                    </p>
                     @error('pagu_anggaran')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                     @enderror
@@ -157,10 +161,11 @@
                 <div>
                     <h4 class="font-semibold text-blue-900 dark:text-blue-300 mb-2">Panduan Input Data Anggaran</h4>
                     <ul class="text-sm text-blue-800 dark:text-blue-400 space-y-1">
-                        <li>• <strong>RO (Parent):</strong> Item tingkat tertinggi, hanya isi Kode Kegiatan, KRO, dan RO</li>
-                        <li>• <strong>Sub Komponen:</strong> Item di bawah RO, ketik manual Kode Sub Komponen (2 karakter, contoh: AA, AB)</li>
-                        <li>• <strong>Akun (Detail):</strong> Item detail, pilih Sub Komponen dari dropdown lalu isi Kode Akun</li>
-                        <li>• Pagu pada RO dan Sub Komponen akan otomatis dihitung dari child items</li>
+                        <li>• <strong>RO (Parent):</strong> Item tingkat tertinggi, pagu dihitung otomatis dari Sub Komponen</li>
+                        <li>• <strong>Sub Komponen:</strong> Item di bawah RO, pagu dihitung otomatis dari Akun</li>
+                        <li>• <strong>Akun (Detail):</strong> Item detail, <span class="font-bold text-orange-600 dark:text-orange-400">HANYA di level ini Anda input pagu anggaran</span></li>
+                        <li>• <strong>Hierarki:</strong> RO → Sub Komponen → Akun</li>
+                        <li>• <strong>Input Pagu:</strong> Hanya di level <strong>Akun</strong>, level RO & Sub Komponen otomatis</li>
                         <li>• Pastikan urutan input: RO → Sub Komponen → Akun</li>
                     </ul>
                 </div>
@@ -203,6 +208,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const akunInput = document.getElementById('kode_akun');
 
+    // PERBAIKAN: Pagu anggaran elements
+    const paguAnggaran = document.getElementById('pagu_anggaran');
+    const paguRequired = document.getElementById('pagu_required');
+    const paguHint = document.getElementById('pagu_hint');
+
     // ========================================
     // Handle Level Selection Change
     // ========================================
@@ -220,28 +230,61 @@ document.addEventListener('DOMContentLoaded', function() {
         subkomponenInput.removeAttribute('required');
         akunInput.removeAttribute('required');
 
-        if (level === 'subkomponen') {
-            // Level Sub Komponen: tampilkan input manual
+        // PERBAIKAN: Handle pagu anggaran berdasarkan level
+        if (level === 'ro') {
+            // Level RO: disable input pagu
+            paguAnggaran.setAttribute('readonly', 'readonly');
+            paguAnggaran.removeAttribute('required');
+            paguAnggaran.classList.add('bg-gray-100', 'dark:bg-navy-700');
+            paguAnggaran.value = '';
+            paguRequired.style.display = 'none';
+            paguHint.innerHTML = '<span class="text-orange-600 dark:text-orange-400"><strong>Pagu dihitung otomatis</strong> dari Sub Komponen di bawahnya</span>';
+            paguHint.className = 'text-xs mt-1';
+
+        } else if (level === 'subkomponen') {
+            // Level Sub Komponen: disable input pagu, tampilkan input manual
             subkomponenGroup.style.display = 'block';
             subkomponenInput.style.display = 'block';
             subkomponenInput.setAttribute('required', 'required');
             subkompHint.textContent = 'Ketik kode sub komponen baru (2 karakter, contoh: AA, AB, CC)';
 
+            paguAnggaran.setAttribute('readonly', 'readonly');
+            paguAnggaran.removeAttribute('required');
+            paguAnggaran.classList.add('bg-gray-100', 'dark:bg-navy-700');
+            paguAnggaran.value = '';
+            paguRequired.style.display = 'none';
+            paguHint.innerHTML = '<span class="text-orange-600 dark:text-orange-400"><strong>Pagu dihitung otomatis</strong> dari Akun di bawahnya</span>';
+            paguHint.className = 'text-xs mt-1';
+
         } else if (level === 'akun') {
-            // Level Akun: tampilkan dropdown sub komponen
+            // Level Akun: enable input pagu, tampilkan dropdown sub komponen
             subkomponenGroup.style.display = 'block';
             akunGroup.style.display = 'block';
             akunInput.setAttribute('required', 'required');
 
+            paguAnggaran.removeAttribute('readonly');
+            paguAnggaran.setAttribute('required', 'required');
+            paguAnggaran.classList.remove('bg-gray-100', 'dark:bg-navy-700');
+            paguRequired.style.display = 'inline';
+            paguHint.innerHTML = '<span class="text-green-600 dark:text-green-400"><strong>Input pagu anggaran untuk akun ini</strong></span>';
+            paguHint.className = 'text-xs mt-1';
+
             if (ro) {
-                // Jika RO sudah dipilih, load sub komponen
                 loadSubkomponen(ro);
             } else {
-                // Jika RO belum dipilih, tampilkan peringatan
                 subkomponenSelect.innerHTML = '<option value="">Pilih RO terlebih dahulu</option>';
                 subkomponenSelect.style.display = 'block';
                 subkompHint.textContent = 'Pilih RO terlebih dahulu untuk melihat daftar Sub Komponen';
             }
+        } else {
+            // Reset pagu jika level kosong
+            paguAnggaran.removeAttribute('readonly');
+            paguAnggaran.removeAttribute('required');
+            paguAnggaran.classList.remove('bg-gray-100', 'dark:bg-navy-700');
+            paguAnggaran.value = '';
+            paguRequired.style.display = 'none';
+            paguHint.innerHTML = 'Masukkan pagu anggaran';
+            paguHint.className = 'text-xs text-gray-500 mt-1';
         }
     });
 
@@ -252,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const ro = this.value;
         const level = levelSelect.value;
 
-        // Jika level = akun dan RO dipilih, load sub komponen
         if (level === 'akun' && ro) {
             loadSubkomponen(ro);
         }
@@ -289,7 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                // Populate dropdown
                 data.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.kode_subkomponen;
@@ -316,7 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     subkomponenInput.addEventListener('input', function() {
         subkomponenFinal.value = this.value.toUpperCase();
-        this.value = this.value.toUpperCase(); // Auto uppercase
+        this.value = this.value.toUpperCase();
     });
 
     // ========================================
@@ -325,16 +366,27 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('form').addEventListener('submit', function(e) {
         const level = levelSelect.value;
 
+        if (!level) {
+            e.preventDefault();
+            alert('Pilih Level Item terlebih dahulu!');
+            levelSelect.focus();
+            return false;
+        }
+
         if (level === 'akun') {
-            // Untuk level akun, pastikan sub komponen dipilih
             if (!subkomponenFinal.value) {
                 e.preventDefault();
                 alert('Pilih Sub Komponen terlebih dahulu!');
                 subkomponenSelect.focus();
                 return false;
             }
+            if (!paguAnggaran.value) {
+                e.preventDefault();
+                alert('Masukkan Pagu Anggaran untuk level Akun!');
+                paguAnggaran.focus();
+                return false;
+            }
         } else if (level === 'subkomponen') {
-            // Untuk level subkomponen, pastikan input manual terisi
             if (!subkomponenInput.value) {
                 e.preventDefault();
                 alert('Masukkan Kode Sub Komponen!');

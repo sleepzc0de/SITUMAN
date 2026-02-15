@@ -72,7 +72,7 @@ class DataAnggaranController extends Controller
             'kode_akun' => 'nullable|string|max:50',
             'program_kegiatan' => 'required|string',
             'pic' => 'required|string|max:100',
-            'pagu_anggaran' => 'required|numeric|min:0',
+            'pagu_anggaran' => $request->kode_akun ? 'required|numeric|min:0' : 'nullable',
         ]);
 
         DB::beginTransaction();
@@ -84,15 +84,20 @@ class DataAnggaranController extends Controller
             $validated['ref_output'] = $baseRef;
             $validated['len'] = strlen($baseRef);
 
-            if ($validated['kode_subkomponen']) {
+            if (!empty($validated['kode_subkomponen'])) {
                 $validated['referensi'] .= $validated['kode_subkomponen'];
                 $validated['referensi2'] = $baseRef . $validated['kode_subkomponen'];
                 $validated['len'] = strlen($validated['referensi2']);
             }
 
-            if ($validated['kode_akun']) {
+            if (!empty($validated['kode_akun'])) {
                 $validated['referensi'] .= $validated['kode_akun'];
                 $validated['len'] = strlen($validated['referensi']);
+            }
+
+            // Set pagu anggaran
+            if (empty($validated['kode_akun'])) {
+                $validated['pagu_anggaran'] = 0;
             }
 
             // Set initial values
@@ -101,29 +106,17 @@ class DataAnggaranController extends Controller
             $validated['tagihan_outstanding'] = 0;
 
             // Set bulan to 0
-            foreach (
-                [
-                    'januari',
-                    'februari',
-                    'maret',
-                    'april',
-                    'mei',
-                    'juni',
-                    'juli',
-                    'agustus',
-                    'september',
-                    'oktober',
-                    'november',
-                    'desember'
-                ] as $bulan
-            ) {
+            foreach ([
+                'januari', 'februari', 'maret', 'april', 'mei', 'juni',
+                'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            ] as $bulan) {
                 $validated[$bulan] = 0;
             }
 
             $anggaran = Anggaran::create($validated);
 
-            // Update parent totals if this is a child item
-            if ($validated['kode_akun']) {
+            // Update parent totals if this is a child item (level Akun)
+            if (!empty($validated['kode_akun'])) {
                 $this->updateParentTotals($anggaran);
             }
 
@@ -176,47 +169,79 @@ class DataAnggaranController extends Controller
 
     public function update(Request $request, Anggaran $data)
     {
-        $validated = $request->validate([
+        // PERBAIKAN: Validation rules yang dinamis berdasarkan level yang sedang diedit
+        $rules = [
             'kegiatan' => 'required|string|max:50',
             'kro' => 'required|string|max:50',
             'ro' => 'required|string|max:50',
-            'kode_subkomponen' => 'nullable|string|max:50',
-            'kode_akun' => 'nullable|string|max:50',
             'program_kegiatan' => 'required|string',
             'pic' => 'required|string|max:100',
-            'pagu_anggaran' => 'required|numeric|min:0',
-        ]);
+        ];
+
+        // Tambahkan rules untuk kode_subkomponen dan kode_akun hanya jika ada di data
+        if ($data->kode_subkomponen) {
+            $rules['kode_subkomponen'] = 'nullable|string|max:50';
+        }
+
+        if ($data->kode_akun) {
+            $rules['kode_akun'] = 'nullable|string|max:50';
+        }
+
+        // Pagu hanya required untuk level Akun
+        if ($data->kode_akun) {
+            $rules['pagu_anggaran'] = 'required|numeric|min:0';
+        }
+
+        $validated = $request->validate($rules);
 
         DB::beginTransaction();
         try {
-            $oldPagu = $data->pagu_anggaran;
-            $newPagu = $validated['pagu_anggaran'];
-            $selisihPagu = $newPagu - $oldPagu;
+            $selisihPagu = 0;
 
-            // Update sisa anggaran
-            $validated['sisa'] = $data->sisa + $selisihPagu;
+            // Hanya update pagu jika level Akun
+            if ($data->kode_akun) {
+                $oldPagu = $data->pagu_anggaran;
+                $newPagu = $validated['pagu_anggaran'];
+                $selisihPagu = $newPagu - $oldPagu;
 
-            // Regenerate referensi jika ada perubahan
+                // Update sisa anggaran
+                $validated['sisa'] = $data->sisa + $selisihPagu;
+            } else {
+                // Untuk RO dan SubKomponen, hapus pagu dari validated
+                unset($validated['pagu_anggaran']);
+            }
+
+            // PERBAIKAN: Ensure kode_subkomponen dan kode_akun tetap ada di validated
+            // Jika tidak ada di request, ambil dari data yang ada
+            if ($data->kode_subkomponen && !isset($validated['kode_subkomponen'])) {
+                $validated['kode_subkomponen'] = $data->kode_subkomponen;
+            }
+
+            if ($data->kode_akun && !isset($validated['kode_akun'])) {
+                $validated['kode_akun'] = $data->kode_akun;
+            }
+
+            // Regenerate referensi
             $baseRef = $validated['kegiatan'] . $validated['kro'] . $validated['ro'];
             $validated['referensi'] = $baseRef;
             $validated['referensi2'] = $baseRef;
             $validated['ref_output'] = $baseRef;
             $validated['len'] = strlen($baseRef);
 
-            if ($validated['kode_subkomponen']) {
+            if (!empty($validated['kode_subkomponen'])) {
                 $validated['referensi'] .= $validated['kode_subkomponen'];
                 $validated['referensi2'] = $baseRef . $validated['kode_subkomponen'];
                 $validated['len'] = strlen($validated['referensi2']);
             }
 
-            if ($validated['kode_akun']) {
+            if (!empty($validated['kode_akun'])) {
                 $validated['referensi'] .= $validated['kode_akun'];
                 $validated['len'] = strlen($validated['referensi']);
             }
 
             $data->update($validated);
 
-            // Update parent totals if pagu changed
+            // Update parent totals if pagu changed (hanya untuk level Akun)
             if ($selisihPagu != 0 && $data->kode_akun) {
                 $this->updateParentPaguAfterEdit($data, $selisihPagu);
             }
@@ -227,6 +252,10 @@ class DataAnggaranController extends Controller
                 ->with('success', 'Data anggaran berhasil diupdate');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error updating anggaran: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'data_id' => $data->id
+            ]);
             return back()
                 ->withInput()
                 ->with('error', 'Gagal mengupdate data anggaran: ' . $e->getMessage());
@@ -304,8 +333,16 @@ class DataAnggaranController extends Controller
                 ->whereNotNull('kode_akun')
                 ->sum('pagu_anggaran');
 
+            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)
+                ->where('kro', $anggaran->kro)
+                ->where('ro', $anggaran->ro)
+                ->where('kode_subkomponen', $anggaran->kode_subkomponen)
+                ->whereNotNull('kode_akun')
+                ->sum('total_penyerapan');
+
             $subkomp->pagu_anggaran = $totalPagu;
-            $subkomp->sisa = $totalPagu;
+            $subkomp->total_penyerapan = $totalRealisasi;
+            $subkomp->sisa = $totalPagu - $totalRealisasi;
             $subkomp->save();
         }
 
@@ -324,8 +361,16 @@ class DataAnggaranController extends Controller
                 ->whereNull('kode_akun')
                 ->sum('pagu_anggaran');
 
+            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)
+                ->where('kro', $anggaran->kro)
+                ->where('ro', $anggaran->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->sum('total_penyerapan');
+
             $ro->pagu_anggaran = $totalPagu;
-            $ro->sisa = $totalPagu;
+            $ro->total_penyerapan = $totalRealisasi;
+            $ro->sisa = $totalPagu - $totalRealisasi;
             $ro->save();
         }
     }
@@ -377,9 +422,6 @@ class DataAnggaranController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ]);
 
-        // TODO: Implement Excel import
-        // Menggunakan package seperti maatwebsite/excel
-
         return back()->with('info', 'Fitur import Excel akan segera tersedia');
     }
 
@@ -388,8 +430,6 @@ class DataAnggaranController extends Controller
      */
     public function export()
     {
-        // TODO: Implement Excel export
-
         return back()->with('info', 'Fitur export Excel akan segera tersedia');
     }
 

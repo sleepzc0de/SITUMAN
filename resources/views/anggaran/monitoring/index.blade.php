@@ -61,7 +61,7 @@
             </div>
         </form>
 
-        <!-- Summary Cards -->
+        <!-- Summary Cards - PERBAIKAN: Data dari level RO saja -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
                 <div class="flex items-center justify-between">
@@ -135,8 +135,24 @@
         </div>
     </div>
 
-    <!-- Table per RO -->
+    <!-- Table per RO - PERBAIKAN: Tampilkan detail dari groupedData -->
     @foreach($groupedData as $roCode => $roData)
+        @php
+            // PERBAIKAN: Ambil data RO level (parent) untuk summary
+            $roLevel = $roData->where('kode_subkomponen', null)->where('kode_akun', null)->first();
+
+            // Jika tidak ada data RO level, hitung dari sub komponen
+            if (!$roLevel) {
+                $roLevelPagu = $roData->where('kode_akun', null)->sum('pagu_anggaran');
+                $roLevelRealisasi = $roData->where('kode_akun', null)->sum('total_penyerapan');
+                $roLevelSisa = $roData->where('kode_akun', null)->sum('sisa');
+            } else {
+                $roLevelPagu = $roLevel->pagu_anggaran;
+                $roLevelRealisasi = $roLevel->total_penyerapan;
+                $roLevelSisa = $roLevel->sisa;
+            }
+        @endphp
+
         <div class="card">
             <div class="mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">
@@ -144,13 +160,13 @@
                 </h3>
                 <div class="flex items-center gap-4 mt-2 text-sm">
                     <span class="text-gray-600 dark:text-gray-400">
-                        Pagu: <span class="font-semibold text-gray-900 dark:text-white">{{ formatRupiah($roData->sum('pagu_anggaran')) }}</span>
+                        Pagu: <span class="font-semibold text-gray-900 dark:text-white">{{ formatRupiah($roLevelPagu) }}</span>
                     </span>
                     <span class="text-gray-600 dark:text-gray-400">
-                        Realisasi: <span class="font-semibold text-green-600">{{ formatRupiah($roData->sum('total_penyerapan')) }}</span>
+                        Realisasi: <span class="font-semibold text-green-600">{{ formatRupiah($roLevelRealisasi) }}</span>
                     </span>
                     <span class="text-gray-600 dark:text-gray-400">
-                        Sisa: <span class="font-semibold text-purple-600">{{ formatRupiah($roData->sum('sisa')) }}</span>
+                        Sisa: <span class="font-semibold text-purple-600">{{ formatRupiah($roLevelSisa) }}</span>
                     </span>
                 </div>
             </div>
@@ -194,8 +210,11 @@
                                     {{ formatRupiah($item->sisa) }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $item->persentase_penyerapan >= 80 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : ($item->persentase_penyerapan >= 50 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">
-                                        {{ number_format($item->persentase_penyerapan, 2) }}%
+                                    @php
+                                        $persentase = $item->pagu_anggaran > 0 ? ($item->total_penyerapan / $item->pagu_anggaran) * 100 : 0;
+                                    @endphp
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $persentase >= 80 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : ($persentase >= 50 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">
+                                        {{ number_format($persentase, 2) }}%
                                     </span>
                                 </td>
                             </tr>
