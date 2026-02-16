@@ -12,135 +12,128 @@ use Carbon\Carbon;
 class RealisasiAnggaranSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Data SPP dengan nilai presisi
      */
+    private $sppData = [
+        // Format: [akun_ro_subkomp, bulan, bruto, ppn_percent, pph_percent, status]
+        ['4753EBAZ06AA521211', 'januari', 45750000.50, 11, 2, 'Tagihan Telah SP2D'],
+        ['4753EBAZ06AA521213', 'januari', 89500000.75, 11, 0, 'Tagihan Telah SP2D'],
+        ['4753EBAZ06AA522151', 'februari', 34250000.25, 0, 2, 'Tagihan Telah SP2D'],
+        ['4753EBAZ06AB521211', 'februari', 78900000.00, 11, 2, 'Tagihan Belum SP2D'],
+        ['4753EBAZ06AB523121', 'maret', 156780000.50, 11, 0, 'Tagihan Telah SP2D'],
+        ['4753EBA403BA532111', 'januari', 450000000.00, 11, 2, 'Tagihan Telah SP2D'],
+        ['4753EBA403BA521811', 'februari', 234567000.75, 11, 0, 'Tagihan Telah SP2D'],
+        ['4753EBA403BB522151', 'maret', 345670000.50, 0, 2, 'Tagihan Belum SP2D'],
+        ['4753EBA405CA521811', 'april', 189450000.25, 11, 2, 'Tagihan Telah SP2D'],
+        ['4753EBA405CB523121', 'mei', 567890000.00, 11, 0, 'Tagihan Telah SP2D'],
+        ['4753EBA994DA521211', 'juni', 98765000.50, 0, 2, 'Tagihan Telah SP2D'],
+        ['4753EBA994DB521811', 'juli', 234567000.25, 11, 2, 'Tagihan Belum SP2D'],
+    ];
+
     public function run(): void
     {
-        $this->command->info('Starting Realisasi Anggaran Seeder...');
-
-        // Ambil semua akun (level detail)
-        $akunList = Anggaran::whereNotNull('kode_akun')->get();
-
-        $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
-        ];
-
-        $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
-        $lsBendahara = ['LS', 'Bendahara'];
+        $this->command->info('Starting Realisasi Anggaran Seeder (Presisi)...');
 
         $sppCounter = 1;
+        $bulanMapping = [
+            'januari' => 1, 'februari' => 2, 'maret' => 3, 'april' => 4,
+            'mei' => 5, 'juni' => 6, 'juli' => 7, 'agustus' => 8,
+            'september' => 9, 'oktober' => 10, 'november' => 11, 'desember' => 12
+        ];
 
-        foreach ($akunList as $akun) {
-            // Random: 30% kemungkinan akun ini memiliki realisasi
-            if (rand(1, 100) > 30) {
+        foreach ($this->sppData as $data) {
+            [$coa, $bulan, $bruto, $ppnPercent, $pphPercent, $status] = $data;
+
+            // Cari anggaran berdasarkan COA
+            $akun = Anggaran::whereNotNull('kode_akun')
+                ->where('kegiatan', substr($coa, 0, 4))
+                ->where('kro', substr($coa, 4, 3))
+                ->where('ro', substr($coa, 7, 3))
+                ->where('kode_subkomponen', substr($coa, 10, 2))
+                ->where('kode_akun', substr($coa, 12, 6))
+                ->first();
+
+            if (!$akun) {
+                $this->command->warn("Akun not found for COA: {$coa}");
                 continue;
             }
 
-            $this->command->line("Creating SPP for Akun: {$akun->kode_akun}");
+            // Hitung pajak dengan presisi
+            $ppn = ($bruto * $ppnPercent) / 100;
+            $pph = ($bruto * $pphPercent) / 100;
+            $netto = $bruto - $ppn - $pph;
 
-            // Buat 1-3 SPP untuk akun ini
-            $jumlahSPP = rand(1, 3);
+            // Tanggal SPP
+            $bulanNum = $bulanMapping[$bulan];
+            $tglSPP = Carbon::create(2024, $bulanNum, rand(5, 25));
 
-            for ($i = 0; $i < $jumlahSPP; $i++) {
-                // Random bulan
-                $bulan = $bulanList[array_rand($bulanList)];
+            $spp = SPP::create([
+                'id' => Str::uuid(),
+                'bulan' => $bulan,
+                'no_spp' => 'SPP-' . str_pad($sppCounter, 5, '0', STR_PAD_LEFT) . '/2024',
+                'nominatif' => 'Nominatif ' . $akun->program_kegiatan,
+                'tgl_spp' => $tglSPP,
+                'jenis_kegiatan' => $akun->program_kegiatan,
+                'jenis_belanja' => 'Kontraktual',
+                'uraian_spp' => 'Pembayaran untuk ' . $akun->program_kegiatan . ' bulan ' . ucfirst($bulan),
+                'bagian' => 'Bagian ' . $akun->pic,
+                'nama_pic' => 'PIC ' . $akun->pic,
+                'kode_kegiatan' => $akun->kegiatan,
+                'kro' => $akun->kro,
+                'ro' => $akun->ro,
+                'sub_komponen' => $akun->kode_subkomponen,
+                'mak' => $akun->kode_akun,
+                'bruto' => $bruto,
+                'ppn' => $ppn,
+                'pph' => $pph,
+                'netto' => $netto,
+                'ls_bendahara' => 'LS',
+                'status' => $status,
+                'coa' => $coa,
+            ]);
 
-                // Nilai SPP antara 10-50% dari pagu
-                $maxNilai = $akun->pagu_anggaran * 0.5;
-                $minNilai = $akun->pagu_anggaran * 0.1;
-                $bruto = rand($minNilai, $maxNilai);
+            // Update anggaran dengan nilai presisi
+            $this->updateAnggaranFromSPP($akun, $spp);
 
-                // Hitung pajak
-                $ppnPercent = rand(0, 11); // 0% atau 11%
-                $pphPercent = rand(0, 2) == 0 ? 0 : 2; // 0% atau 2%
-
-                $ppn = ($bruto * $ppnPercent) / 100;
-                $pph = ($bruto * $pphPercent) / 100;
-                $netto = $bruto - $ppn - $pph;
-
-                // Random status: 70% sudah SP2D, 30% belum
-                $status = rand(1, 100) <= 70 ? 'Tagihan Telah SP2D' : 'Tagihan Belum SP2D';
-
-                // Tanggal SPP dalam 6 bulan terakhir
-                $tglSPP = Carbon::now()->subMonths(rand(1, 6))->subDays(rand(1, 28));
-
-                $spp = SPP::create([
-                    'id' => Str::uuid(),
-                    'bulan' => $bulan,
-                    'no_spp' => 'SPP-' . str_pad($sppCounter, 5, '0', STR_PAD_LEFT) . '/2024',
-                    'nominatif' => 'Nominatif ' . $sppCounter,
-                    'tgl_spp' => $tglSPP,
-                    'jenis_kegiatan' => 'Kegiatan ' . $akun->program_kegiatan,
-                    'jenis_belanja' => $jenisBelanja[array_rand($jenisBelanja)],
-                    'uraian_spp' => 'Uraian SPP untuk ' . $akun->program_kegiatan,
-                    'bagian' => 'Bagian ' . $akun->pic,
-                    'nama_pic' => 'PIC ' . $akun->pic,
-                    'kode_kegiatan' => $akun->kegiatan,
-                    'kro' => $akun->kro,
-                    'ro' => $akun->ro,
-                    'sub_komponen' => $akun->kode_subkomponen,
-                    'mak' => $akun->kode_akun,
-                    'bruto' => $bruto,
-                    'ppn' => $ppn,
-                    'pph' => $pph,
-                    'netto' => $netto,
-                    'ls_bendahara' => $lsBendahara[array_rand($lsBendahara)],
-                    'status' => $status,
-                    'coa' => $akun->kegiatan . $akun->kro . $akun->ro . $akun->kode_akun,
-                ]);
-
-                // Update data anggaran
-                $this->updateAnggaranFromSPP($akun, $spp);
-
-                $this->command->line("  ✓ Created SPP: {$spp->no_spp} - Rp " . number_format($netto, 0, ',', '.'));
-
-                $sppCounter++;
-            }
+            $this->command->line("✓ SPP-{$sppCounter}: {$akun->program_kegiatan} - Rp " . number_format($netto, 2, ',', '.'));
+            $sppCounter++;
         }
 
-        $this->command->info('Realisasi Anggaran Seeder completed successfully!');
+        $this->command->info('Realisasi Anggaran Seeder completed!');
         $this->printSummary();
     }
 
     /**
-     * Update anggaran based on SPP
+     * Update anggaran based on SPP dengan presisi
      */
     private function updateAnggaranFromSPP($akun, $spp)
     {
         $bulan = strtolower($spp->bulan);
 
-        // Update realisasi bulan atau outstanding
+        // Update realisasi bulan atau outstanding dengan nilai presisi
         if ($spp->status === 'Tagihan Telah SP2D') {
-            $akun->$bulan = ($akun->$bulan ?? 0) + $spp->netto;
+            $akun->$bulan = bcadd($akun->$bulan ?? 0, $spp->netto, 2);
         } else {
-            $akun->tagihan_outstanding = ($akun->tagihan_outstanding ?? 0) + $spp->netto;
+            $akun->tagihan_outstanding = bcadd($akun->tagihan_outstanding ?? 0, $spp->netto, 2);
         }
 
-        // Hitung total penyerapan
-        $akun->total_penyerapan =
-            ($akun->januari ?? 0) +
-            ($akun->februari ?? 0) +
-            ($akun->maret ?? 0) +
-            ($akun->april ?? 0) +
-            ($akun->mei ?? 0) +
-            ($akun->juni ?? 0) +
-            ($akun->juli ?? 0) +
-            ($akun->agustus ?? 0) +
-            ($akun->september ?? 0) +
-            ($akun->oktober ?? 0) +
-            ($akun->november ?? 0) +
-            ($akun->desember ?? 0);
+        // Hitung total penyerapan dengan presisi
+        $total = 0;
+        foreach (['januari', 'februari', 'maret', 'april', 'mei', 'juni',
+                  'juli', 'agustus', 'september', 'oktober', 'november', 'desember'] as $b) {
+            $total = bcadd($total, $akun->$b ?? 0, 2);
+        }
 
-        $akun->sisa = $akun->pagu_anggaran - $akun->total_penyerapan;
+        $akun->total_penyerapan = $total;
+        $akun->sisa = bcsub($akun->pagu_anggaran, $total, 2);
         $akun->save();
 
-        // Update parent (Sub Komponen)
+        // Update parent levels
         $this->updateParentLevels($akun);
     }
 
     /**
-     * Update parent levels
+     * Update parent levels dengan presisi
      */
     private function updateParentLevels($akun)
     {
@@ -167,7 +160,7 @@ class RealisasiAnggaranSeeder extends Seeder
 
             $subkomp->tagihan_outstanding = $children->sum('tagihan_outstanding');
             $subkomp->total_penyerapan = $children->sum('total_penyerapan');
-            $subkomp->sisa = $subkomp->pagu_anggaran - $subkomp->total_penyerapan;
+            $subkomp->sisa = bcsub($subkomp->pagu_anggaran, $subkomp->total_penyerapan, 2);
             $subkomp->save();
         }
 
@@ -194,7 +187,7 @@ class RealisasiAnggaranSeeder extends Seeder
 
             $ro->tagihan_outstanding = $children->sum('tagihan_outstanding');
             $ro->total_penyerapan = $children->sum('total_penyerapan');
-            $ro->sisa = $ro->pagu_anggaran - $ro->total_penyerapan;
+            $ro->sisa = bcsub($ro->pagu_anggaran, $ro->total_penyerapan, 2);
             $ro->save();
         }
     }
@@ -207,16 +200,28 @@ class RealisasiAnggaranSeeder extends Seeder
         $totalSPP = SPP::count();
         $totalBruto = SPP::sum('bruto');
         $totalNetto = SPP::sum('netto');
-        $sudahSP2D = SPP::where('status', 'Tagihan Telah SP2D')->count();
-        $belumSP2D = SPP::where('status', 'Tagihan Belum SP2D')->count();
+        $totalPPN = SPP::sum('ppn');
+        $totalPPh = SPP::sum('pph');
+        $sudahSP2D = SPP::where('status', 'Tagihan Telah SP2D')->sum('netto');
+        $belumSP2D = SPP::where('status', 'Tagihan Belum SP2D')->sum('netto');
 
         $this->command->info('');
-        $this->command->info('=== Summary ===');
-        $this->command->info("Total SPP: {$totalSPP}");
-        $this->command->info("Sudah SP2D: {$sudahSP2D}");
-        $this->command->info("Belum SP2D: {$belumSP2D}");
-        $this->command->info("Total Bruto: Rp " . number_format($totalBruto, 0, ',', '.'));
-        $this->command->info("Total Netto: Rp " . number_format($totalNetto, 0, ',', '.'));
+        $this->command->info('╔════════════════════════════════════════════════════════════╗');
+        $this->command->info('║                   SUMMARY REALISASI                        ║');
+        $this->command->info('╠════════════════════════════════════════════════════════════╣');
+        $this->command->table(
+            ['Kategori', 'Nilai'],
+            [
+                ['Total SPP', $totalSPP],
+                ['Total Bruto', 'Rp ' . number_format($totalBruto, 2, ',', '.')],
+                ['Total PPN', 'Rp ' . number_format($totalPPN, 2, ',', '.')],
+                ['Total PPh', 'Rp ' . number_format($totalPPh, 2, ',', '.')],
+                ['Total Netto', 'Rp ' . number_format($totalNetto, 2, ',', '.')],
+                ['Sudah SP2D', 'Rp ' . number_format($sudahSP2D, 2, ',', '.')],
+                ['Belum SP2D', 'Rp ' . number_format($belumSP2D, 2, ',', '.')],
+            ]
+        );
+        $this->command->info('╚════════════════════════════════════════════════════════════╝');
         $this->command->info('');
     }
 }
