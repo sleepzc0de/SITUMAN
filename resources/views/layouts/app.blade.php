@@ -371,6 +371,42 @@ window.addEventListener('scroll', () => isScrolled = window.scrollY > 20);" :cla
                         </div>
                     </div>
 
+                    <!-- Menu Inventaris -->
+                    <div x-data="{ open: {{ request()->routeIs('inventaris.*') ? 'true' : 'false' }} }" class="space-y-1">
+                        <button @click="open = !open"
+                            class="w-full group flex items-center justify-between px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 {{ request()->routeIs('inventaris.*') ? 'bg-gradient-to-r from-navy-50 to-navy-100 dark:from-navy-700 dark:to-navy-600 text-navy-700 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-navy-700' }}">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('inventaris.*') ? 'text-navy-600 dark:text-gold-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-navy-500 dark:group-hover:text-gold-400' }}"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Inventaris
+                            </div>
+                            <svg class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('inventaris.*') ? 'text-navy-600 dark:text-gold-400' : 'text-gray-400 dark:text-gray-500' }}"
+                                :class="{ 'rotate-180': open }" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7">
+                                </path>
+                            </svg>
+                        </button>
+
+                        <div x-show="open" x-collapse class="ml-8 space-y-1">
+                            <a href="{{ route('inventaris.monitoring-atk.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.monitoring-atk.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Monitoring ATK
+                            </a>
+                            <a href="{{ route('inventaris.permintaan-atk.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.permintaan-atk.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Permintaan ATK
+                            </a>
+                            <a href="{{ route('inventaris.aset-end-user.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.aset-end-user.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Aset End User
+                            </a>
+                        </div>
+                    </div>
+
                     @hasrole('superadmin|admin')
                         <!-- Manajemen User -->
                         <a href="{{ route('users.index') }}"

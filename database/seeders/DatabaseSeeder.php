@@ -13,6 +13,11 @@ class DatabaseSeeder extends Seeder
             PegawaiSeeder::class,
             AnggaranSeeder::class,
             RealisasiAnggaranSeeder::class,
+             // Inventaris Seeders
+            KategoriAtkSeeder::class,
+            AtkSeeder::class,
+            KategoriAsetSeeder::class,
+            AsetEndUserSeeder::class,
         ]);
     }
 }

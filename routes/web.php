@@ -101,6 +101,33 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('data.export');
     });
 
+    // Inventaris
+    Route::prefix('inventaris')->name('inventaris.')->group(function () {
+        // Monitoring ATK
+        Route::resource('monitoring-atk', App\Http\Controllers\Inventaris\MonitoringAtkController::class);
+        Route::post('monitoring-atk/{monitoringAtk}/update-stok', [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'updateStok'])
+            ->name('monitoring-atk.update-stok');
+
+        // Permintaan ATK
+        Route::resource('permintaan-atk', App\Http\Controllers\Inventaris\PermintaanAtkController::class);
+        Route::post('permintaan-atk/{permintaanAtk}/approve', [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'approve'])
+            ->name('permintaan-atk.approve')
+            ->middleware('role:superadmin,admin');
+        Route::post('permintaan-atk/{permintaanAtk}/reject', [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'reject'])
+            ->name('permintaan-atk.reject')
+            ->middleware('role:superadmin,admin');
+        Route::post('permintaan-atk/{permintaanAtk}/complete', [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'complete'])
+            ->name('permintaan-atk.complete')
+            ->middleware('role:superadmin,admin');
+
+        // Aset End User
+        Route::resource('aset-end-user', App\Http\Controllers\Inventaris\AsetEndUserController::class);
+        Route::post('aset-end-user/{asetEndUser}/pinjam', [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'pinjam'])
+            ->name('aset-end-user.pinjam');
+        Route::post('aset-end-user/{asetEndUser}/kembalikan', [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'kembalikan'])
+            ->name('aset-end-user.kembalikan');
+    });
+
     // User Management (Admin & Superadmin only)
     Route::middleware('role:superadmin,admin')->group(function () {
         Route::resource('users', UserManagementController::class);
