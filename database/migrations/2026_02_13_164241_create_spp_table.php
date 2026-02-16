@@ -1,4 +1,5 @@
 <?php
+// database/migrations/2026_02_13_164241_create_spp_table.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -9,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('spp', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('bulan', 20);
             $table->string('no_spp', 100)->unique();
             $table->string('nominatif', 255)->nullable();
@@ -47,12 +48,12 @@ return new class extends Migration
             $table->softDeletes();
             $table->timestamps();
 
-            // Tambahkan index
-            $table->index(['coa']);
-            $table->index(['bulan']);
-            $table->index(['status']);
-            $table->index(['ro']);
-            $table->index(['created_at']);
+            // Index untuk performa
+            $table->index(['coa'], 'idx_coa');
+            $table->index(['bulan'], 'idx_bulan');
+            $table->index(['status'], 'idx_status');
+            $table->index(['ro'], 'idx_ro');
+            $table->index(['created_at'], 'idx_created');
         });
     }
 

@@ -1,11 +1,15 @@
 <?php
+// app/Models/Anggaran.php
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class Anggaran extends Model
 {
+    use HasUuids;
+
     protected $table = 'anggaran';
 
     protected $fillable = [
@@ -36,6 +40,7 @@ class Anggaran extends Model
         'sisa' => 'decimal:2',
     ];
 
+    // Relasi
     public function spp()
     {
         return $this->hasMany(SPP::class, 'coa', 'coa');
@@ -46,14 +51,42 @@ class Anggaran extends Model
         return $this->hasMany(RevisiAnggaran::class);
     }
 
+    // Accessor untuk COA
     public function getCOAAttribute()
     {
-        return $this->kegiatan . $this->kro . $this->ro . $this->kode_akun;
+        return $this->kegiatan . $this->kro . $this->ro . ($this->kode_akun ?? '');
     }
 
+    // Accessor untuk persentase penyerapan
     public function getPersentasePenyerapanAttribute()
     {
         if ($this->pagu_anggaran == 0) return 0;
         return ($this->total_penyerapan / $this->pagu_anggaran) * 100;
+    }
+
+    // Scope untuk query optimization
+    public function scopeByRO($query, $ro)
+    {
+        return $query->where('ro', $ro);
+    }
+
+    public function scopeBySubkomponen($query, $subkomponen)
+    {
+        return $query->where('kode_subkomponen', $subkomponen);
+    }
+
+    public function scopeParentRO($query)
+    {
+        return $query->whereNull('kode_subkomponen')->whereNull('kode_akun');
+    }
+
+    public function scopeSubkomponen($query)
+    {
+        return $query->whereNotNull('kode_subkomponen')->whereNull('kode_akun');
+    }
+
+    public function scopeAkun($query)
+    {
+        return $query->whereNotNull('kode_akun');
     }
 }

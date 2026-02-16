@@ -1,13 +1,15 @@
 <?php
+// app/Models/SPP.php
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SPP extends Model
 {
-    use SoftDeletes;
+    use HasUuids, SoftDeletes;
 
     protected $table = 'spp';
 
@@ -36,7 +38,6 @@ class SPP extends Model
 
     protected $dates = ['deleted_at'];
 
-
     protected static function boot()
     {
         parent::boot();
@@ -50,5 +51,26 @@ class SPP extends Model
     public function anggaran()
     {
         return $this->belongsTo(Anggaran::class, 'coa', 'coa');
+    }
+
+    // Scope untuk query optimization
+    public function scopeByBulan($query, $bulan)
+    {
+        return $query->where('bulan', $bulan);
+    }
+
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeSudahSP2D($query)
+    {
+        return $query->where('status', 'Tagihan Telah SP2D');
+    }
+
+    public function scopeBelumSP2D($query)
+    {
+        return $query->where('status', 'Tagihan Belum SP2D');
     }
 }

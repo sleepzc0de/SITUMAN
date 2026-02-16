@@ -1,4 +1,5 @@
 <?php
+// database/migrations/2026_02_13_152422_create_anggaran_tables.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -9,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('anggaran', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('kegiatan', 50);
             $table->string('kro', 50);
             $table->string('ro', 50);
@@ -42,7 +43,11 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['kegiatan', 'kro', 'ro', 'kode_akun']);
+            // Index untuk performa query
+            $table->index(['kegiatan', 'kro', 'ro', 'kode_akun'], 'idx_coa');
+            $table->index(['ro'], 'idx_ro');
+            $table->index(['kode_subkomponen'], 'idx_subkomp');
+            $table->index(['kode_akun'], 'idx_akun');
         });
     }
 

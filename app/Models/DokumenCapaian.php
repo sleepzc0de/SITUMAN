@@ -1,11 +1,15 @@
 <?php
+// app/Models/DokumenCapaian.php
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 class DokumenCapaian extends Model
 {
+    use HasUuids;
+
     protected $table = 'dokumen_capaian';
 
     protected $fillable = [
@@ -13,13 +17,12 @@ class DokumenCapaian extends Model
         'sub_komponen',
         'bulan',
         'nama_dokumen',
-        'file_path', // Legacy single file
-        'files',     // Multiple files
+        'file_path',
+        'files',
         'keterangan',
         'user_id'
     ];
 
-    // Cast files to array
     protected $casts = [
         'files' => 'array',
     ];
@@ -29,7 +32,7 @@ class DokumenCapaian extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Helper method to get all files (legacy + new)
+    // Helper method to get all files
     public function getAllFiles()
     {
         $allFiles = [];
