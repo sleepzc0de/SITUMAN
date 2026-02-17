@@ -392,14 +392,31 @@ window.addEventListener('scroll', () => isScrolled = window.scrollY > 20);" :cla
                         </button>
 
                         <div x-show="open" x-collapse class="ml-8 space-y-1">
+                            <!-- Kategori ATK -->
+                            <a href="{{ route('inventaris.kategori-atk.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.kategori-atk.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Kategori ATK
+                            </a>
+
+                            <!-- Monitoring ATK -->
                             <a href="{{ route('inventaris.monitoring-atk.index') }}"
                                 class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.monitoring-atk.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
                                 Monitoring ATK
                             </a>
+
+                            <!-- Permintaan ATK -->
                             <a href="{{ route('inventaris.permintaan-atk.index') }}"
                                 class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.permintaan-atk.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
                                 Permintaan ATK
                             </a>
+
+                            <!-- Kategori Aset -->
+                            <a href="{{ route('inventaris.kategori-aset.index') }}"
+                                class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.kategori-aset.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
+                                Kategori Aset
+                            </a>
+
+                            <!-- Aset End User -->
                             <a href="{{ route('inventaris.aset-end-user.index') }}"
                                 class="block px-4 py-2 text-sm {{ request()->routeIs('inventaris.aset-end-user.*') ? 'text-navy-700 dark:text-gold-400 font-medium' : 'text-gray-600 dark:text-gray-400' }} hover:text-navy-700 dark:hover:text-gold-400 hover:bg-navy-50 dark:hover:bg-navy-700 rounded-lg transition-colors">
                                 Aset End User

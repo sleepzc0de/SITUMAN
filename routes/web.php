@@ -101,7 +101,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('data.export');
     });
 
-      // Inventaris
+    // Inventaris
     Route::prefix('inventaris')->name('inventaris.')->group(function () {
 
         // Monitoring ATK
@@ -155,6 +155,12 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             // Pinjam & Kembalikan
             Route::post('aset-end-user/{asetEndUser}/pinjam', 'pinjam')->name('aset-end-user.pinjam');
             Route::post('aset-end-user/{asetEndUser}/kembalikan', 'kembalikan')->name('aset-end-user.kembalikan');
+
+            // Kategori ATK
+            Route::resource('kategori-atk', App\Http\Controllers\Inventaris\KategoriAtkController::class);
+
+            // Kategori Aset
+            Route::resource('kategori-aset', App\Http\Controllers\Inventaris\KategoriAsetController::class);
         });
     });
 
