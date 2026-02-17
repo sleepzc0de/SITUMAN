@@ -101,12 +101,28 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('data.export');
     });
 
-    // Inventaris
+      // Inventaris
     Route::prefix('inventaris')->name('inventaris.')->group(function () {
+
         // Monitoring ATK
-        Route::resource('monitoring-atk', App\Http\Controllers\Inventaris\MonitoringAtkController::class);
-        Route::post('monitoring-atk/{monitoringAtk}/update-stok', [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'updateStok'])
-            ->name('monitoring-atk.update-stok');
+        Route::controller(App\Http\Controllers\Inventaris\MonitoringAtkController::class)->group(function () {
+            Route::get('monitoring-atk', 'index')->name('monitoring-atk.index');
+            Route::get('monitoring-atk/create', 'create')->name('monitoring-atk.create');
+            Route::post('monitoring-atk', 'store')->name('monitoring-atk.store');
+            Route::get('monitoring-atk/{monitoringAtk}', 'show')->name('monitoring-atk.show');
+            Route::get('monitoring-atk/{monitoringAtk}/edit', 'edit')->name('monitoring-atk.edit');
+            Route::put('monitoring-atk/{monitoringAtk}', 'update')->name('monitoring-atk.update');
+            Route::delete('monitoring-atk/{monitoringAtk}', 'destroy')->name('monitoring-atk.destroy');
+
+            // Export & Import
+            Route::get('monitoring-atk-export', 'export')->name('monitoring-atk.export');
+            Route::get('monitoring-atk-template', 'downloadTemplate')->name('monitoring-atk.template');
+            Route::get('monitoring-atk-import', 'importForm')->name('monitoring-atk.import-form');
+            Route::post('monitoring-atk-import', 'import')->name('monitoring-atk.import');
+
+            // Update Stok
+            Route::post('monitoring-atk/{monitoringAtk}/update-stok', 'updateStok')->name('monitoring-atk.update-stok');
+        });
 
         // Permintaan ATK
         Route::resource('permintaan-atk', App\Http\Controllers\Inventaris\PermintaanAtkController::class);
@@ -121,11 +137,25 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->middleware('role:superadmin,admin');
 
         // Aset End User
-        Route::resource('aset-end-user', App\Http\Controllers\Inventaris\AsetEndUserController::class);
-        Route::post('aset-end-user/{asetEndUser}/pinjam', [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'pinjam'])
-            ->name('aset-end-user.pinjam');
-        Route::post('aset-end-user/{asetEndUser}/kembalikan', [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'kembalikan'])
-            ->name('aset-end-user.kembalikan');
+        Route::controller(App\Http\Controllers\Inventaris\AsetEndUserController::class)->group(function () {
+            Route::get('aset-end-user', 'index')->name('aset-end-user.index');
+            Route::get('aset-end-user/create', 'create')->name('aset-end-user.create');
+            Route::post('aset-end-user', 'store')->name('aset-end-user.store');
+            Route::get('aset-end-user/{asetEndUser}', 'show')->name('aset-end-user.show');
+            Route::get('aset-end-user/{asetEndUser}/edit', 'edit')->name('aset-end-user.edit');
+            Route::put('aset-end-user/{asetEndUser}', 'update')->name('aset-end-user.update');
+            Route::delete('aset-end-user/{asetEndUser}', 'destroy')->name('aset-end-user.destroy');
+
+            // Export & Import
+            Route::get('aset-end-user-export', 'export')->name('aset-end-user.export');
+            Route::get('aset-end-user-template', 'downloadTemplate')->name('aset-end-user.template');
+            Route::get('aset-end-user-import', 'importForm')->name('aset-end-user.import-form');
+            Route::post('aset-end-user-import', 'import')->name('aset-end-user.import');
+
+            // Pinjam & Kembalikan
+            Route::post('aset-end-user/{asetEndUser}/pinjam', 'pinjam')->name('aset-end-user.pinjam');
+            Route::post('aset-end-user/{asetEndUser}/kembalikan', 'kembalikan')->name('aset-end-user.kembalikan');
+        });
     });
 
     // User Management (Admin & Superadmin only)

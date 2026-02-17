@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Atk;
 use App\Models\KategoriAtk;
 use Illuminate\Http\Request;
+use App\Exports\AtkExport;
+use App\Exports\AtkTemplateExport;
+use App\Imports\AtkImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MonitoringAtkController extends Controller
 {
@@ -131,4 +135,55 @@ class MonitoringAtkController extends Controller
 
         return back()->with('success', 'Stok berhasil diperbarui');
     }
+
+    public function export()
+{
+    return Excel::download(new AtkExport, 'data-atk-' . date('Y-m-d') . '.xlsx');
+}
+
+public function downloadTemplate()
+{
+    return Excel::download(new AtkTemplateExport, 'template-import-atk.xlsx');
+}
+
+public function importForm()
+{
+    $kategoris = KategoriAtk::orderBy('nama')->get();
+    return view('inventaris.monitoring-atk.import', compact('kategoris'));
+}
+
+public function import(Request $request)
+{
+    $request->validate([
+        'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+    ]);
+
+    try {
+        $import = new AtkImport();
+        Excel::import($import, $request->file('file'));
+
+        $failures = $import->failures();
+        $errors = $import->errors();
+
+        if ($failures->count() > 0 || $errors->count() > 0) {
+            $errorMessages = [];
+
+            foreach ($failures as $failure) {
+                $errorMessages[] = "Baris {$failure->row()}: " . implode(', ', $failure->errors());
+            }
+
+            foreach ($errors as $error) {
+                $errorMessages[] = "Error: " . $error->getMessage();
+            }
+
+            return back()->with('warning', 'Import selesai dengan beberapa error: ' . implode(' | ', $errorMessages));
+        }
+
+        return redirect()->route('inventaris.monitoring-atk.index')
+            ->with('success', 'Data ATK berhasil diimport');
+
+    } catch (\Exception $e) {
+        return back()->with('error', 'Terjadi kesalahan saat import: ' . $e->getMessage());
+    }
+}
 }
