@@ -14,30 +14,31 @@ class AppServiceProvider extends ServiceProvider
         User::class => UserPolicy::class,
     ];
 
-    public function register(): void
-    {
-        //
-    }
+    public function register(): void {}
 
     public function boot(): void
     {
-        // Register policies
         Gate::policy(User::class, UserPolicy::class);
 
-        // Custom Blade Directives
+        // ✅ BLADE DIRECTIVE: @hasrole - support pipe & array
         Blade::if('hasrole', function ($roles) {
-            if (!auth()->check()) {
-                return false;
-            }
-
+            if (!auth()->check()) return false;
             $userRole = auth()->user()->role;
+            if (is_array($roles)) return in_array($userRole, $roles);
+            // Support 'superadmin|admin' format
+            return in_array($userRole, explode('|', $roles));
+        });
 
-            if (is_array($roles)) {
-                return in_array($userRole, $roles);
-            }
+        // ✅ BLADE DIRECTIVE: @canaccess - cek akses modul
+        Blade::if('canaccess', function ($module) {
+            if (!auth()->check()) return false;
+            return auth()->user()->canAccessModule($module);
+        });
 
-            $rolesArray = explode('|', $roles);
-            return in_array($userRole, $rolesArray);
+        // ✅ BLADE DIRECTIVE: @isadmin
+        Blade::if('isadmin', function () {
+            if (!auth()->check()) return false;
+            return in_array(auth()->user()->role, ['superadmin', 'admin']);
         });
 
         // Format currency
