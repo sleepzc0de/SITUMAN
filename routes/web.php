@@ -41,6 +41,19 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::get('grading/{pegawai}', [KenaikanGradingController::class, 'show'])->name('grading.show');
         Route::get('mutasi', [ProyeksiMutasiController::class, 'index'])->name('mutasi');
         Route::get('mutasi/{pegawai}', [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
+
+        // Kelola Data Pegawai (CRUD + Import/Export)
+        Route::resource('pegawai', \App\Http\Controllers\Kepegawaian\PegawaiController::class);
+        Route::get('pegawai-export', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export'])
+            ->name('pegawai.export');
+        Route::get('pegawai-template', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'downloadTemplate'])
+            ->name('pegawai.template');
+        Route::get('pegawai-import', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'importForm'])
+            ->name('pegawai.import-form');
+        Route::post('pegawai-import', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'import'])
+            ->name('pegawai.import');
+        Route::get('pegawai/analytics/data', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'analyticsData'])
+            ->name('pegawai.analytics');
     });
 
     // Anggaran

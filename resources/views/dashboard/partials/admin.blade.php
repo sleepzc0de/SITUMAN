@@ -131,6 +131,7 @@
                     ['route' => 'inventaris.monitoring-atk.index', 'icon' => '📦', 'label' => 'Monitoring ATK', 'color' => 'orange'],
                     ['route' => 'users.index', 'icon' => '👤', 'label' => 'Manajemen User', 'color' => 'purple'],
                     ['route' => 'roles.index', 'icon' => '🔑', 'label' => 'Kelola Role', 'color' => 'red'],
+                    ['route' => 'kepegawaian.pegawai.index', 'icon' => '📋', 'label' => 'Kelola Data Pegawai', 'color' => 'teal'],
                 ];
                 @endphp
                 @foreach($quickActions as $action)
