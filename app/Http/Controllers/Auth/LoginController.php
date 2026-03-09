@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Auth/LoginController.php
 
 namespace App\Http\Controllers\Auth;
 
@@ -23,15 +24,18 @@ class LoginController extends Controller
         $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
+            'captcha'  => 'required|string',
         ], [
             'email.required'    => 'Email wajib diisi.',
             'email.email'       => 'Format email tidak valid.',
             'password.required' => 'Password wajib diisi.',
+            'captcha.required'  => 'Kode captcha wajib diisi.',
         ]);
 
-        // =====================================================
-        // Rate Limiting: max 5 percobaan per menit per IP+email
-        // =====================================================
+        // ✅ Validasi Captcha
+        $this->validateCaptcha($request);
+
+        // Rate Limiting
         $throttleKey = Str::lower($request->email) . '|' . $request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
@@ -41,34 +45,25 @@ class LoginController extends Controller
             ]);
         }
 
-        // =====================================================
         // Cari user berdasarkan email
-        // =====================================================
         $user = User::where('email', $request->email)->first();
 
-        // =====================================================
-        // Verifikasi password dengan salt
-        // =====================================================
+        // Verifikasi password
         if (!$user || !$this->verifyPassword($user, $request->password)) {
             RateLimiter::hit($throttleKey, 60);
-
             throw ValidationException::withMessages([
                 'email' => 'Email atau password salah.',
             ]);
         }
 
-        // =====================================================
         // Login berhasil
-        // =====================================================
         RateLimiter::clear($throttleKey);
 
-        // Rehash otomatis jika cost factor berubah
         if (PasswordHashService::needsRehash($user->password)) {
             $user->setPassword($request->password);
             $user->save();
         }
 
-        // Login manual karena kita tidak pakai Auth::attempt()
         Auth::login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
@@ -80,34 +75,39 @@ class LoginController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-
         return redirect('/login');
     }
 
     // =========================================================
-    // PRIVATE: Verifikasi password dengan fallback
+    // PRIVATE: Validasi Captcha
     // =========================================================
+    private function validateCaptcha(Request $request): void
+    {
+        $sessionPhrase = $request->session()->get('captcha_phrase');
+        $inputPhrase   = strtolower(trim($request->input('captcha')));
 
-    /**
-     * Verifikasi password dengan mempertimbangkan dua kondisi:
-     *
-     * 1. User BARU  → punya password_salt → verifikasi dengan salt
-     * 2. User LAMA  → tidak punya salt   → verifikasi bcrypt biasa,
-     *                                       lalu upgrade otomatis ke sistem salt
-     */
+
+        $request->session()->forget('captcha_phrase');
+
+        if (!$sessionPhrase || strtolower($sessionPhrase) !== $inputPhrase) {
+            throw ValidationException::withMessages([
+                'captcha' => 'Kode captcha salah atau sudah kadaluarsa. Silakan refresh captcha.',
+            ]);
+        }
+    }
+
+    // =========================================================
+    // PRIVATE: Verifikasi password
+    // =========================================================
     private function verifyPassword(User $user, string $plainPassword): bool
     {
-        // Kondisi 1: User sudah pakai sistem salt (baru)
         if (!empty($user->password_salt)) {
             return $user->verifyPassword($plainPassword);
         }
 
-        // Kondisi 2: User lama pakai bcrypt biasa (tanpa salt)
         if (password_verify($plainPassword, $user->password)) {
-            // ✅ Upgrade otomatis ke sistem salt baru
             $user->setPassword($plainPassword);
             $user->save();
-
             return true;
         }
 
