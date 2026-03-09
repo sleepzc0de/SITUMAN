@@ -204,6 +204,12 @@ class DashboardController extends Controller
                 Anggaran::select('ro', DB::raw('SUM(pagu_anggaran) as pagu'), DB::raw('SUM(total_penyerapan) as realisasi'))
                     ->whereNotNull('ro')->groupBy('ro')->get()
             ),
+            'chartSppBulan' => Cache::remember(
+                'chart_spp_bulan',
+                300,
+                fn() => SPP::select('bulan', DB::raw('SUM(netto) as total'))
+                    ->sudahSP2D()->groupBy('bulan')->orderBy('bulan')->get()
+            ),
         ];
     }
 

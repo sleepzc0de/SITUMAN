@@ -8,25 +8,147 @@
     x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 20 }, { passive: true })"
     :class="{ 'dark': $store.app.darkMode }"
     x-cloak>
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="description" content="@yield('meta_description', config('app.name') . ' — Sistem Informasi Kepegawaian')">
+    <meta name="description" content="@yield('meta_description', config('app.name') . ' — Sistem Informasi Tata Usaha dan Manajemen')">
     <meta name="theme-color" content="#334e68">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap" rel="stylesheet">
     <title>@yield('title', 'Dashboard') · {{ config('app.name', 'SiTUMAN') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
-</head>
+    <style>
+        /* ── Custom Scrollbar ── */
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+        .dark .scrollbar-thin::-webkit-scrollbar-thumb { background: #334e68; }
 
+        /* ── Skeleton shimmer ── */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+        }
+        .dark .skeleton {
+            background: linear-gradient(90deg, #1e3a5f 25%, #1a3353 50%, #1e3a5f 75%);
+            background-size: 200% 100%;
+        }
+
+        /* ── Animated gradient text ── */
+        @keyframes gradient-x {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #1e4d8c, #2d6fd4, #c9a227, #e8b84b);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient-x 6s ease infinite;
+        }
+
+        /* ── Fade-in / Slide-up animations ── */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-ring { 0% { transform: scale(.9); opacity: 1; } 80%, 100% { transform: scale(2); opacity: 0; } }
+        .animate-fade-in { animation: fadeIn .35s ease both; }
+        .animate-slide-up { animation: slideUp .3s ease both; }
+        .animate-pulse-ring::before {
+            content: ''; position: absolute; inset: 0; border-radius: 50%;
+            background: currentColor; opacity: .4;
+            animation: pulse-ring 1.6s ease-out infinite;
+        }
+
+        /* ── Nav items ── */
+        .nav-item-active {
+            @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
+                   bg-navy-600 text-white shadow-md shadow-navy-600/30 transition-all duration-200;
+        }
+        .nav-item-inactive {
+            @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+                   text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-navy-800
+                   hover:text-gray-900 dark:hover:text-white transition-all duration-200;
+        }
+        .nav-subitem-active {
+            @apply block px-3 py-2 rounded-lg text-sm font-semibold text-navy-700
+                   dark:text-navy-300 bg-navy-50 dark:bg-navy-800/60 transition-colors duration-150;
+        }
+        .nav-subitem-inactive {
+            @apply block px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400
+                   hover:bg-gray-100 dark:hover:bg-navy-800 hover:text-gray-800 dark:hover:text-gray-200
+                   transition-colors duration-150;
+        }
+        .section-label {
+            @apply text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-navy-500 px-3;
+        }
+        .btn-icon {
+            @apply w-9 h-9 flex items-center justify-center rounded-xl transition-colors duration-200;
+        }
+
+        /* ── Cards ── */
+        .card {
+            @apply bg-white dark:bg-navy-800 rounded-2xl border border-gray-100 dark:border-navy-700
+                   shadow-sm;
+        }
+        .stat-card {
+            @apply bg-white dark:bg-navy-800 rounded-2xl p-5 border border-gray-100
+                   dark:border-navy-700 shadow-sm hover:shadow-lg hover:-translate-y-0.5
+                   transition-all duration-200 cursor-default;
+        }
+        .stat-icon {
+            @apply w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0;
+        }
+        .chart-card {
+            @apply bg-white dark:bg-navy-800 rounded-2xl p-5 border border-gray-100
+                   dark:border-navy-700 shadow-sm;
+        }
+        .chart-title {
+            @apply text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4;
+        }
+        .progress-bar {
+            @apply w-full bg-gray-100 dark:bg-navy-700 rounded-full overflow-hidden;
+            height: 6px;
+        }
+        .progress-fill {
+            @apply h-full rounded-full transition-all duration-700;
+        }
+        .info-row {
+            @apply flex items-center justify-between py-2.5 border-b border-gray-50
+                   dark:border-navy-700/60 last:border-0;
+        }
+        .badge {
+            @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold;
+        }
+        .badge-info  { @apply bg-sky-50   dark:bg-sky-900/30   text-sky-700   dark:text-sky-400; }
+        .badge-gray  { @apply bg-gray-100 dark:bg-navy-700     text-gray-600  dark:text-gray-400; }
+        .badge-green { @apply bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400; }
+
+        /* ── Toast ── */
+        .toast-item {
+            pointer-events: auto;
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 14px 16px; border-radius: 16px;
+            background: white; border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 40px -8px rgba(0,0,0,.18);
+            font-size: 13px; line-height: 1.5;
+            animation: slideUp .3s ease;
+        }
+        .dark .toast-item { background: #1e3a5f; border-color: #2d5a8e; color: #e2e8f0; }
+    </style>
+</head>
 <body class="bg-gray-50 dark:bg-navy-950 font-sans antialiased min-h-screen transition-colors duration-300">
 
-{{-- ── Loading Overlay ─────────────────────────────────────── --}}
+{{-- ── Loading Overlay ── --}}
 <div x-show="$store.app.isLoading"
      x-transition:enter="transition duration-200"
      x-transition:enter-start="opacity-0"
@@ -44,22 +166,20 @@
     <p class="mt-4 text-sm text-navy-600 dark:text-navy-300 font-medium animate-pulse">Memuat…</p>
 </div>
 
-{{-- ── Toast Container ─────────────────────────────────────── --}}
+{{-- ── Toast Container ── --}}
 <div id="toast-container"
      class="fixed top-4 right-4 z-[90] flex flex-col gap-2.5 w-80 pointer-events-none">
-    {{-- Toasts appended via JS --}}
 </div>
 
 {{-- ══════════════════════════════════════════════════════════
      NAVBAR
-═══════════════════════════════════════════════════════════ --}}
+══════════════════════════════════════════════════════════ --}}
 <header class="fixed inset-x-0 top-0 z-50 transition-all duration-300"
         :class="scrolled
             ? 'bg-white/95 dark:bg-navy-900/95 backdrop-blur-xl shadow-md shadow-gray-900/5 dark:shadow-navy-900/30 border-b border-gray-200/60 dark:border-navy-700/60'
             : 'bg-white/80  dark:bg-navy-900/80  backdrop-blur-md  border-b border-gray-200/40 dark:border-navy-700/40'">
     <div class="mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16 gap-3">
-
             {{-- Left: Toggle + Logo --}}
             <div class="flex items-center gap-2.5">
                 <button @click="$store.app.toggleSidebar()"
@@ -69,29 +189,26 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
                 </button>
-
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 group">
-                    <div class="w-9 h-9 bg-gradient-to-br from-navy-600 to-navy-800 rounded-xl flex items-center justify-center shadow-md
-                                group-hover:shadow-navy-700/40 group-hover:shadow-lg transition-shadow duration-200">
+                    <div class="w-9 h-9 bg-gradient-to-br from-navy-600 to-navy-800 rounded-xl flex items-center
+                                justify-center shadow-md group-hover:shadow-navy-700/40 group-hover:shadow-lg
+                                transition-all duration-200 group-hover:scale-105">
                         <span class="text-white font-bold text-sm tracking-tight">ST</span>
                     </div>
-                    <span class="hidden sm:block text-lg font-bold text-gradient animate-gradient tracking-tight">SiTUMAN</span>
+                    <span class="hidden sm:block text-lg font-bold text-gradient tracking-tight">SiTUMAN</span>
                 </a>
             </div>
 
             {{-- Right: Actions --}}
             <div class="flex items-center gap-1">
-
                 {{-- Dark Mode Toggle --}}
                 <button @click="$store.app.toggleDarkMode()"
                         class="btn-icon text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-navy-800"
                         aria-label="Toggle theme">
-                    {{-- Moon --}}
                     <svg x-show="!$store.app.darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display:none;">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                     </svg>
-                    {{-- Sun --}}
                     <svg x-show="$store.app.darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -107,10 +224,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                         </svg>
-                        {{-- Badge dot (aktifkan jika ada notif) --}}
-                        {{-- <span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-navy-900"></span> --}}
                     </button>
-
                     <div x-show="open" @click.away="open = false"
                          x-transition:enter="transition ease-out duration-150"
                          x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
@@ -157,7 +271,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
-
                     <div x-show="open" @click.away="open = false"
                          x-transition:enter="transition ease-out duration-150"
                          x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
@@ -167,8 +280,6 @@
                          x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
                          class="absolute right-0 mt-2 w-64 card z-50 py-1.5 overflow-hidden origin-top-right"
                          style="display:none;">
-
-                        {{-- Header --}}
                         <div class="px-4 py-3 border-b border-gray-100 dark:border-navy-700 mb-1">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-gradient-to-br from-navy-500 to-navy-700 rounded-full
@@ -186,17 +297,14 @@
                                 </div>
                             </div>
                         </div>
-
-                        {{-- Items --}}
                         @php
                             $menuItems = [
-                                ['href' => route('profile'),           'icon_bg' => 'bg-navy-50 dark:bg-navy-700',   'icon_color' => 'text-navy-600 dark:text-navy-300',   'label' => 'Profil Saya',    'desc' => 'Lihat & edit profil',
+                                ['href' => route('profile'),            'icon_bg' => 'bg-navy-50 dark:bg-navy-700',   'icon_color' => 'text-navy-600 dark:text-navy-300',   'label' => 'Profil Saya',  'desc' => 'Lihat & edit profil',
                                  'icon' => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'],
-                                ['href' => route('profile').'#password','icon_bg' => 'bg-amber-50 dark:bg-navy-700', 'icon_color' => 'text-amber-600 dark:text-amber-400', 'label' => 'Pengaturan',    'desc' => 'Password & keamanan',
+                                ['href' => route('profile').'#password','icon_bg' => 'bg-amber-50 dark:bg-navy-700',  'icon_color' => 'text-amber-600 dark:text-amber-400', 'label' => 'Pengaturan', 'desc' => 'Password & keamanan',
                                  'icon' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'],
                             ];
                         @endphp
-
                         @foreach($menuItems as $item)
                         <a href="{{ $item['href'] }}"
                            class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200
@@ -213,7 +321,6 @@
                             </div>
                         </a>
                         @endforeach
-
                         @hasrole('superadmin|admin')
                         <div class="mx-4 my-1.5 border-t border-gray-100 dark:border-navy-700"></div>
                         <a href="{{ route('roles.index') }}"
@@ -232,8 +339,6 @@
                             </div>
                         </a>
                         @endhasrole
-
-                        {{-- Logout --}}
                         <div class="mx-4 my-1.5 border-t border-gray-100 dark:border-navy-700"></div>
                         <form method="POST" action="{{ route('logout') }}" class="px-2 pb-1.5">
                             @csrf
@@ -255,16 +360,13 @@
                         </form>
                     </div>
                 </div>
-                {{-- End User Menu --}}
             </div>
         </div>
     </div>
 </header>
-{{-- ══ END NAVBAR ══ --}}
 
-{{-- ── Layout Wrapper ─────────────────────────────────────── --}}
+{{-- ── Layout Wrapper ── --}}
 <div class="flex pt-16 min-h-screen">
-
     {{-- ══════════════════════════════════════════════════════
          SIDEBAR
     ══════════════════════════════════════════════════════ --}}
@@ -275,7 +377,6 @@
                   shadow-xl shadow-gray-900/5 dark:shadow-navy-900/20
                   transition-transform duration-300 ease-in-out will-change-transform"
            :class="$store.app.sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
-
         {{-- Sidebar Top: User card --}}
         <div class="pt-20 px-4 pb-4 border-b border-gray-100 dark:border-navy-700/80">
             <div class="flex items-center gap-3 px-3 py-3
@@ -298,8 +399,6 @@
 
         {{-- Navigation --}}
         <nav class="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
-
-            {{-- Dashboard --}}
             <a href="{{ route('dashboard') }}"
                class="{{ request()->routeIs('dashboard') ? 'nav-item-active' : 'nav-item-inactive' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,11 +407,10 @@
                 </svg>
                 <span>Dashboard</span>
                 @if(request()->routeIs('dashboard'))
-                    <span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>
+                    <span class="ml-auto w-2 h-2 bg-gold-400 rounded-full animate-pulse"></span>
                 @endif
             </a>
 
-            {{-- Kepegawaian --}}
             @canaccess('kepegawaian')
             @php $kepActive = request()->routeIs('kepegawaian.*'); @endphp
             <div x-data="{ open: {{ $kepActive ? 'true' : 'false' }} }" class="space-y-0.5">
@@ -347,7 +445,6 @@
             </div>
             @endcanaccess
 
-            {{-- Anggaran --}}
             @canaccess('anggaran')
             @php $angActive = request()->routeIs('anggaran.*'); @endphp
             <div x-data="{ open: {{ $angActive ? 'true' : 'false' }} }" class="space-y-0.5">
@@ -384,7 +481,6 @@
             </div>
             @endcanaccess
 
-            {{-- Inventaris --}}
             @canaccess('inventaris')
             @php $invActive = request()->routeIs('inventaris.*'); @endphp
             <div x-data="{ open: {{ $invActive ? 'true' : 'false' }} }" class="space-y-0.5">
@@ -404,11 +500,11 @@
                 </button>
                 <div x-show="open" x-collapse class="pl-11 space-y-0.5 pt-0.5">
                     @php $invSubs = [
-                        ['route' => 'inventaris.kategori-atk.index',    'match' => 'inventaris.kategori-atk.*',    'label' => 'Kategori ATK'],
-                        ['route' => 'inventaris.monitoring-atk.index',  'match' => 'inventaris.monitoring-atk.*',  'label' => 'Monitoring ATK'],
-                        ['route' => 'inventaris.permintaan-atk.index',  'match' => 'inventaris.permintaan-atk.*',  'label' => 'Permintaan ATK'],
-                        ['route' => 'inventaris.kategori-aset.index',   'match' => 'inventaris.kategori-aset.*',   'label' => 'Kategori Aset'],
-                        ['route' => 'inventaris.aset-end-user.index',   'match' => 'inventaris.aset-end-user.*',   'label' => 'Aset End User'],
+                        ['route' => 'inventaris.kategori-atk.index',   'match' => 'inventaris.kategori-atk.*',   'label' => 'Kategori ATK'],
+                        ['route' => 'inventaris.monitoring-atk.index', 'match' => 'inventaris.monitoring-atk.*', 'label' => 'Monitoring ATK'],
+                        ['route' => 'inventaris.permintaan-atk.index', 'match' => 'inventaris.permintaan-atk.*', 'label' => 'Permintaan ATK'],
+                        ['route' => 'inventaris.kategori-aset.index',  'match' => 'inventaris.kategori-aset.*',  'label' => 'Kategori Aset'],
+                        ['route' => 'inventaris.aset-end-user.index',  'match' => 'inventaris.aset-end-user.*',  'label' => 'Aset End User'],
                     ]; @endphp
                     @foreach($invSubs as $sub)
                     <a href="{{ route($sub['route']) }}"
@@ -420,12 +516,10 @@
             </div>
             @endcanaccess
 
-            {{-- Admin Section --}}
             @canaccess('users')
             <div class="pt-3 pb-1">
                 <p class="section-label">Administrasi</p>
             </div>
-
             @php $adminLinks = [
                 ['route' => 'users.index',       'match' => 'users.*',       'label' => 'Manajemen User',
                  'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
@@ -434,7 +528,6 @@
                 ['route' => 'permissions.index', 'match' => 'permissions.*', 'label' => 'Kelola Permission',
                  'icon' => 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'],
             ]; @endphp
-
             @foreach($adminLinks as $link)
             <a href="{{ route($link['route']) }}"
                class="{{ request()->routeIs($link['match']) ? 'nav-item-active' : 'nav-item-inactive' }}">
@@ -443,12 +536,11 @@
                 </svg>
                 <span>{{ $link['label'] }}</span>
                 @if(request()->routeIs($link['match']))
-                    <span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>
+                    <span class="ml-auto w-2 h-2 bg-gold-400 rounded-full"></span>
                 @endif
             </a>
             @endforeach
             @endcanaccess
-
         </nav>
 
         {{-- Footer --}}
@@ -459,7 +551,6 @@
             </div>
         </div>
     </aside>
-    {{-- ══ END SIDEBAR ══ --}}
 
     {{-- Overlay (Mobile) --}}
     <div x-show="$store.app.sidebarOpen"
@@ -481,13 +572,9 @@
           :class="$store.app.sidebarOpen ? 'lg:ml-72' : 'ml-0'">
         <div class="min-h-[calc(100vh-4rem)] px-4 sm:px-6 lg:px-8 py-6 lg:py-8
                     bg-gray-50 dark:bg-navy-950 transition-colors duration-300">
-
-            {{-- Breadcrumb --}}
             @hasSection('breadcrumb')
             <div class="mb-5">@yield('breadcrumb')</div>
             @endif
-
-            {{-- Page Header --}}
             @hasSection('page_header')
             <div class="mb-6">@yield('page_header')</div>
             @elsehasSection('title')
@@ -523,15 +610,12 @@
             @endif
             @endforeach
 
-            {{-- Page Content --}}
             <div class="animate-fade-in">
                 @yield('content')
             </div>
-
         </div>
     </main>
 </div>
-{{-- ── End Layout ── --}}
 
 {{-- Scroll to Top --}}
 <button x-show="scrolled"
@@ -544,7 +628,7 @@
         x-transition:leave-end="opacity-0 translate-y-3 scale-90"
         class="fixed bottom-6 right-6 z-50 w-11 h-11 bg-navy-600 dark:bg-navy-500 text-white
                rounded-2xl shadow-lg shadow-navy-900/30 hover:bg-navy-700 dark:hover:bg-navy-400
-               flex items-center justify-center transition-colors duration-200"
+               hover:scale-110 flex items-center justify-center transition-all duration-200"
         style="display:none;"
         aria-label="Kembali ke atas">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -554,5 +638,49 @@
 
 @stack('modals')
 @stack('scripts')
+
+{{-- ── Global JS: app store + dark mode system default ── --}}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.store('app', {
+        // ── Dark mode: ikuti sistem, bisa di-override user ──
+        darkMode: (() => {
+            const saved = localStorage.getItem('situman_dark');
+            if (saved !== null) return saved === 'true';
+            return window.matchMedia('(prefers-color-scheme: dark)').matches;
+        })(),
+        sidebarOpen: window.innerWidth >= 1024,
+        isLoading: false,
+
+        toggleDarkMode() {
+            this.darkMode = !this.darkMode;
+            localStorage.setItem('situman_dark', this.darkMode);
+        },
+        toggleSidebar() {
+            this.sidebarOpen = !this.sidebarOpen;
+        },
+        setLoading(val) { this.isLoading = val; },
+    });
+
+    // Sinkronisasi perubahan system preference
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (localStorage.getItem('situman_dark') === null) {
+            Alpine.store('app').darkMode = e.matches;
+        }
+    });
+});
+
+// Auto-hide flash messages
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-auto-hide]').forEach(el => {
+        setTimeout(() => {
+            el.style.transition = 'opacity .4s, transform .4s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(() => el.remove(), 400);
+        }, 4500);
+    });
+});
+</script>
 </body>
 </html>
