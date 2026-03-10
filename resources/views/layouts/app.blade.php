@@ -40,110 +40,109 @@
 
 {{-- ===== PAGE LOADER ===== --}}
 <div id="page-loader"
-     class="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden
-            bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800"
+     class="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden"
+     style="background: linear-gradient(135deg, #0f172a 0%, #1a2332 50%, #243b53 100%);"
      aria-hidden="true">
 
-    {{-- Grid background --}}
-    <div class="absolute inset-0 bg-grid opacity-[0.07] pointer-events-none"></div>
+    {{-- Grid pattern --}}
+    <div class="absolute inset-0 pointer-events-none"
+         style="background-image: radial-gradient(circle, rgba(148,163,184,0.07) 1px, transparent 1px); background-size: 28px 28px;"></div>
 
-    {{-- Ambient glow blobs --}}
-    <div class="absolute top-1/3 left-1/3 w-96 h-96 rounded-full pointer-events-none"
-         style="background: radial-gradient(circle, rgba(71,101,129,0.25) 0%, transparent 70%); filter: blur(40px);"></div>
-    <div class="absolute bottom-1/3 right-1/3 w-80 h-80 rounded-full pointer-events-none"
-         style="background: radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%); filter: blur(40px);"></div>
+    {{-- Ambient glow --}}
+    <div class="absolute pointer-events-none"
+         style="top: 20%; left: 20%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(71,101,129,0.2) 0%, transparent 65%); filter: blur(40px); border-radius: 50%;"></div>
+    <div class="absolute pointer-events-none"
+         style="bottom: 20%; right: 20%; width: 320px; height: 320px; background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 65%); filter: blur(40px); border-radius: 50%;"></div>
 
     {{-- Floating particles --}}
-    <div class="absolute inset-0 pointer-events-none overflow-hidden">
-        @for($i = 0; $i < 8; $i++)
-        <div class="absolute rounded-full"
-             style="
-                width:  {{ [4,3,5,3,4,6,3,4][$i] }}px;
-                height: {{ [4,3,5,3,4,6,3,4][$i] }}px;
-                background: {{ ['rgba(251,191,36,0.4)','rgba(255,255,255,0.15)','rgba(251,191,36,0.25)','rgba(255,255,255,0.1)','rgba(251,191,36,0.3)','rgba(255,255,255,0.12)','rgba(251,191,36,0.2)','rgba(255,255,255,0.18)'][$i] }};
-                top:  {{ [15,72,30,55,80,20,65,45][$i] }}%;
-                left: {{ [20,75,55,35,15,85,45,65][$i] }}%;
-                animation: particleFloat {{ [3.5,4.2,3.8,5.0,4.5,3.2,4.8,3.9][$i] }}s {{ [0,0.8,0.4,1.2,0.6,1.5,0.2,1.0][$i] }}s ease-in-out infinite;
-             ">
-        </div>
-        @endfor
-    </div>
+    @php
+        $particles = [
+            ['size' => 4, 'color' => 'rgba(251,191,36,0.5)',  'top' => 15, 'left' => 20, 'dur' => 3.5, 'delay' => 0.0],
+            ['size' => 3, 'color' => 'rgba(255,255,255,0.15)','top' => 70, 'left' => 75, 'dur' => 4.2, 'delay' => 0.8],
+            ['size' => 5, 'color' => 'rgba(251,191,36,0.3)',  'top' => 30, 'left' => 55, 'dur' => 3.8, 'delay' => 0.4],
+            ['size' => 3, 'color' => 'rgba(255,255,255,0.1)', 'top' => 55, 'left' => 35, 'dur' => 5.0, 'delay' => 1.2],
+            ['size' => 4, 'color' => 'rgba(251,191,36,0.25)', 'top' => 80, 'left' => 15, 'dur' => 4.5, 'delay' => 0.6],
+            ['size' => 6, 'color' => 'rgba(255,255,255,0.1)', 'top' => 20, 'left' => 85, 'dur' => 3.2, 'delay' => 1.5],
+            ['size' => 3, 'color' => 'rgba(251,191,36,0.2)',  'top' => 65, 'left' => 45, 'dur' => 4.8, 'delay' => 0.2],
+            ['size' => 4, 'color' => 'rgba(255,255,255,0.18)','top' => 45, 'left' => 65, 'dur' => 3.9, 'delay' => 1.0],
+        ];
+    @endphp
+    @foreach($particles as $p)
+    <div class="absolute rounded-full loader-particle pointer-events-none"
+         style="
+            width: {{ $p['size'] }}px;
+            height: {{ $p['size'] }}px;
+            background: {{ $p['color'] }};
+            top: {{ $p['top'] }}%;
+            left: {{ $p['left'] }}%;
+            animation-duration: {{ $p['dur'] }}s;
+            animation-delay: {{ $p['delay'] }}s;
+         "></div>
+    @endforeach
 
     {{-- Main content --}}
     <div class="relative flex flex-col items-center gap-10 select-none px-8">
 
-        {{-- Logo + text --}}
+        {{-- Logo --}}
         <div class="loader-logo flex flex-col items-center gap-5">
-            {{-- Logo box --}}
-            <div class="loader-logo-box w-24 h-24 rounded-3xl flex items-center justify-center
-                        ring-1 ring-white/10"
-                 style="background: linear-gradient(135deg, #486581 0%, #243b53 100%);">
-                <span class="text-white font-bold text-4xl tracking-tight" style="font-family: 'Inter', sans-serif;">ST</span>
+            <div class="loader-logo-box w-24 h-24 rounded-3xl flex items-center justify-center"
+                 style="background: linear-gradient(135deg, #486581 0%, #243b53 100%); box-shadow: 0 0 0 1px rgba(255,255,255,0.08);">
+                <span class="text-white font-bold text-4xl" style="font-family:'Inter',sans-serif; letter-spacing:-1px;">ST</span>
             </div>
-
-            {{-- Text --}}
-            <div class="text-center space-y-1">
-                <h1 class="loader-title text-4xl font-bold text-white tracking-tight">SiTUMAN</h1>
-                <p class="loader-subtitle text-navy-300 text-sm font-medium tracking-wide">
+            <div class="text-center">
+                <h1 class="loader-title text-4xl font-bold text-white" style="letter-spacing:-1px;">SiTUMAN</h1>
+                <p class="loader-subtitle text-sm font-medium mt-1" style="color: #7898b8; letter-spacing: 0.05em;">
                     Sistem Informasi TU Biro Manajemen BMN dan Pengadaan
                 </p>
             </div>
         </div>
 
         {{-- Spinner + progress --}}
-        <div class="flex flex-col items-center gap-5 w-64">
+        <div class="flex flex-col items-center gap-5" style="width: 220px;">
 
-            {{-- SVG ring spinner --}}
-            <div class="relative w-14 h-14 flex items-center justify-center">
-                {{-- Static track --}}
-                <svg class="absolute w-14 h-14" viewBox="0 0 56 56">
-                    <circle cx="28" cy="28" r="24"
-                            fill="none"
-                            stroke="rgba(255,255,255,0.06)"
-                            stroke-width="3"/>
+            {{-- SVG Ring Spinner --}}
+            <div class="relative flex items-center justify-center" style="width: 56px; height: 56px;">
+
+                {{-- Track ring --}}
+                <svg style="position:absolute;width:56px;height:56px;" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="22" fill="none"
+                            stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
                 </svg>
 
-                {{-- Animated fill ring --}}
-                <svg class="absolute w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+                {{-- Fill ring (animates stroke-dashoffset) --}}
+                <svg style="position:absolute;width:56px;height:56px;transform:rotate(-90deg);" viewBox="0 0 56 56">
                     <defs>
-                        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%"   stop-color="#fbbf24"/>
-                            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.6"/>
+                        <linearGradient id="ringFill" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%"   stop-color="#f59e0b"/>
+                            <stop offset="100%" stop-color="#fbbf24"/>
                         </linearGradient>
                     </defs>
-                    <circle cx="28" cy="28" r="24"
-                            fill="none"
-                            stroke="url(#ringGrad)"
-                            stroke-width="3"
+                    <circle cx="28" cy="28" r="22" fill="none"
+                            stroke="url(#ringFill)" stroke-width="3"
                             stroke-linecap="round"
-                            stroke-dasharray="150.8"
-                            stroke-dashoffset="150.8"
+                            stroke-dasharray="138.2"
+                            stroke-dashoffset="138.2"
                             class="loader-circle"/>
                 </svg>
 
-                {{-- Spinning arc overlay --}}
-                <svg class="absolute w-14 h-14 loader-ring-rotate" viewBox="0 0 56 56"
-                     style="transform-box: fill-box; transform-origin: 50% 50%;">
-                    <circle cx="28" cy="28" r="24"
-                            fill="none"
-                            stroke="rgba(251,191,36,0.7)"
-                            stroke-width="3"
+                {{-- Spinning arc (separate SVG, rotates independently) --}}
+                <svg class="loader-spin-arc" style="position:absolute;width:56px;height:56px;" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="22" fill="none"
+                            stroke="rgba(251,191,36,0.8)" stroke-width="3"
                             stroke-linecap="round"
-                            stroke-dasharray="12 138.8"/>
+                            stroke-dasharray="10 128.2"/>
                 </svg>
 
                 {{-- Center dot --}}
-                <div class="w-2 h-2 bg-gold-400 rounded-full loader-dot-ping"></div>
+                <div class="loader-dot" style="width:8px;height:8px;background:#fbbf24;border-radius:50%;position:relative;z-index:1;"></div>
             </div>
 
             {{-- Progress bar --}}
-            <div class="w-full space-y-2">
-                <div class="h-0.5 w-full rounded-full overflow-hidden"
-                     style="background: rgba(255,255,255,0.08);">
-                    <div class="h-full rounded-full loader-bar"
-                         style="background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b); background-size: 200% 100%;"></div>
+            <div style="width:100%;">
+                <div style="height:2px;width:100%;background:rgba(255,255,255,0.07);border-radius:999px;overflow:hidden;">
+                    <div class="loader-bar" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:0%;"></div>
                 </div>
-                <p class="loader-status text-navy-400 text-xs text-center font-medium tracking-wide">
+                <p class="loader-status" style="color:#627d98;font-size:12px;text-align:center;margin-top:10px;font-weight:500;letter-spacing:0.03em;">
                     Memuat sistem...
                 </p>
             </div>
@@ -151,15 +150,15 @@
     </div>
 
     {{-- Footer --}}
-    <div class="absolute bottom-6 flex items-center gap-2 text-navy-600 text-xs">
+    <div style="position:absolute;bottom:24px;color:#334e68;font-size:11px;display:flex;align-items:center;gap:8px;">
         <span>SiTUMAN v2.0</span>
-        <span class="w-1 h-1 bg-navy-600 rounded-full"></span>
+        <span style="width:3px;height:3px;background:#334e68;border-radius:50%;display:inline-block;"></span>
         <span>© {{ date('Y') }}</span>
     </div>
 </div>
 {{-- ===== END PAGE LOADER ===== --}}
 
-{{-- Alpine loading overlay (AJAX / action) --}}
+{{-- Alpine loading overlay --}}
 <div x-show="$store.app.isLoading"
      x-transition:enter="transition-opacity duration-150"
      x-transition:enter-start="opacity-0"
@@ -177,7 +176,8 @@
 
 {{-- Toast Container --}}
 <div id="toast-container"
-     class="fixed top-4 right-4 z-[60] flex flex-col gap-2 w-80 pointer-events-none">
+     class="fixed top-4 right-4 z-[60] flex flex-col gap-2 w-80"
+     style="pointer-events:none;">
 </div>
 
 {{-- ===== NAVBAR ===== --}}
@@ -307,7 +307,6 @@
                                 border border-gray-100 dark:border-navy-700 py-1 z-50 origin-top-right"
                          style="display:none;">
 
-                        {{-- Header --}}
                         <div class="px-4 py-3 border-b border-gray-100 dark:border-navy-700">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-gradient-to-br from-navy-500 to-navy-700 rounded-full
@@ -330,7 +329,6 @@
                             </div>
                         </div>
 
-                        {{-- Menu Items --}}
                         <div class="py-1">
                             <a href="{{ route('profile') }}"
                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200
@@ -384,7 +382,6 @@
                             @endhasrole
                         </div>
 
-                        {{-- Logout --}}
                         <div class="border-t border-gray-100 dark:border-navy-700 pt-1 pb-1">
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
@@ -407,14 +404,12 @@
                         </div>
                     </div>
                 </div>
-                {{-- END User Menu --}}
             </div>
         </div>
     </div>
 </nav>
 {{-- ===== END NAVBAR ===== --}}
 
-{{-- Main Layout --}}
 <div class="flex pt-16 min-h-screen">
 
     {{-- ===== SIDEBAR ===== --}}
@@ -425,7 +420,6 @@
            :class="$store.app.sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
            aria-label="Sidebar navigasi">
 
-        {{-- Sidebar Header --}}
         <div class="p-4 border-b border-gray-200 dark:border-navy-700 pt-20">
             <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-navy-50 to-navy-100 dark:from-navy-700 dark:to-navy-600 rounded-xl">
                 <div class="w-11 h-11 bg-gradient-to-br from-navy-500 to-navy-700 rounded-xl
@@ -441,29 +435,22 @@
             </div>
         </div>
 
-        {{-- Navigation --}}
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 scrollbar-thin" aria-label="Menu utama">
 
-            {{-- Dashboard --}}
             @php $isDash = request()->routeIs('dashboard') @endphp
-            <a href="{{ route('dashboard') }}"
-               class="{{ $isDash ? 'nav-item-active' : 'nav-item-inactive' }}">
+            <a href="{{ route('dashboard') }}" class="{{ $isDash ? 'nav-item-active' : 'nav-item-inactive' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                 </svg>
                 Dashboard
-                @if($isDash)
-                <span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>
-                @endif
+                @if($isDash)<span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>@endif
             </a>
 
-            {{-- Kepegawaian --}}
             @canaccess('kepegawaian')
             @php $isKepeg = request()->routeIs('kepegawaian.*') @endphp
             <div x-data="{ open: @js($isKepeg) }" class="space-y-0.5">
-                <button @click="open = !open"
-                        class="w-full {{ $isKepeg ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
+                <button @click="open = !open" class="w-full {{ $isKepeg ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -471,23 +458,19 @@
                         </svg>
                         Kepegawaian
                     </div>
-                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }"
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
                 <div x-show="open" x-collapse class="pl-10 space-y-0.5">
-                    @php
-                        $kepegawaianLinks = [
-                            ['route' => 'kepegawaian.sebaran',      'pattern' => 'kepegawaian.sebaran*',  'label' => 'Sebaran Pegawai'],
-                            ['route' => 'kepegawaian.grading',      'pattern' => 'kepegawaian.grading*',  'label' => 'Kenaikan Grading'],
-                            ['route' => 'kepegawaian.mutasi',       'pattern' => 'kepegawaian.mutasi*',   'label' => 'Proyeksi Mutasi'],
-                            ['route' => 'kepegawaian.pegawai.index','pattern' => 'kepegawaian.pegawai*',  'label' => 'Kelola Data Pegawai'],
-                        ];
-                    @endphp
+                    @php $kepegawaianLinks = [
+                        ['route' => 'kepegawaian.sebaran',       'pattern' => 'kepegawaian.sebaran*', 'label' => 'Sebaran Pegawai'],
+                        ['route' => 'kepegawaian.grading',       'pattern' => 'kepegawaian.grading*', 'label' => 'Kenaikan Grading'],
+                        ['route' => 'kepegawaian.mutasi',        'pattern' => 'kepegawaian.mutasi*',  'label' => 'Proyeksi Mutasi'],
+                        ['route' => 'kepegawaian.pegawai.index', 'pattern' => 'kepegawaian.pegawai*', 'label' => 'Kelola Data Pegawai'],
+                    ]; @endphp
                     @foreach($kepegawaianLinks as $link)
-                    <a href="{{ route($link['route']) }}"
-                       class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
+                    <a href="{{ route($link['route']) }}" class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
                         {{ $link['label'] }}
                     </a>
                     @endforeach
@@ -495,12 +478,10 @@
             </div>
             @endcanaccess
 
-            {{-- Anggaran --}}
             @canaccess('anggaran')
             @php $isAnggaran = request()->routeIs('anggaran.*') @endphp
             <div x-data="{ open: @js($isAnggaran) }" class="space-y-0.5">
-                <button @click="open = !open"
-                        class="w-full {{ $isAnggaran ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
+                <button @click="open = !open" class="w-full {{ $isAnggaran ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -508,25 +489,21 @@
                         </svg>
                         Anggaran
                     </div>
-                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }"
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
                 <div x-show="open" x-collapse class="pl-10 space-y-0.5">
-                    @php
-                        $anggaranLinks = [
-                            ['route' => 'anggaran.data.index',      'pattern' => 'anggaran.data.*',      'label' => 'Kelola Data Anggaran'],
-                            ['route' => 'anggaran.monitoring.index', 'pattern' => 'anggaran.monitoring.*','label' => 'Monitoring Anggaran'],
-                            ['route' => 'anggaran.spp.index',        'pattern' => 'anggaran.spp.*',       'label' => 'Data SPP'],
-                            ['route' => 'anggaran.usulan.index',     'pattern' => 'anggaran.usulan.*',    'label' => 'Usulan Penarikan Dana'],
-                            ['route' => 'anggaran.dokumen.index',    'pattern' => 'anggaran.dokumen.*',   'label' => 'Dokumen Capaian Output'],
-                            ['route' => 'anggaran.revisi.index',     'pattern' => 'anggaran.revisi.*',    'label' => 'Revisi Anggaran'],
-                        ];
-                    @endphp
+                    @php $anggaranLinks = [
+                        ['route' => 'anggaran.data.index',      'pattern' => 'anggaran.data.*',      'label' => 'Kelola Data Anggaran'],
+                        ['route' => 'anggaran.monitoring.index', 'pattern' => 'anggaran.monitoring.*','label' => 'Monitoring Anggaran'],
+                        ['route' => 'anggaran.spp.index',        'pattern' => 'anggaran.spp.*',       'label' => 'Data SPP'],
+                        ['route' => 'anggaran.usulan.index',     'pattern' => 'anggaran.usulan.*',    'label' => 'Usulan Penarikan Dana'],
+                        ['route' => 'anggaran.dokumen.index',    'pattern' => 'anggaran.dokumen.*',   'label' => 'Dokumen Capaian Output'],
+                        ['route' => 'anggaran.revisi.index',     'pattern' => 'anggaran.revisi.*',    'label' => 'Revisi Anggaran'],
+                    ]; @endphp
                     @foreach($anggaranLinks as $link)
-                    <a href="{{ route($link['route']) }}"
-                       class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
+                    <a href="{{ route($link['route']) }}" class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
                         {{ $link['label'] }}
                     </a>
                     @endforeach
@@ -534,12 +511,10 @@
             </div>
             @endcanaccess
 
-            {{-- Inventaris --}}
             @canaccess('inventaris')
             @php $isInv = request()->routeIs('inventaris.*') @endphp
             <div x-data="{ open: @js($isInv) }" class="space-y-0.5">
-                <button @click="open = !open"
-                        class="w-full {{ $isInv ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
+                <button @click="open = !open" class="w-full {{ $isInv ? 'nav-item-active' : 'nav-item-inactive' }} justify-between">
                     <div class="flex items-center gap-3">
                         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -547,24 +522,20 @@
                         </svg>
                         Inventaris
                     </div>
-                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }"
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 flex-shrink-0 transition-transform duration-200" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                 </button>
                 <div x-show="open" x-collapse class="pl-10 space-y-0.5">
-                    @php
-                        $inventarisLinks = [
-                            ['route' => 'inventaris.kategori-atk.index',   'pattern' => 'inventaris.kategori-atk.*',   'label' => 'Kategori ATK'],
-                            ['route' => 'inventaris.monitoring-atk.index', 'pattern' => 'inventaris.monitoring-atk.*', 'label' => 'Monitoring ATK'],
-                            ['route' => 'inventaris.permintaan-atk.index', 'pattern' => 'inventaris.permintaan-atk.*', 'label' => 'Permintaan ATK'],
-                            ['route' => 'inventaris.kategori-aset.index',  'pattern' => 'inventaris.kategori-aset.*',  'label' => 'Kategori Aset'],
-                            ['route' => 'inventaris.aset-end-user.index',  'pattern' => 'inventaris.aset-end-user.*',  'label' => 'Aset End User'],
-                        ];
-                    @endphp
+                    @php $inventarisLinks = [
+                        ['route' => 'inventaris.kategori-atk.index',   'pattern' => 'inventaris.kategori-atk.*',   'label' => 'Kategori ATK'],
+                        ['route' => 'inventaris.monitoring-atk.index', 'pattern' => 'inventaris.monitoring-atk.*', 'label' => 'Monitoring ATK'],
+                        ['route' => 'inventaris.permintaan-atk.index', 'pattern' => 'inventaris.permintaan-atk.*', 'label' => 'Permintaan ATK'],
+                        ['route' => 'inventaris.kategori-aset.index',  'pattern' => 'inventaris.kategori-aset.*',  'label' => 'Kategori Aset'],
+                        ['route' => 'inventaris.aset-end-user.index',  'pattern' => 'inventaris.aset-end-user.*',  'label' => 'Aset End User'],
+                    ]; @endphp
                     @foreach($inventarisLinks as $link)
-                    <a href="{{ route($link['route']) }}"
-                       class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
+                    <a href="{{ route($link['route']) }}" class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
                         {{ $link['label'] }}
                     </a>
                     @endforeach
@@ -572,39 +543,32 @@
             </div>
             @endcanaccess
 
-            {{-- Administrasi --}}
             @canaccess('users')
             <div class="pt-3 pb-1">
                 <p class="section-label">Administrasi</p>
             </div>
-            @php
-                $adminLinks = [
-                    ['route' => 'users.index',       'pattern' => 'users.*',       'label' => 'Manajemen User',
-                     'path' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
-                    ['route' => 'roles.index',       'pattern' => 'roles.*',       'label' => 'Kelola Role',
-                     'path' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
-                    ['route' => 'permissions.index', 'pattern' => 'permissions.*', 'label' => 'Kelola Permission',
-                     'path' => 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'],
-                ];
-            @endphp
+            @php $adminLinks = [
+                ['route' => 'users.index',       'pattern' => 'users.*',       'label' => 'Manajemen User',
+                 'path' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
+                ['route' => 'roles.index',       'pattern' => 'roles.*',       'label' => 'Kelola Role',
+                 'path' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
+                ['route' => 'permissions.index', 'pattern' => 'permissions.*', 'label' => 'Kelola Permission',
+                 'path' => 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'],
+            ]; @endphp
             @foreach($adminLinks as $link)
             @php $isActive = request()->routeIs($link['pattern']) @endphp
-            <a href="{{ route($link['route']) }}"
-               class="{{ $isActive ? 'nav-item-active' : 'nav-item-inactive' }}">
+            <a href="{{ route($link['route']) }}" class="{{ $isActive ? 'nav-item-active' : 'nav-item-inactive' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $link['path'] }}"/>
                 </svg>
                 {{ $link['label'] }}
-                @if($isActive)
-                <span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>
-                @endif
+                @if($isActive)<span class="ml-auto w-1.5 h-1.5 bg-gold-400 rounded-full"></span>@endif
             </a>
             @endforeach
             @endcanaccess
 
         </nav>
 
-        {{-- Sidebar Footer --}}
         <div class="p-4 border-t border-gray-200 dark:border-navy-700">
             <div class="flex items-center justify-between text-xs text-gray-400 dark:text-gray-600">
                 <span>SiTUMAN v2.0</span>
@@ -614,7 +578,6 @@
     </aside>
     {{-- ===== END SIDEBAR ===== --}}
 
-    {{-- Overlay Mobile --}}
     <div x-show="$store.app.sidebarOpen"
          @click="$store.app.sidebarOpen = false"
          class="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden"
@@ -624,20 +587,17 @@
          x-transition:leave="transition-opacity duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         style="display:none;"
-         aria-hidden="true"></div>
+         style="display:none;" aria-hidden="true"></div>
 
     {{-- ===== MAIN CONTENT ===== --}}
     <main class="flex-1 min-w-0 transition-[margin] duration-300 ease-in-out overflow-x-hidden"
           :class="$store.app.sidebarOpen ? 'lg:ml-72' : 'ml-0'">
         <div class="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 min-h-screen bg-gray-50 dark:bg-navy-900 transition-colors duration-200">
 
-            {{-- Breadcrumb --}}
             @hasSection('breadcrumb')
             <div class="mb-6">@yield('breadcrumb')</div>
             @endif
 
-            {{-- Page Header --}}
             @hasSection('page_header')
             <div class="mb-6">@yield('page_header')</div>
             @else
@@ -651,11 +611,10 @@
                 @endif
             @endif
 
-            {{-- Flash Messages --}}
             @foreach([
-                'success' => ['bg-green-50 dark:bg-green-900/20', 'border-green-200 dark:border-green-700', 'text-green-800 dark:text-green-400', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
-                'error'   => ['bg-red-50 dark:bg-red-900/20',     'border-red-200 dark:border-red-700',     'text-red-800 dark:text-red-400',     'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
-                'warning' => ['bg-yellow-50 dark:bg-yellow-900/20','border-yellow-200 dark:border-yellow-700','text-yellow-800 dark:text-yellow-400','M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'],
+                'success' => ['bg-green-50 dark:bg-green-900/20',   'border-green-200 dark:border-green-700',   'text-green-800 dark:text-green-400',   'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
+                'error'   => ['bg-red-50 dark:bg-red-900/20',       'border-red-200 dark:border-red-700',       'text-red-800 dark:text-red-400',       'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                'warning' => ['bg-yellow-50 dark:bg-yellow-900/20', 'border-yellow-200 dark:border-yellow-700', 'text-yellow-800 dark:text-yellow-400', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'],
             ] as $type => [$bg, $border, $text, $path])
                 @if(session($type))
                 <div class="mb-5 {{ $bg }} border {{ $border }} {{ $text }} px-4 py-3 rounded-xl flex items-center gap-3"
@@ -668,7 +627,6 @@
                 @endif
             @endforeach
 
-            {{-- Content --}}
             <div class="animate-fade-in">
                 @yield('content')
             </div>
@@ -676,7 +634,6 @@
     </main>
 </div>
 
-{{-- Scroll to Top --}}
 <button x-show="isScrolled"
         @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
         x-transition:enter="transition ease-out duration-200"
@@ -688,8 +645,7 @@
         class="fixed bottom-6 right-6 p-3 bg-navy-600 text-white rounded-full shadow-lg
                hover:bg-navy-700 hover:scale-110 active:scale-95
                transition-[transform,background-color] duration-200 z-40"
-        style="display:none;"
-        aria-label="Kembali ke atas">
+        style="display:none;" aria-label="Kembali ke atas">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
     </svg>

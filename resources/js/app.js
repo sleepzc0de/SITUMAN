@@ -19,23 +19,19 @@ Alpine.plugin(persist);
     const loader = document.getElementById('page-loader');
     if (!loader) return;
 
-    const STATUS_MESSAGES = [
-        'Memuat sistem...',
-        'Menyiapkan data...',
-        'Hampir selesai...',
-    ];
-
-    let msgIndex = 0;
+    const MESSAGES = ['Memuat sistem...', 'Menyiapkan data...', 'Hampir selesai...'];
+    let msgIndex  = 0;
     let dismissed = false;
+
     const statusEl = loader.querySelector('.loader-status');
 
-    // Rotasi status text setiap 700ms
+    // Rotasi teks status setiap 700ms
     const msgTimer = setInterval(() => {
         if (!statusEl) return;
-        msgIndex = (msgIndex + 1) % STATUS_MESSAGES.length;
+        msgIndex = (msgIndex + 1) % MESSAGES.length;
         statusEl.style.opacity = '0';
         setTimeout(() => {
-            statusEl.textContent = STATUS_MESSAGES[msgIndex];
+            statusEl.textContent = MESSAGES[msgIndex];
             statusEl.style.opacity = '1';
         }, 200);
     }, 700);
@@ -48,14 +44,14 @@ Alpine.plugin(persist);
         loader.addEventListener('transitionend', () => loader.remove(), { once: true });
     };
 
-    // Tunggu halaman benar-benar selesai load + minimal 1.4s
+    // Dismiss setelah halaman selesai + minimal 1.4 detik
     if (document.readyState === 'complete') {
         setTimeout(dismiss, 1400);
     } else {
         window.addEventListener('load', () => setTimeout(dismiss, 1400), { once: true });
     }
 
-    // Safety fallback maksimal 5 detik
+    // Safety fallback
     setTimeout(dismiss, 5000);
 })();
 
@@ -73,12 +69,10 @@ Alpine.store('app', {
 
         this._applyDark();
 
-        // Sidebar auto-close saat resize ke mobile
         window.addEventListener('resize', () => {
             if (window.innerWidth < 1024) this.sidebarOpen = false;
         }, { passive: true });
 
-        // Ikuti system preference jika belum ada override manual
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
             if (localStorage.getItem('darkMode') === null) {
                 this.darkMode = e.matches;
@@ -129,14 +123,13 @@ window.formatCurrency = v =>
 window.formatDate = d =>
     new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-// ── Toast System ──────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────
 const TOAST_COLORS = {
     success: 'bg-emerald-500',
     error:   'bg-red-500',
     warning: 'bg-amber-500',
     info:    'bg-sky-500',
 };
-
 const TOAST_ICONS = {
     success: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
     error:   `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>`,
