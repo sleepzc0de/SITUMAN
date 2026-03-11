@@ -1,7 +1,5 @@
 @extends('layouts.app')
-
 @section('title', 'Monitoring Anggaran')
-
 @section('breadcrumb')
 <nav class="breadcrumb">
     <a href="{{ route('dashboard') }}" class="breadcrumb-item">Dashboard</a>
@@ -9,7 +7,6 @@
     <span class="breadcrumb-current">Monitoring Anggaran</span>
 </nav>
 @endsection
-
 @section('page_header')
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
@@ -17,7 +14,6 @@
         <p class="page-subtitle">Pantau realisasi, SPP, dan sisa anggaran secara terintegrasi</p>
     </div>
     <div class="flex flex-wrap gap-2">
-
         @hasrole('superadmin|admin')
         <form method="POST"
               action="{{ route('anggaran.monitoring.recalculate') }}"
@@ -33,7 +29,6 @@
             </button>
         </form>
         @endhasrole
-
         <button onclick="window.print()" class="btn btn-outline btn-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -43,8 +38,7 @@
             </svg>
             Cetak
         </button>
-
-        <a href="{{ route('anggaran.monitoring.export', array_filter(['ro' => $ro, 'subkomponen' => $subkomponen], fn($v) => $v !== 'all')) }}"
+        <a x-data x-bind:href="$store.monitoring ? $store.monitoring.exportUrl : '#'"
            class="btn btn-secondary btn-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -53,83 +47,420 @@
             </svg>
             Export Excel
         </a>
-
     </div>
 </div>
 @endsection
 
+@push('scripts')
+@php
+    $jsGroupedData = $groupedData->map(fn($roData) => $roData->map(fn($item) => [
+        'ro'                  => $item->ro,
+        'kode_subkomponen'    => $item->kode_subkomponen,
+        'kode_akun'           => $item->kode_akun,
+        'program_kegiatan'    => $item->program_kegiatan,
+        'pagu_anggaran'       => (float) $item->pagu_anggaran,
+        'tagihan_outstanding' => (float) $item->tagihan_outstanding,
+        'total_penyerapan'    => (float) $item->total_penyerapan,
+        'sisa'                => (float) $item->sisa,
+        'januari'             => (float) $item->januari,
+        'februari'            => (float) $item->februari,
+        'maret'               => (float) $item->maret,
+        'april'               => (float) $item->april,
+        'mei'                 => (float) $item->mei,
+        'juni'                => (float) $item->juni,
+        'juli'                => (float) $item->juli,
+        'agustus'             => (float) $item->agustus,
+        'september'           => (float) $item->september,
+        'oktober'             => (float) $item->oktober,
+        'november'            => (float) $item->november,
+        'desember'            => (float) $item->desember,
+    ])->values());
+    $jsRecentSPP = $recentSPP->map(fn($s) => [
+        'id'         => $s->id,
+        'no_spp'     => $s->no_spp,
+        'tgl_spp'    => $s->tgl_spp?->format('d/m/Y'),
+        'uraian_spp' => $s->uraian_spp,
+        'ro'         => $s->ro,
+        'netto'      => (float) $s->netto,
+        'status'     => $s->status,
+    ]);
+    $jsUsulanPending = $usulanPending->map(fn($u) => [
+        'ro'           => $u->ro,
+        'bulan'        => $u->bulan,
+        'nilai_usulan' => (float) $u->nilai_usulan,
+        'user'         => ['nama' => $u->user->nama ?? '-'],
+    ]);
+    $jsSubkomponenList = $subkomponenList;
+    $jsRoNames         = collect($roList)->pluck('name', 'code');
+@endphp
+<script>
+// ── Debounce utility (defined BEFORE alpine:init) ─────────────
+function _debounce(fn, delay) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// ── Alpine Store + Component — registered inside alpine:init ──
+document.addEventListener('alpine:init', () => {
+
+    // Store
+    Alpine.store('monitoring', {
+        filters: { ro: 'all', subkomponen: 'all' },
+        get exportUrl() {
+            const p = new URLSearchParams();
+            if (this.filters.ro          !== 'all') p.set('ro',          this.filters.ro);
+            if (this.filters.subkomponen !== 'all') p.set('subkomponen', this.filters.subkomponen);
+            const qs = p.toString();
+            return `{{ route('anggaran.monitoring.export') }}${qs ? '?' + qs : ''}`;
+        },
+    });
+
+    // Component
+    Alpine.data('monitoringAnggaran', () => ({
+
+        // ── State ────────────────────────────────────────────
+        loading: false,
+        filters: {
+            ro:          '{{ $ro }}',
+            subkomponen: '{{ $subkomponen }}',
+            bulan:       '{{ $bulan }}',
+        },
+        totals: {
+            pagu:        {{ (float) $totalPagu }},
+            realisasi:   {{ (float) $totalRealisasi }},
+            sisa:        {{ (float) $totalSisa }},
+            outstanding: {{ (float) $totalOutstanding }},
+        },
+        sppStats: {
+            total:      {{ $sppStats['total'] }},
+            sudah_sp2d: {{ $sppStats['sudah_sp2d'] }},
+            belum_sp2d: {{ $sppStats['belum_sp2d'] }},
+            nilai_sp2d: {{ (float) $sppStats['nilai_sp2d'] }},
+        },
+        recentSPP:          @json($jsRecentSPP),
+        usulanPending:      @json($jsUsulanPending),
+        totalUsulanPending: {{ (float) $totalUsulanPending }},
+        dokumenCount:       {{ $dokumenCount }},
+        chartData:          @json($chartData),
+        chartLabels:        @json($chartLabels),
+        groupedData:        @json($jsGroupedData),
+        subkomponenList:    @json($jsSubkomponenList),
+        roNames:            @json($jsRoNames),
+        chartInstance:      null,
+        _debouncedFetch:    null,   // will hold the debounced wrapper
+
+        // ── Computed ─────────────────────────────────────────
+        get pctRealisasi() {
+            return this.totals.pagu > 0
+                ? (this.totals.realisasi / this.totals.pagu) * 100 : 0;
+        },
+        get pctSisa() {
+            return this.totals.pagu > 0
+                ? (this.totals.sisa / this.totals.pagu) * 100 : 0;
+        },
+
+        // ── Init ─────────────────────────────────────────────
+        init() {
+            // Build debounced fetch once — avoids window.debounce dependency
+            this._debouncedFetch = _debounce(() => this.fetchData(), 400);
+
+            Alpine.store('monitoring').filters.ro          = this.filters.ro;
+            Alpine.store('monitoring').filters.subkomponen = this.filters.subkomponen;
+            this.$nextTick(() => this.initChart());
+        },
+
+        // ── Filter ───────────────────────────────────────────
+        onFilterChange() {
+            Alpine.store('monitoring').filters.ro          = this.filters.ro;
+            Alpine.store('monitoring').filters.subkomponen = this.filters.subkomponen;
+            this._debouncedFetch();
+        },
+        resetFilters() {
+            this.filters = { ro: 'all', subkomponen: 'all', bulan: 'all' };
+            Alpine.store('monitoring').filters.ro          = 'all';
+            Alpine.store('monitoring').filters.subkomponen = 'all';
+            this.fetchData();
+        },
+
+        // ── Fetch ─────────────────────────────────────────────
+        async fetchData() {
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({
+                    ro:          this.filters.ro,
+                    subkomponen: this.filters.subkomponen,
+                    bulan:       this.filters.bulan,
+                });
+                const res = await fetch(
+                    `{{ route('anggaran.monitoring.data') }}?${params}`,
+                    {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept':           'application/json',
+                            'X-CSRF-TOKEN':     document.querySelector('meta[name=csrf-token]').content,
+                        }
+                    }
+                );
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const json = await res.json();
+                this.totals             = json.totals;
+                this.sppStats           = json.sppStats;
+                this.recentSPP          = json.recentSPP;
+                this.usulanPending      = json.usulanPending;
+                this.totalUsulanPending = json.totalUsulanPending;
+                this.dokumenCount       = json.dokumenCount;
+                this.subkomponenList    = json.subkomponenList;
+                this.groupedData        = json.groupedData;
+                this.roNames            = json.roNames;
+                this.chartData          = json.chartData;
+                this.updateChart();
+            } catch (e) {
+                console.error(e);
+                if (typeof window.showToast === 'function') {
+                    window.showToast('Gagal memuat data. Silakan coba lagi.', 'error');
+                }
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        // ── Chart ─────────────────────────────────────────────
+        initChart() {
+            const ctx = document.getElementById('chartRealisasi');
+            if (!ctx || typeof Chart === 'undefined') return;
+            const isDark     = document.documentElement.classList.contains('dark');
+            const gridColor  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+            const labelColor = isDark ? '#9fb3c8' : '#627d98';
+            this.chartInstance = new Chart(ctx, {
+                data: {
+                    labels: this.chartLabels,
+                    datasets: [
+                        {
+                            type:            'bar',
+                            label:           'Realisasi Bulanan',
+                            data:            [...this.chartData],
+                            backgroundColor: 'rgba(16,185,129,0.55)',
+                            borderColor:     'rgba(16,185,129,0.85)',
+                            borderWidth:     1.5,
+                            borderRadius:    5,
+                            borderSkipped:   false,
+                            order:           2,
+                        },
+                        {
+                            type:                 'line',
+                            label:                'Kumulatif',
+                            data:                 this.cumulative(this.chartData),
+                            borderColor:          '#486581',
+                            backgroundColor:      'rgba(72,101,129,0.07)',
+                            borderWidth:          2,
+                            pointRadius:          3,
+                            pointHoverRadius:     5,
+                            pointBackgroundColor: '#486581',
+                            tension:              0.35,
+                            fill:                 true,
+                            order:                1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display:  true,
+                            position: 'top',
+                            labels: {
+                                color:    labelColor,
+                                font:     { size: 11 },
+                                boxWidth: 12,
+                                padding:  14,
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx =>
+                                    `${ctx.dataset.label}: ${
+                                        typeof window.formatCurrencyShort === 'function'
+                                            ? window.formatCurrencyShort(ctx.parsed.y)
+                                            : ctx.parsed.y
+                                    }`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid:  { color: gridColor },
+                            ticks: { color: labelColor, font: { size: 10 } },
+                        },
+                        y: {
+                            grid:  { color: gridColor },
+                            ticks: {
+                                color:    labelColor,
+                                font:     { size: 10 },
+                                callback: v =>
+                                    typeof window.formatCurrencyShort === 'function'
+                                        ? window.formatCurrencyShort(v) : v,
+                            },
+                            beginAtZero: true,
+                        }
+                    }
+                }
+            });
+        },
+        updateChart() {
+            if (!this.chartInstance) return;
+            this.chartInstance.data.datasets[0].data = [...this.chartData];
+            this.chartInstance.data.datasets[1].data = this.cumulative(this.chartData);
+            this.chartInstance.update('active');
+        },
+
+        // ── Helpers ───────────────────────────────────────────
+        cumulative(data) {
+            return data.reduce((acc, v, i) => {
+                acc.push((acc[i - 1] ?? 0) + v);
+                return acc;
+            }, []);
+        },
+        fmt(v) {
+            return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(v ?? 0));
+        },
+        fmtShort(v) {
+            v = v ?? 0;
+            if (v >= 1e12) return 'Rp ' + (v / 1e12).toFixed(1) + ' T';
+            if (v >= 1e9)  return 'Rp ' + (v / 1e9).toFixed(1)  + ' M';
+            if (v >= 1e6)  return 'Rp ' + (v / 1e6).toFixed(1)  + ' jt';
+            if (v >= 1e3)  return 'Rp ' + (v / 1e3).toFixed(0)  + ' rb';
+            return 'Rp ' + v;
+        },
+        capitalize(str) {
+            if (!str) return '';
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        },
+        itemPct(item) {
+            return item.pagu_anggaran > 0
+                ? (item.total_penyerapan / item.pagu_anggaran) * 100 : 0;
+        },
+        roPct(roData) {
+            const arr      = Array.isArray(roData) ? roData : Object.values(roData);
+            const roRow    = arr.find(r => !r.kode_subkomponen && !r.kode_akun);
+            const children = arr.filter(r => !r.kode_akun);
+            const pagu     = roRow?.pagu_anggaran
+                ?? children.reduce((s, r) => s + r.pagu_anggaran, 0);
+            const real     = roRow?.total_penyerapan
+                ?? children.reduce((s, r) => s + r.total_penyerapan, 0);
+            return pagu > 0 ? (real / pagu) * 100 : 0;
+        },
+        roSummary(roData) {
+            const arr   = Array.isArray(roData) ? roData : Object.values(roData);
+            const roRow = arr.find(r => !r.kode_subkomponen && !r.kode_akun);
+            if (roRow) {
+                return {
+                    pagu:        roRow.pagu_anggaran,
+                    realisasi:   roRow.total_penyerapan,
+                    sisa:        roRow.sisa,
+                    outstanding: roRow.tagihan_outstanding,
+                };
+            }
+            const children = arr.filter(r => !r.kode_akun);
+            return {
+                pagu:        children.reduce((s, r) => s + r.pagu_anggaran, 0),
+                realisasi:   children.reduce((s, r) => s + r.total_penyerapan, 0),
+                sisa:        children.reduce((s, r) => s + r.sisa, 0),
+                outstanding: children.reduce((s, r) => s + r.tagihan_outstanding, 0),
+            };
+        },
+        badgeClass(pct) {
+            if (pct >= 80) return 'badge-success';
+            if (pct >= 50) return 'badge-warning';
+            return 'badge-danger';
+        },
+        barColor(pct) {
+            if (pct >= 80) return 'bg-green-500';
+            if (pct >= 50) return 'bg-amber-500';
+            return 'bg-red-400';
+        },
+    }));
+});
+</script>
+@endpush
 
 @section('content')
-<div class="space-y-6">
-
+<div
+    class="space-y-6"
+    x-data="monitoringAnggaran"
+>
     {{-- ===== FILTERS ===== --}}
     <div class="card">
-        <form method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="input-group">
                 <label class="input-label">RO</label>
-                <select name="ro" class="input-field" data-auto-submit>
+                <select class="input-field" x-model="filters.ro" @change="onFilterChange()">
                     <option value="all">Semua RO</option>
                     @foreach($roList as $item)
-                        <option value="{{ $item['code'] }}"
-                                {{ $ro === $item['code'] ? 'selected' : '' }}>
+                        <option value="{{ $item['code'] }}">
                             {{ $item['code'] }} — {{ Str::limit($item['name'], 35) }}
                         </option>
                     @endforeach
                 </select>
             </div>
-
             <div class="input-group">
                 <label class="input-label">Sub Komponen</label>
-                <select name="subkomponen" class="input-field" data-auto-submit>
+                <select class="input-field" x-model="filters.subkomponen" @change="onFilterChange()">
                     <option value="all">Semua Sub Komponen</option>
-                    @foreach($subkomponenList as $code => $name)
-                        <option value="{{ $code }}"
-                                {{ $subkomponen === $code ? 'selected' : '' }}>
-                            {{ $code }} — {{ Str::limit($name, 30) }}
+                    <template x-for="[code, name] in Object.entries(subkomponenList)" :key="code">
+                        <option :value="code"
+                                :selected="filters.subkomponen === code"
+                                x-text="`${code} — ${String(name).substring(0, 35)}`">
                         </option>
-                    @endforeach
+                    </template>
                 </select>
             </div>
-
             <div class="input-group">
                 <label class="input-label">Bulan</label>
-                <select name="bulan" class="input-field" data-auto-submit>
+                <select class="input-field" x-model="filters.bulan" @change="onFilterChange()">
                     <option value="all">Semua Bulan</option>
                     @foreach($bulanList as $b)
-                        <option value="{{ $b }}"
-                                {{ $bulan === $b ? 'selected' : '' }}>
-                            {{ ucfirst($b) }}
-                        </option>
+                        <option value="{{ $b }}">{{ ucfirst($b) }}</option>
                     @endforeach
                 </select>
             </div>
-
             <div class="input-group">
                 <label class="input-label">&nbsp;</label>
-                <a href="{{ route('anggaran.monitoring.index') }}" class="btn btn-ghost w-full">
+                <button @click="resetFilters()" class="btn btn-ghost w-full">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                     Reset Filter
-                </a>
+                </button>
             </div>
+        </div>
+    </div>
 
-        </form>
+    {{-- ===== LOADING OVERLAY ===== --}}
+    <div x-show="loading"
+         x-transition:enter="transition-opacity duration-150"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 flex items-center justify-center
+                bg-white/60 dark:bg-navy-900/60 backdrop-blur-sm"
+         style="display:none;">
+        <div class="flex flex-col items-center gap-3">
+            <div class="w-10 h-10 border-4 border-navy-200 border-t-navy-600
+                        rounded-full animate-spin"></div>
+            <p class="text-sm font-medium text-navy-600 dark:text-navy-300">Memuat data...</p>
+        </div>
     </div>
 
     {{-- ===== KPI CARDS ===== --}}
-    @php
-        $pctRealisasi  = calculate_percentage($totalRealisasi, $totalPagu);
-        $pctSisa       = calculate_percentage($totalSisa, $totalPagu);
-        $gradRealisasi = $pctRealisasi >= 80
-            ? 'from-emerald-500 to-emerald-700'
-            : ($pctRealisasi >= 50 ? 'from-yellow-500 to-yellow-600' : 'from-red-500 to-red-700');
-    @endphp
-
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
         {{-- Total Pagu --}}
         <div class="card bg-gradient-to-br from-navy-600 to-navy-800 border-0 text-white">
             <div class="flex items-start justify-between gap-2">
@@ -137,38 +468,42 @@
                     <p class="text-[11px] font-semibold text-navy-200 uppercase tracking-wider">
                         Total Pagu
                     </p>
-                    <p class="text-lg lg:text-xl font-bold mt-1 truncate">
-                        {{ formatRupiah($totalPagu) }}
-                    </p>
+                    <p class="text-lg lg:text-xl font-bold mt-1 truncate"
+                       x-text="fmt(totals.pagu)"></p>
                     <p class="text-[11px] text-navy-300 mt-1">Anggaran ditetapkan</p>
                 </div>
                 <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3
-                                 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11
-                                 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343
+                                 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1
+                                 c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                 </div>
             </div>
         </div>
 
         {{-- Total Realisasi --}}
-        <div class="card bg-gradient-to-br {{ $gradRealisasi }} border-0 text-white">
+        <div class="card border-0 text-white"
+             :class="pctRealisasi >= 80
+                ? 'bg-gradient-to-br from-emerald-500 to-emerald-700'
+                : (pctRealisasi >= 50
+                    ? 'bg-gradient-to-br from-yellow-500 to-yellow-600'
+                    : 'bg-gradient-to-br from-red-500 to-red-700')">
             <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
                         Total Realisasi
                     </p>
-                    <p class="text-lg lg:text-xl font-bold mt-1 truncate">
-                        {{ formatRupiah($totalRealisasi) }}
-                    </p>
+                    <p class="text-lg lg:text-xl font-bold mt-1 truncate"
+                       x-text="fmt(totals.realisasi)"></p>
                     <div class="flex items-center gap-1.5 mt-2">
                         <div class="flex-1 h-1 bg-white/25 rounded-full overflow-hidden">
                             <div class="h-full bg-white rounded-full transition-all duration-700"
-                                 style="width:{{ min($pctRealisasi, 100) }}%"></div>
+                                 :style="`width:${Math.min(pctRealisasi, 100)}%`"></div>
                         </div>
-                        <span class="text-[11px] font-bold">{{ number_format($pctRealisasi, 1) }}%</span>
+                        <span class="text-[11px] font-bold"
+                              x-text="`${pctRealisasi.toFixed(1)}%`"></span>
                     </div>
                 </div>
                 <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -187,9 +522,8 @@
                     <p class="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
                         Outstanding
                     </p>
-                    <p class="text-lg lg:text-xl font-bold mt-1 truncate">
-                        {{ formatRupiah($totalOutstanding) }}
-                    </p>
+                    <p class="text-lg lg:text-xl font-bold mt-1 truncate"
+                       x-text="fmt(totals.outstanding)"></p>
                     <p class="text-[11px] text-white/70 mt-1">Tagihan belum SP2D</p>
                 </div>
                 <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -208,12 +542,10 @@
                     <p class="text-[11px] font-semibold text-white/70 uppercase tracking-wider">
                         Sisa Anggaran
                     </p>
-                    <p class="text-lg lg:text-xl font-bold mt-1 truncate">
-                        {{ formatRupiah($totalSisa) }}
-                    </p>
-                    <p class="text-[11px] text-white/70 mt-1">
-                        {{ number_format($pctSisa, 1) }}% dari pagu
-                    </p>
+                    <p class="text-lg lg:text-xl font-bold mt-1 truncate"
+                       x-text="fmt(totals.sisa)"></p>
+                    <p class="text-[11px] text-white/70 mt-1"
+                       x-text="`${pctSisa.toFixed(1)}% dari pagu`"></p>
                 </div>
                 <div class="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,20 +556,28 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     {{-- ===== ALERT THRESHOLD ===== --}}
-    @if($pctRealisasi < 50 && $totalPagu > 0)
-    <div class="alert alert-warning">
+    <div x-show="pctRealisasi < 50 && totals.pagu > 0"
+         x-transition:enter="transition-opacity duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="alert alert-warning"
+         style="display:none;">
         <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732
-                     4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667
+                     1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34
+                     16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
         <div>
             <p class="font-semibold">
-                Penyerapan Anggaran Rendah — {{ number_format($pctRealisasi, 1) }}%
+                Penyerapan Anggaran Rendah —
+                <span x-text="`${pctRealisasi.toFixed(1)}%`"></span>
             </p>
             <p class="text-sm mt-0.5">
                 Segera tindaklanjuti
@@ -249,12 +589,10 @@
             </p>
         </div>
     </div>
-    @endif
 
     {{-- ===== CHART + PANEL INTEGRASI ===== --}}
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-        {{-- Chart Realisasi per Bulan --}}
+        {{-- Chart --}}
         <div class="xl:col-span-2 card">
             <div class="section-header">
                 <div>
@@ -271,7 +609,6 @@
 
         {{-- Panel Kanan --}}
         <div class="flex flex-col gap-4">
-
             {{-- SPP Stats --}}
             <div class="card">
                 <div class="flex items-center justify-between mb-3">
@@ -283,29 +620,25 @@
                 </div>
                 <div class="grid grid-cols-3 gap-2 text-center">
                     <div class="bg-gray-50 dark:bg-navy-700/50 rounded-xl py-3 px-2">
-                        <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                            {{ $sppStats['total'] }}
-                        </p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white"
+                           x-text="sppStats.total"></p>
                         <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Total</p>
                     </div>
                     <div class="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl py-3 px-2">
-                        <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
-                            {{ $sppStats['sudah_sp2d'] }}
-                        </p>
+                        <p class="text-2xl font-bold text-emerald-700 dark:text-emerald-400"
+                           x-text="sppStats.sudah_sp2d"></p>
                         <p class="text-[11px] text-emerald-600 dark:text-emerald-500 mt-0.5">SP2D</p>
                     </div>
                     <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl py-3 px-2">
-                        <p class="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                            {{ $sppStats['belum_sp2d'] }}
-                        </p>
+                        <p class="text-2xl font-bold text-amber-700 dark:text-amber-400"
+                           x-text="sppStats.belum_sp2d"></p>
                         <p class="text-[11px] text-amber-600 dark:text-amber-500 mt-0.5">Pending</p>
                     </div>
                 </div>
                 <div class="mt-3 pt-3 border-t border-gray-100 dark:border-navy-700">
                     <p class="text-xs text-gray-500 dark:text-gray-400">Nilai sudah SP2D</p>
-                    <p class="text-base font-bold text-gray-900 dark:text-white mt-0.5">
-                        {{ formatRupiah($sppStats['nilai_sp2d']) }}
-                    </p>
+                    <p class="text-base font-bold text-gray-900 dark:text-white mt-0.5"
+                       x-text="fmt(sppStats.nilai_sp2d)"></p>
                 </div>
             </div>
 
@@ -318,8 +651,7 @@
                         Lihat semua →
                     </a>
                 </div>
-
-                @if($usulanPending->isEmpty())
+                <template x-if="usulanPending.length === 0">
                     <div class="text-center py-4">
                         <svg class="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2"
                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,35 +662,36 @@
                             Tidak ada usulan pending
                         </p>
                     </div>
-                @else
-                    <div class="space-y-2">
-                        @foreach($usulanPending->take(3) as $usulan)
-                        <div class="flex items-center justify-between gap-2 p-2.5
-                                    bg-amber-50 dark:bg-amber-900/20 rounded-xl">
-                            <div class="min-w-0 flex-1">
-                                <p class="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
-                                    RO {{ $usulan->ro }} · {{ ucfirst($usulan->bulan) }}
-                                </p>
-                                <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                                    {{ $usulan->user->nama ?? '-' }}
-                                </p>
-                            </div>
-                            <span class="text-xs font-bold text-amber-700 dark:text-amber-400 flex-shrink-0">
-                                {{ formatRupiahShort($usulan->nilai_usulan) }}
-                            </span>
+                </template>
+                <template x-if="usulanPending.length > 0">
+                    <div>
+                        <div class="space-y-2">
+                            <template x-for="(u, i) in usulanPending.slice(0, 3)" :key="i">
+                                <div class="flex items-center justify-between gap-2 p-2.5
+                                            bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-xs font-semibold text-gray-800
+                                                   dark:text-gray-200 truncate"
+                                           x-text="`RO ${u.ro} · ${capitalize(u.bulan)}`"></p>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate"
+                                           x-text="u.user.nama"></p>
+                                    </div>
+                                    <span class="text-xs font-bold text-amber-700
+                                                 dark:text-amber-400 flex-shrink-0"
+                                          x-text="fmtShort(u.nilai_usulan)"></span>
+                                </div>
+                            </template>
                         </div>
-                        @endforeach
+                        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-navy-700
+                                    flex items-center justify-between">
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                Total nilai pending
+                            </span>
+                            <span class="text-sm font-bold text-amber-600 dark:text-amber-400"
+                                  x-text="fmt(totalUsulanPending)"></span>
+                        </div>
                     </div>
-                    <div class="mt-3 pt-3 border-t border-gray-100 dark:border-navy-700
-                                flex items-center justify-between">
-                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                            Total nilai pending
-                        </span>
-                        <span class="text-sm font-bold text-amber-600 dark:text-amber-400">
-                            {{ formatRupiah($totalUsulanPending) }}
-                        </span>
-                    </div>
-                @endif
+                </template>
             </div>
 
             {{-- Dokumen Capaian --}}
@@ -367,9 +700,8 @@
                     <div>
                         <h3 class="section-title">Dokumen Capaian</h3>
                         <p class="mt-1.5">
-                            <span class="text-2xl font-bold text-gray-900 dark:text-white">
-                                {{ $dokumenCount }}
-                            </span>
+                            <span class="text-2xl font-bold text-gray-900 dark:text-white"
+                                  x-text="dokumenCount"></span>
                             <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">
                                 dokumen terupload
                             </span>
@@ -380,13 +712,14 @@
                     </a>
                 </div>
             </div>
-
         </div>
     </div>
 
     {{-- ===== SPP TERBARU ===== --}}
-    @if($recentSPP->isNotEmpty())
-    <div class="card">
+    <div class="card" x-show="recentSPP.length > 0" style="display:none;"
+         x-transition:enter="transition-opacity duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
         <div class="section-header">
             <div>
                 <h3 class="section-title">SPP Terbaru</h3>
@@ -409,94 +742,98 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($recentSPP as $spp)
-                    <tr>
-                        <td class="font-mono text-xs whitespace-nowrap">{{ $spp->no_spp }}</td>
-                        <td class="text-xs whitespace-nowrap">
-                            {{ $spp->tgl_spp ? format_tanggal_short($spp->tgl_spp) : '-' }}
-                        </td>
-                        <td>
-                            <span class="line-clamp-2 text-xs">{{ $spp->uraian_spp }}</span>
-                        </td>
-                        <td>
-                            <span class="badge badge-info">{{ $spp->ro }}</span>
-                        </td>
-                        <td class="text-right font-semibold text-sm whitespace-nowrap">
-                            {{ formatRupiah($spp->netto) }}
-                        </td>
-                        <td class="text-center">
-                            @if($spp->status === 'Tagihan Telah SP2D')
-                                <span class="badge badge-success">SP2D</span>
-                            @else
-                                <span class="badge badge-warning">Pending</span>
-                            @endif
-                        </td>
-                    </tr>
-                    @endforeach
+                    <template x-for="spp in recentSPP" :key="spp.id">
+                        <tr>
+                            <td class="font-mono text-xs whitespace-nowrap"
+                                x-text="spp.no_spp"></td>
+                            <td class="text-xs whitespace-nowrap"
+                                x-text="spp.tgl_spp ?? '-'"></td>
+                            <td>
+                                <span class="line-clamp-2 text-xs"
+                                      x-text="spp.uraian_spp"></span>
+                            </td>
+                            <td>
+                                <span class="badge badge-info" x-text="spp.ro"></span>
+                            </td>
+                            <td class="text-right font-semibold text-sm whitespace-nowrap"
+                                x-text="fmt(spp.netto)"></td>
+                            <td class="text-center">
+                                <span :class="spp.status === 'Tagihan Telah SP2D'
+                                              ? 'badge badge-success'
+                                              : 'badge badge-warning'"
+                                      x-text="spp.status === 'Tagihan Telah SP2D'
+                                              ? 'SP2D' : 'Pending'">
+                                </span>
+                            </td>
+                        </tr>
+                    </template>
                 </tbody>
             </table>
         </div>
     </div>
-    @endif
 
     {{-- ===== TABEL DETAIL PER RO ===== --}}
-    @forelse($groupedData as $roCode => $roData)
-        @php
-            $roLevel            = $roData->whereNull('kode_subkomponen')->whereNull('kode_akun')->first();
-            $roLevelPagu        = $roLevel?->pagu_anggaran       ?? $roData->whereNull('kode_akun')->sum('pagu_anggaran');
-            $roLevelRealisasi   = $roLevel?->total_penyerapan    ?? $roData->whereNull('kode_akun')->sum('total_penyerapan');
-            $roLevelSisa        = $roLevel?->sisa                ?? $roData->whereNull('kode_akun')->sum('sisa');
-            $roLevelOutstanding = $roLevel?->tagihan_outstanding ?? 0;
-            $roPct              = calculate_percentage($roLevelRealisasi, $roLevelPagu);
-            $roBarColor         = progressBarColor($roPct);
-            $roBadge            = statusAnggaranBadge($roPct);
-            $roName             = collect($roList)->firstWhere('code', $roCode)['name'] ?? $roCode;
-        @endphp
+    <template x-if="Object.keys(groupedData).length === 0">
+        <div class="card">
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor"
+                         viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0
+                                 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0
+                                 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <p class="empty-state-title">Tidak ada data anggaran</p>
+                <p class="empty-state-desc">
+                    Sesuaikan filter atau tambahkan data anggaran terlebih dahulu.
+                </p>
+                <a href="{{ route('anggaran.data.index') }}" class="btn btn-primary btn-sm mt-3">
+                    Kelola Data Anggaran
+                </a>
+            </div>
+        </div>
+    </template>
 
+    <template x-for="[roCode, roData] in Object.entries(groupedData)" :key="roCode">
         <div class="card" x-data="{ expanded: true }">
-
             {{-- RO Header --}}
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div class="flex-1 min-w-0">
                     <div class="flex flex-wrap items-center gap-2 mb-1">
-                        <span class="badge badge-info font-mono">RO {{ $roCode }}</span>
-                        <span class="badge {{ $roBadge }}">{{ number_format($roPct, 1) }}%</span>
+                        <span class="badge badge-info font-mono"
+                              x-text="`RO ${roCode}`"></span>
+                        <span :class="`badge ${badgeClass(roPct(roData))}`"
+                              x-text="`${roPct(roData).toFixed(1)}%`"></span>
                     </div>
-                    <h3 class="text-sm font-bold text-gray-900 dark:text-white leading-snug">
-                        {{ $roName }}
-                    </h3>
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white leading-snug"
+                        x-text="roNames[roCode] ?? roCode"></h3>
                     <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-2
                                 text-xs text-gray-500 dark:text-gray-400">
-                        <span>
-                            Pagu:
-                            <strong class="text-gray-900 dark:text-white">
-                                {{ formatRupiah($roLevelPagu) }}
-                            </strong>
+                        <span>Pagu:
+                            <strong class="text-gray-900 dark:text-white"
+                                    x-text="fmt(roSummary(roData).pagu)"></strong>
                         </span>
-                        <span>
-                            Realisasi:
-                            <strong class="text-emerald-600 dark:text-emerald-400">
-                                {{ formatRupiah($roLevelRealisasi) }}
-                            </strong>
+                        <span>Realisasi:
+                            <strong class="text-emerald-600 dark:text-emerald-400"
+                                    x-text="fmt(roSummary(roData).realisasi)"></strong>
                         </span>
-                        @if($roLevelOutstanding > 0)
-                        <span>
-                            Outstanding:
-                            <strong class="text-amber-600 dark:text-amber-400">
-                                {{ formatRupiah($roLevelOutstanding) }}
-                            </strong>
-                        </span>
-                        @endif
-                        <span>
-                            Sisa:
-                            <strong class="text-purple-600 dark:text-purple-400">
-                                {{ formatRupiah($roLevelSisa) }}
-                            </strong>
+                        <template x-if="roSummary(roData).outstanding > 0">
+                            <span>Outstanding:
+                                <strong class="text-amber-600 dark:text-amber-400"
+                                        x-text="fmt(roSummary(roData).outstanding)"></strong>
+                            </span>
+                        </template>
+                        <span>Sisa:
+                            <strong class="text-purple-600 dark:text-purple-400"
+                                    x-text="fmt(roSummary(roData).sisa)"></strong>
                         </span>
                     </div>
                     <div class="mt-2.5 progress-bar-wrap">
-                        <div class="{{ $roBarColor }} progress-bar"
-                             style="width:{{ min($roPct, 100) }}%"></div>
+                        <div class="progress-bar transition-all duration-700"
+                             :class="barColor(roPct(roData))"
+                             :style="`width:${Math.min(roPct(roData), 100)}%`"></div>
                     </div>
                 </div>
                 <button @click="expanded = !expanded"
@@ -511,17 +848,19 @@
                 </button>
             </div>
 
-            {{-- Tabel Collapsible --}}
+            {{-- Tabel --}}
             <div x-show="expanded" x-collapse>
                 <div class="table-wrapper">
-                    <table class="table text-xs" id="tbl-ro-{{ $roCode }}">
+                    <table class="table text-xs">
                         <thead>
                             <tr>
                                 <th class="min-w-52">Sub Komponen / Akun</th>
                                 <th class="text-right whitespace-nowrap">Pagu</th>
-                                @foreach(['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'] as $bl)
-                                    <th class="text-right whitespace-nowrap">{{ $bl }}</th>
-                                @endforeach
+                                <template x-for="bl in ['Jan','Feb','Mar','Apr','Mei','Jun',
+                                                        'Jul','Agu','Sep','Okt','Nov','Des']"
+                                          :key="bl">
+                                    <th class="text-right whitespace-nowrap" x-text="bl"></th>
+                                </template>
                                 <th class="text-right whitespace-nowrap">Outstanding</th>
                                 <th class="text-right whitespace-nowrap">Realisasi</th>
                                 <th class="text-right whitespace-nowrap">Sisa</th>
@@ -529,212 +868,70 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($roData as $item)
-                                @php
-                                    $isAkun  = !empty($item->kode_akun);
-                                    $isSubk  = !$isAkun && !empty($item->kode_subkomponen);
-                                    $isRORow = !$isAkun && !$isSubk;
-                                    $pct     = calculate_percentage($item->total_penyerapan, $item->pagu_anggaran);
-
-                                    $rowClass = match(true) {
-                                        $isRORow => 'bg-navy-50 dark:bg-navy-700/40 font-bold',
-                                        $isSubk  => 'bg-gray-50 dark:bg-navy-800/60 font-semibold',
-                                        default  => '',
-                                    };
-                                    $indent = match(true) {
-                                        $isRORow => 'pl-3',
-                                        $isSubk  => 'pl-6',
-                                        default  => 'pl-10',
-                                    };
-                                @endphp
-                                <tr class="{{ $rowClass }} hover:bg-blue-50/40
-                                           dark:hover:bg-navy-700/20 transition-colors duration-100">
-
-                                    {{-- Label --}}
-                                    <td class="py-2.5 {{ $indent }}">
-                                        @if(!$isRORow)
-                                            <span class="font-mono text-[10px] text-gray-400
-                                                         mr-1.5 select-all">
-                                                {{ $isSubk ? $item->kode_subkomponen : $item->kode_akun }}
-                                            </span>
-                                        @endif
-                                        <span class="{{ $isRORow
-                                            ? 'text-navy-700 dark:text-navy-300'
-                                            : 'text-gray-700 dark:text-gray-300' }}">
-                                            {{ Str::limit($item->program_kegiatan, $isRORow ? 60 : 50) }}
+                            <template x-for="(item, idx) in roData" :key="idx">
+                                <tr :class="{
+                                        'bg-navy-50 dark:bg-navy-700/40 font-bold':
+                                            !item.kode_akun && !item.kode_subkomponen,
+                                        'bg-gray-50 dark:bg-navy-800/60 font-semibold':
+                                            !item.kode_akun && item.kode_subkomponen,
+                                    }"
+                                    class="hover:bg-blue-50/40 dark:hover:bg-navy-700/20
+                                           transition-colors duration-100">
+                                    <td :class="{
+                                            'pl-3':  !item.kode_akun && !item.kode_subkomponen,
+                                            'pl-6':  !item.kode_akun && item.kode_subkomponen,
+                                            'pl-10':  item.kode_akun,
+                                        }"
+                                        class="py-2.5">
+                                        <span x-show="item.kode_akun || item.kode_subkomponen"
+                                              class="font-mono text-[10px] text-gray-400
+                                                     mr-1.5 select-all"
+                                              x-text="item.kode_akun ?? item.kode_subkomponen">
+                                        </span>
+                                        <span :class="(!item.kode_akun && !item.kode_subkomponen)
+                                                ? 'text-navy-700 dark:text-navy-300'
+                                                : 'text-gray-700 dark:text-gray-300'"
+                                              x-text="String(item.program_kegiatan ?? '').substring(0, 60)">
                                         </span>
                                     </td>
-
-                                    {{-- Pagu --}}
                                     <td class="py-2.5 text-right font-semibold whitespace-nowrap
-                                               text-gray-900 dark:text-white">
-                                        {{ formatRupiah($item->pagu_anggaran) }}
-                                    </td>
-
-                                    {{-- Bulan Jan–Des --}}
-                                    @foreach([
-                                        'januari','februari','maret','april','mei','juni',
-                                        'juli','agustus','september','oktober','november','desember'
-                                    ] as $bf)
-                                        <td class="py-2.5 text-right whitespace-nowrap
-                                            {{ $item->$bf > 0
+                                               text-gray-900 dark:text-white"
+                                        x-text="fmt(item.pagu_anggaran)"></td>
+                                    <template x-for="bf in ['januari','februari','maret','april',
+                                                            'mei','juni','juli','agustus',
+                                                            'september','oktober','november','desember']"
+                                              :key="bf">
+                                        <td class="py-2.5 text-right whitespace-nowrap"
+                                            :class="item[bf] > 0
                                                 ? 'text-emerald-600 dark:text-emerald-400'
-                                                : 'text-gray-300 dark:text-gray-600' }}">
-                                            {{ $item->$bf > 0 ? formatRupiah($item->$bf) : '—' }}
+                                                : 'text-gray-300 dark:text-gray-600'"
+                                            x-text="item[bf] > 0 ? fmt(item[bf]) : '—'">
                                         </td>
-                                    @endforeach
-
-                                    {{-- Outstanding --}}
-                                    <td class="py-2.5 text-right whitespace-nowrap
-                                        {{ $item->tagihan_outstanding > 0
+                                    </template>
+                                    <td class="py-2.5 text-right whitespace-nowrap"
+                                        :class="item.tagihan_outstanding > 0
                                             ? 'text-amber-600 dark:text-amber-400 font-medium'
-                                            : 'text-gray-300 dark:text-gray-600' }}">
-                                        {{ $item->tagihan_outstanding > 0
-                                            ? formatRupiah($item->tagihan_outstanding)
-                                            : '—' }}
+                                            : 'text-gray-300 dark:text-gray-600'"
+                                        x-text="item.tagihan_outstanding > 0
+                                            ? fmt(item.tagihan_outstanding) : '—'">
                                     </td>
-
-                                    {{-- Realisasi --}}
                                     <td class="py-2.5 text-right font-semibold whitespace-nowrap
-                                               text-emerald-600 dark:text-emerald-400">
-                                        {{ formatRupiah($item->total_penyerapan) }}
-                                    </td>
-
-                                    {{-- Sisa --}}
+                                               text-emerald-600 dark:text-emerald-400"
+                                        x-text="fmt(item.total_penyerapan)"></td>
                                     <td class="py-2.5 text-right font-semibold whitespace-nowrap
-                                               text-purple-600 dark:text-purple-400">
-                                        {{ formatRupiah($item->sisa) }}
-                                    </td>
-
-                                    {{-- % --}}
+                                               text-purple-600 dark:text-purple-400"
+                                        x-text="fmt(item.sisa)"></td>
                                     <td class="py-2.5 text-center">
-                                        <span class="badge {{ statusAnggaranBadge($pct) }}">
-                                            {{ number_format($pct, 1) }}%
-                                        </span>
+                                        <span :class="`badge ${badgeClass(itemPct(item))}`"
+                                              x-text="`${itemPct(item).toFixed(1)}%`"></span>
                                     </td>
-
                                 </tr>
-                            @endforeach
+                            </template>
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div>
-    @empty
-        <div class="card">
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor"
-                         viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1
-                                 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-                <p class="empty-state-title">Tidak ada data anggaran</p>
-                <p class="empty-state-desc">
-                    Sesuaikan filter atau tambahkan data anggaran terlebih dahulu.
-                </p>
-                <a href="{{ route('anggaran.data.index') }}" class="btn btn-primary btn-sm mt-3">
-                    Kelola Data Anggaran
-                </a>
-            </div>
-        </div>
-    @endforelse
-
+    </template>
 </div>
 @endsection
-
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    const ctx = document.getElementById('chartRealisasi');
-    if (!ctx || typeof Chart === 'undefined') return;
-
-    const labels     = @json($chartLabels);
-    const data       = @json($chartData);
-    const isDark     = document.documentElement.classList.contains('dark');
-    const gridColor  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-    const labelColor = isDark ? '#9fb3c8' : '#627d98';
-
-    // Kumulatif
-    const cumulative = data.reduce((acc, v, i) => {
-        acc.push((acc[i - 1] ?? 0) + v);
-        return acc;
-    }, []);
-
-    new Chart(ctx, {
-        data: {
-            labels,
-            datasets: [
-                {
-                    type: 'bar',
-                    label: 'Realisasi Bulanan',
-                    data,
-                    backgroundColor: 'rgba(16,185,129,0.55)',
-                    borderColor:     'rgba(16,185,129,0.85)',
-                    borderWidth:     1.5,
-                    borderRadius:    5,
-                    borderSkipped:   false,
-                    order:           2,
-                },
-                {
-                    type: 'line',
-                    label: 'Kumulatif',
-                    data: cumulative,
-                    borderColor:        '#486581',
-                    backgroundColor:    'rgba(72,101,129,0.07)',
-                    borderWidth:        2,
-                    pointRadius:        3,
-                    pointHoverRadius:   5,
-                    pointBackgroundColor: '#486581',
-                    tension:            0.35,
-                    fill:               true,
-                    order:              1,
-                }
-            ]
-        },
-        options: {
-            responsive:           true,
-            maintainAspectRatio:  false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-                legend: {
-                    display:  true,
-                    position: 'top',
-                    labels: {
-                        color:    labelColor,
-                        font:     { size: 11 },
-                        boxWidth: 12,
-                        padding:  14,
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: ctx =>
-                            `${ctx.dataset.label}: ${window.formatCurrencyShort(ctx.parsed.y)}`
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid:  { color: gridColor },
-                    ticks: { color: labelColor, font: { size: 10 } },
-                },
-                y: {
-                    grid:  { color: gridColor },
-                    ticks: {
-                        color:    labelColor,
-                        font:     { size: 10 },
-                        callback: v => window.formatCurrencyShort(v),
-                    },
-                    beginAtZero: true,
-                }
-            }
-        }
-    });
-});
-</script>
-@endpush

@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Anggaran\MonitoringAnggaranController;
-use App\Http\Controllers\Anggaran\SPPController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Kepegawaian\SebaranPegawaiController;
@@ -13,23 +12,23 @@ use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 // ═══════════════════════════════════════════════════════
-// GUEST ROUTES
+// GUEST
 // ═══════════════════════════════════════════════════════
 Route::middleware('guest')->group(function () {
-    Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::get('login',  [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('login', [LoginController::class, 'login']);
     Route::get('captcha', [\App\Http\Controllers\Auth\CaptchaController::class, 'generate'])
         ->name('captcha');
 });
 
 // ═══════════════════════════════════════════════════════
-// AUTHENTICATED ROUTES
+// AUTHENTICATED
 // ═══════════════════════════════════════════════════════
 Route::middleware(['auth', 'has.role'])->group(function () {
 
     // ── Dashboard ────────────────────────────────────────
-    Route::get('/',         [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard',[DashboardController::class, 'index']);
+    Route::get('/',          [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // ── Profile ──────────────────────────────────────────
     Route::get('/profile', fn() => view('profile.index'))->name('profile');
@@ -44,29 +43,28 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     // ════════════════════════════════════════════════════
     Route::prefix('kepegawaian')->name('kepegawaian.')->group(function () {
 
-        // Sebaran
-        Route::get('sebaran',        [SebaranPegawaiController::class, 'index'])->name('sebaran');
-        Route::get('sebaran/{pegawai}', [SebaranPegawaiController::class, 'show'])->name('sebaran.show');
+        Route::get('sebaran',            [SebaranPegawaiController::class, 'index'])->name('sebaran');
+        Route::get('sebaran/{pegawai}',  [SebaranPegawaiController::class, 'show'])->name('sebaran.show');
+        Route::get('grading',            [KenaikanGradingController::class, 'index'])->name('grading');
+        Route::get('grading/{pegawai}',  [KenaikanGradingController::class, 'show'])->name('grading.show');
+        Route::get('mutasi',             [ProyeksiMutasiController::class, 'index'])->name('mutasi');
+        Route::get('mutasi/{pegawai}',   [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
 
-        // Grading
-        Route::get('grading',        [KenaikanGradingController::class, 'index'])->name('grading');
-        Route::get('grading/{pegawai}', [KenaikanGradingController::class, 'show'])->name('grading.show');
-
-        // Mutasi
-        Route::get('mutasi',         [ProyeksiMutasiController::class, 'index'])->name('mutasi');
-        Route::get('mutasi/{pegawai}', [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
-
-        // Pegawai CRUD + Import / Export
         Route::resource('pegawai', \App\Http\Controllers\Kepegawaian\PegawaiController::class);
-        Route::get('pegawai-export',   [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export'])
+        Route::get('pegawai-export',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export'])
             ->name('pegawai.export');
-        Route::get('pegawai-template', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'downloadTemplate'])
+        Route::get('pegawai-template',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'downloadTemplate'])
             ->name('pegawai.template');
-        Route::get('pegawai-import',   [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'importForm'])
+        Route::get('pegawai-import',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'importForm'])
             ->name('pegawai.import-form');
-        Route::post('pegawai-import',  [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'import'])
+        Route::post('pegawai-import',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'import'])
             ->name('pegawai.import');
-        Route::get('pegawai/analytics/data', [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'analyticsData'])
+        Route::get('pegawai/analytics/data',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'analyticsData'])
             ->name('pegawai.analytics');
     });
 
@@ -75,10 +73,14 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     // ════════════════════════════════════════════════════
     Route::prefix('anggaran')->name('anggaran.')->group(function () {
 
-        // ── Monitoring ──────────────────────────────────
+        // ── Monitoring (urutan penting: spesifik dulu, resource belakangan) ──
         Route::get('monitoring',
             [MonitoringAnggaranController::class, 'index'])
             ->name('monitoring.index');
+
+        Route::get('monitoring/data',
+            [MonitoringAnggaranController::class, 'data'])
+            ->name('monitoring.data');
 
         Route::get('monitoring/export',
             [MonitoringAnggaranController::class, 'export'])
@@ -89,7 +91,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('monitoring.recalculate')
             ->middleware('role:superadmin,admin');
 
-        // ── SPP ─────────────────────────────────────────
+        // ── SPP ──────────────────────────────────────────────
         Route::resource('spp', App\Http\Controllers\Anggaran\SPPController::class);
         Route::get('spp/ajax/subkomponen',
             [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
@@ -98,7 +100,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
             ->name('spp.ajax.akun');
 
-        // ── Usulan Penarikan ────────────────────────────
+        // ── Usulan Penarikan ──────────────────────────────────
         Route::resource('usulan', App\Http\Controllers\Anggaran\UsulanPenarikanController::class);
         Route::get('usulan/ajax/subkomponen',
             [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
@@ -112,7 +114,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('usulan.reject')
             ->middleware('role:superadmin,admin');
 
-        // ── Dokumen Capaian ─────────────────────────────
+        // ── Dokumen Capaian ───────────────────────────────────
         Route::resource('dokumen', App\Http\Controllers\Anggaran\DokumenCapaianController::class);
         Route::get('dokumen/ajax/subkomponen',
             [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen'])
@@ -124,13 +126,13 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'downloadSingle'])
             ->name('dokumen.download-single');
 
-        // ── Revisi Anggaran ─────────────────────────────
+        // ── Revisi Anggaran ───────────────────────────────────
         Route::resource('revisi', App\Http\Controllers\Anggaran\RevisiAnggaranController::class);
         Route::get('revisi/{revisi}/download-dokumen',
             [App\Http\Controllers\Anggaran\RevisiAnggaranController::class, 'downloadDokumen'])
             ->name('revisi.download-dokumen');
 
-        // ── Data Anggaran ───────────────────────────────
+        // ── Data Anggaran ─────────────────────────────────────
         Route::resource('data', App\Http\Controllers\Anggaran\DataAnggaranController::class);
         Route::get('data/ajax/subkomponen',
             [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'getSubkomponen'])
@@ -158,7 +160,8 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('inventaris')->name('inventaris.')->group(function () {
 
         // Monitoring ATK
-        Route::resource('monitoring-atk', App\Http\Controllers\Inventaris\MonitoringAtkController::class);
+        Route::resource('monitoring-atk',
+            App\Http\Controllers\Inventaris\MonitoringAtkController::class);
         Route::get('monitoring-atk-export',
             [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'export'])
             ->name('monitoring-atk.export');
@@ -176,7 +179,8 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('monitoring-atk.update-stok');
 
         // Permintaan ATK
-        Route::resource('permintaan-atk', App\Http\Controllers\Inventaris\PermintaanAtkController::class);
+        Route::resource('permintaan-atk',
+            App\Http\Controllers\Inventaris\PermintaanAtkController::class);
         Route::post('permintaan-atk/{permintaanAtk}/approve',
             [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'approve'])
             ->name('permintaan-atk.approve')
@@ -191,7 +195,8 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->middleware('role:superadmin,admin');
 
         // Aset End User
-        Route::resource('aset-end-user', App\Http\Controllers\Inventaris\AsetEndUserController::class);
+        Route::resource('aset-end-user',
+            App\Http\Controllers\Inventaris\AsetEndUserController::class);
         Route::get('aset-end-user-export',
             [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'export'])
             ->name('aset-end-user.export');
@@ -212,8 +217,10 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('aset-end-user.kembalikan');
 
         // Kategori
-        Route::resource('kategori-atk',  App\Http\Controllers\Inventaris\KategoriAtkController::class);
-        Route::resource('kategori-aset', App\Http\Controllers\Inventaris\KategoriAsetController::class);
+        Route::resource('kategori-atk',
+            App\Http\Controllers\Inventaris\KategoriAtkController::class);
+        Route::resource('kategori-aset',
+            App\Http\Controllers\Inventaris\KategoriAsetController::class);
     });
 
     // ════════════════════════════════════════════════════
@@ -221,19 +228,16 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     // ════════════════════════════════════════════════════
     Route::middleware('role:superadmin,admin')->group(function () {
 
-        // User Management
         Route::resource('users', UserManagementController::class);
         Route::post('users/{user}/assign-role',
             [RoleManagementController::class, 'assignRole'])
             ->name('users.assign-role');
 
-        // Role Management
-        Route::get('roles',          [RoleManagementController::class, 'rolesIndex'])  ->name('roles.index');
-        Route::post('roles',         [RoleManagementController::class, 'rolesStore'])  ->name('roles.store');
-        Route::put('roles/{role}',   [RoleManagementController::class, 'rolesUpdate']) ->name('roles.update');
-        Route::delete('roles/{role}',[RoleManagementController::class, 'rolesDestroy'])->name('roles.destroy');
+        Route::get('roles',           [RoleManagementController::class, 'rolesIndex'])  ->name('roles.index');
+        Route::post('roles',          [RoleManagementController::class, 'rolesStore'])  ->name('roles.store');
+        Route::put('roles/{role}',    [RoleManagementController::class, 'rolesUpdate']) ->name('roles.update');
+        Route::delete('roles/{role}', [RoleManagementController::class, 'rolesDestroy'])->name('roles.destroy');
 
-        // Permissions (view only)
         Route::get('permissions', [RoleManagementController::class, 'permissionsIndex'])
             ->name('permissions.index');
     });
