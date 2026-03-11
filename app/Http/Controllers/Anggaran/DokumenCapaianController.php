@@ -25,10 +25,46 @@ class DokumenCapaianController extends Controller
         }
 
         $dokumens = $query->paginate(20);
+
+        // Jika request dari Alpine (AJAX), kembalikan JSON
+        if ($request->boolean('json')) {
+            $rows = $dokumens->getCollection()->map(fn($d) => [
+                'id'               => $d->id,
+                'nama_dokumen'     => $d->nama_dokumen,
+                'ro'               => $d->ro,
+                'sub_komponen'     => $d->sub_komponen,
+                'bulan'            => $d->bulan,
+                'keterangan'       => $d->keterangan,
+                'file_count'       => count($d->getAllFiles()),
+                'user_nama'        => $d->user?->nama ?? '—',
+                'created_at_short' => format_tanggal_short($d->created_at),
+            ]);
+
+            return response()->json([
+                'rows'         => $rows,
+                'current_page' => $dokumens->currentPage(),
+                'last_page'    => $dokumens->lastPage(),
+                'per_page'     => $dokumens->perPage(),
+                'total'        => $dokumens->total(),
+                'total_file'   => $dokumens->getCollection()->sum(fn($d) => count($d->getAllFiles())),
+                'ro_count'     => $dokumens->getCollection()->pluck('ro')->unique()->count(),
+            ]);
+        }
+
         $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.dokumen.index', compact('dokumens', 'roList', 'bulanList'));
@@ -38,8 +74,18 @@ class DokumenCapaianController extends Controller
     {
         $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         return view('anggaran.dokumen.create', compact('roList', 'bulanList'));
@@ -98,7 +144,6 @@ class DokumenCapaianController extends Controller
 
             return redirect()->route('anggaran.dokumen.index')
                 ->with('success', 'Dokumen capaian output berhasil diupload (' . count($uploadedFiles) . ' file)');
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian store error: ' . $e->getMessage());
             return back()->withInput()->with('error', 'Gagal mengupload dokumen: ' . $e->getMessage());
@@ -117,7 +162,6 @@ class DokumenCapaianController extends Controller
                 ->first();
 
             return view('anggaran.dokumen.show', compact('dokumen', 'anggaranSubkomp'));
-
         } catch (\Exception $e) {
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Dokumen tidak ditemukan');
@@ -130,12 +174,21 @@ class DokumenCapaianController extends Controller
             $dokumen  = DokumenCapaian::findOrFail($id);
             $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
             $bulanList = [
-                'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+                'januari',
+                'februari',
+                'maret',
+                'april',
+                'mei',
+                'juni',
+                'juli',
+                'agustus',
+                'september',
+                'oktober',
+                'november',
+                'desember'
             ];
 
             return view('anggaran.dokumen.edit', compact('dokumen', 'roList', 'bulanList'));
-
         } catch (\Exception $e) {
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Dokumen tidak ditemukan');
@@ -201,7 +254,6 @@ class DokumenCapaianController extends Controller
 
             return redirect()->route('anggaran.dokumen.index')
                 ->with('success', 'Dokumen capaian output berhasil diupdate');
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian update error: ' . $e->getMessage());
             return back()->withInput()->with('error', 'Gagal mengupdate dokumen: ' . $e->getMessage());
@@ -223,7 +275,6 @@ class DokumenCapaianController extends Controller
 
             return redirect()->route('anggaran.dokumen.index')
                 ->with('success', 'Dokumen capaian output berhasil dihapus');
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian destroy error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
@@ -274,7 +325,6 @@ class DokumenCapaianController extends Controller
             $zip->close();
 
             return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian download error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
@@ -300,7 +350,6 @@ class DokumenCapaianController extends Controller
             }
 
             return response()->download($fullPath, $file['name']);
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian downloadSingle error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.show', $id)
@@ -324,7 +373,6 @@ class DokumenCapaianController extends Controller
                 ->get(['kode_subkomponen', 'program_kegiatan', 'pagu_anggaran', 'total_penyerapan', 'sisa']);
 
             return response()->json($subkomponens);
-
         } catch (\Exception $e) {
             Log::error('DokumenCapaian getSubkomponen error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
