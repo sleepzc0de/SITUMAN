@@ -59,4 +59,9 @@ class DokumenCapaian extends Model
 
         return $allFiles;
     }
+
+    public function anggaran()
+    {
+        return $this->belongsTo(Anggaran::class);
+    }
 }

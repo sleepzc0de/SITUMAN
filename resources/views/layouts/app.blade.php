@@ -9,10 +9,10 @@
     }"
     x-init="
         window.addEventListener('scroll', () => {
-            if (_scrollTimer) return;
-            _scrollTimer = requestAnimationFrame(() => {
+            if (this._scrollTimer) return;
+            this._scrollTimer = requestAnimationFrame(() => {
                 isScrolled = window.scrollY > 20;
-                _scrollTimer = null;
+                this._scrollTimer = null;
             });
         }, { passive: true });
     "
@@ -24,17 +24,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="@yield('meta_description', config('app.name') . ' - Sistem Informasi Kepegawaian Modern')">
     <meta name="theme-color" content="#334e68">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32x32.png') }}">
-
     <title>@yield('title', 'Dashboard') · {{ config('app.name', 'SiTUMAN') }}</title>
-
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
+    @stack('head')
 </head>
 <body class="bg-gray-50 dark:bg-navy-950 font-sans antialiased min-h-screen">
 
@@ -43,73 +41,52 @@
      class="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden"
      style="background: linear-gradient(135deg, #0f172a 0%, #1a2332 50%, #243b53 100%);"
      aria-hidden="true">
-
     {{-- Grid pattern --}}
     <div class="absolute inset-0 pointer-events-none"
          style="background-image: radial-gradient(circle, rgba(148,163,184,0.07) 1px, transparent 1px); background-size: 28px 28px;"></div>
-
     {{-- Ambient glow --}}
     <div class="absolute pointer-events-none"
-         style="top: 20%; left: 20%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(71,101,129,0.2) 0%, transparent 65%); filter: blur(40px); border-radius: 50%;"></div>
+         style="top:20%;left:20%;width:400px;height:400px;background:radial-gradient(circle,rgba(71,101,129,0.2) 0%,transparent 65%);filter:blur(40px);border-radius:50%;"></div>
     <div class="absolute pointer-events-none"
-         style="bottom: 20%; right: 20%; width: 320px; height: 320px; background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 65%); filter: blur(40px); border-radius: 50%;"></div>
-
+         style="bottom:20%;right:20%;width:320px;height:320px;background:radial-gradient(circle,rgba(245,158,11,0.08) 0%,transparent 65%);filter:blur(40px);border-radius:50%;"></div>
     {{-- Floating particles --}}
     @php
         $particles = [
-            ['size' => 4, 'color' => 'rgba(251,191,36,0.5)',  'top' => 15, 'left' => 20, 'dur' => 3.5, 'delay' => 0.0],
-            ['size' => 3, 'color' => 'rgba(255,255,255,0.15)','top' => 70, 'left' => 75, 'dur' => 4.2, 'delay' => 0.8],
-            ['size' => 5, 'color' => 'rgba(251,191,36,0.3)',  'top' => 30, 'left' => 55, 'dur' => 3.8, 'delay' => 0.4],
-            ['size' => 3, 'color' => 'rgba(255,255,255,0.1)', 'top' => 55, 'left' => 35, 'dur' => 5.0, 'delay' => 1.2],
-            ['size' => 4, 'color' => 'rgba(251,191,36,0.25)', 'top' => 80, 'left' => 15, 'dur' => 4.5, 'delay' => 0.6],
-            ['size' => 6, 'color' => 'rgba(255,255,255,0.1)', 'top' => 20, 'left' => 85, 'dur' => 3.2, 'delay' => 1.5],
-            ['size' => 3, 'color' => 'rgba(251,191,36,0.2)',  'top' => 65, 'left' => 45, 'dur' => 4.8, 'delay' => 0.2],
-            ['size' => 4, 'color' => 'rgba(255,255,255,0.18)','top' => 45, 'left' => 65, 'dur' => 3.9, 'delay' => 1.0],
+            ['size' => 4, 'color' => 'rgba(251,191,36,0.5)',   'top' => 15, 'left' => 20, 'dur' => 3.5, 'delay' => 0.0],
+            ['size' => 3, 'color' => 'rgba(255,255,255,0.15)', 'top' => 70, 'left' => 75, 'dur' => 4.2, 'delay' => 0.8],
+            ['size' => 5, 'color' => 'rgba(251,191,36,0.3)',   'top' => 30, 'left' => 55, 'dur' => 3.8, 'delay' => 0.4],
+            ['size' => 3, 'color' => 'rgba(255,255,255,0.1)',  'top' => 55, 'left' => 35, 'dur' => 5.0, 'delay' => 1.2],
+            ['size' => 4, 'color' => 'rgba(251,191,36,0.25)',  'top' => 80, 'left' => 15, 'dur' => 4.5, 'delay' => 0.6],
+            ['size' => 6, 'color' => 'rgba(255,255,255,0.1)',  'top' => 20, 'left' => 85, 'dur' => 3.2, 'delay' => 1.5],
+            ['size' => 3, 'color' => 'rgba(251,191,36,0.2)',   'top' => 65, 'left' => 45, 'dur' => 4.8, 'delay' => 0.2],
+            ['size' => 4, 'color' => 'rgba(255,255,255,0.18)', 'top' => 45, 'left' => 65, 'dur' => 3.9, 'delay' => 1.0],
         ];
     @endphp
     @foreach($particles as $p)
     <div class="absolute rounded-full loader-particle pointer-events-none"
-         style="
-            width: {{ $p['size'] }}px;
-            height: {{ $p['size'] }}px;
-            background: {{ $p['color'] }};
-            top: {{ $p['top'] }}%;
-            left: {{ $p['left'] }}%;
-            animation-duration: {{ $p['dur'] }}s;
-            animation-delay: {{ $p['delay'] }}s;
-         "></div>
+         style="width:{{ $p['size'] }}px;height:{{ $p['size'] }}px;background:{{ $p['color'] }};top:{{ $p['top'] }}%;left:{{ $p['left'] }}%;animation-duration:{{ $p['dur'] }}s;animation-delay:{{ $p['delay'] }}s;"></div>
     @endforeach
-
     {{-- Main content --}}
     <div class="relative flex flex-col items-center gap-10 select-none px-8">
-
         {{-- Logo --}}
         <div class="loader-logo flex flex-col items-center gap-5">
             <div class="loader-logo-box w-24 h-24 rounded-3xl flex items-center justify-center"
-                 style="background: linear-gradient(135deg, #486581 0%, #243b53 100%); box-shadow: 0 0 0 1px rgba(255,255,255,0.08);">
-                <span class="text-white font-bold text-4xl" style="font-family:'Inter',sans-serif; letter-spacing:-1px;">ST</span>
+                 style="background:linear-gradient(135deg,#486581 0%,#243b53 100%);box-shadow:0 0 0 1px rgba(255,255,255,0.08);">
+                <span class="text-white font-bold text-4xl" style="font-family:'Inter',sans-serif;letter-spacing:-1px;">ST</span>
             </div>
             <div class="text-center">
                 <h1 class="loader-title text-4xl font-bold text-white" style="letter-spacing:-1px;">SiTUMAN</h1>
-                <p class="loader-subtitle text-sm font-medium mt-1" style="color: #7898b8; letter-spacing: 0.05em;">
+                <p class="loader-subtitle text-sm font-medium mt-1" style="color:#7898b8;letter-spacing:0.05em;">
                     Sistem Informasi TU Biro Manajemen BMN dan Pengadaan
                 </p>
             </div>
         </div>
-
         {{-- Spinner + progress --}}
-        <div class="flex flex-col items-center gap-5" style="width: 220px;">
-
-            {{-- SVG Ring Spinner --}}
-            <div class="relative flex items-center justify-center" style="width: 56px; height: 56px;">
-
-                {{-- Track ring --}}
+        <div class="flex flex-col items-center gap-5" style="width:220px;">
+            <div class="relative flex items-center justify-center" style="width:56px;height:56px;">
                 <svg style="position:absolute;width:56px;height:56px;" viewBox="0 0 56 56">
-                    <circle cx="28" cy="28" r="22" fill="none"
-                            stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+                    <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
                 </svg>
-
-                {{-- Fill ring (animates stroke-dashoffset) --}}
                 <svg style="position:absolute;width:56px;height:56px;transform:rotate(-90deg);" viewBox="0 0 56 56">
                     <defs>
                         <linearGradient id="ringFill" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -118,26 +95,17 @@
                         </linearGradient>
                     </defs>
                     <circle cx="28" cy="28" r="22" fill="none"
-                            stroke="url(#ringFill)" stroke-width="3"
-                            stroke-linecap="round"
-                            stroke-dasharray="138.2"
-                            stroke-dashoffset="138.2"
+                            stroke="url(#ringFill)" stroke-width="3" stroke-linecap="round"
+                            stroke-dasharray="138.2" stroke-dashoffset="138.2"
                             class="loader-circle"/>
                 </svg>
-
-                {{-- Spinning arc (separate SVG, rotates independently) --}}
                 <svg class="loader-spin-arc" style="position:absolute;width:56px;height:56px;" viewBox="0 0 56 56">
                     <circle cx="28" cy="28" r="22" fill="none"
-                            stroke="rgba(251,191,36,0.8)" stroke-width="3"
-                            stroke-linecap="round"
+                            stroke="rgba(251,191,36,0.8)" stroke-width="3" stroke-linecap="round"
                             stroke-dasharray="10 128.2"/>
                 </svg>
-
-                {{-- Center dot --}}
                 <div class="loader-dot" style="width:8px;height:8px;background:#fbbf24;border-radius:50%;position:relative;z-index:1;"></div>
             </div>
-
-            {{-- Progress bar --}}
             <div style="width:100%;">
                 <div style="height:2px;width:100%;background:rgba(255,255,255,0.07);border-radius:999px;overflow:hidden;">
                     <div class="loader-bar" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#f59e0b,#fbbf24);width:0%;"></div>
@@ -148,7 +116,6 @@
             </div>
         </div>
     </div>
-
     {{-- Footer --}}
     <div style="position:absolute;bottom:24px;color:#334e68;font-size:11px;display:flex;align-items:center;gap:8px;">
         <span>SiTUMAN v2.0</span>
@@ -186,7 +153,6 @@
      :class="isScrolled ? 'shadow-md' : 'shadow-sm'">
     <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
-
             {{-- LEFT --}}
             <div class="flex items-center gap-3">
                 <button @click="$store.app.toggleSidebar()"
@@ -195,11 +161,9 @@
                         :aria-expanded="$store.app.sidebarOpen"
                         aria-label="Toggle sidebar">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M4 6h16M4 12h16M4 18h16"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
                 </button>
-
                 <a href="{{ route('dashboard') }}" class="flex items-center gap-2 group">
                     <div class="w-9 h-9 bg-gradient-to-br from-navy-600 to-navy-800 rounded-xl
                                 flex items-center justify-center shadow-md
@@ -209,10 +173,8 @@
                     <span class="hidden sm:block text-xl font-bold text-gradient animate-gradient">SiTUMAN</span>
                 </a>
             </div>
-
             {{-- RIGHT --}}
             <div class="flex items-center gap-1 sm:gap-2">
-
                 {{-- Dark Mode --}}
                 <button @click="$store.app.toggleDarkMode()"
                         class="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-navy-700
@@ -223,8 +185,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                     </svg>
-                    <svg x-show="$store.app.darkMode" class="w-5 h-5" fill="none" stroke="currentColor"
-                         viewBox="0 0 24 24">
+                    <svg x-show="$store.app.darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
@@ -244,7 +205,6 @@
                         <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white dark:ring-navy-800"></span>
                         @endif
                     </button>
-
                     <div x-show="open" @click.away="open = false"
                          x-transition:enter="transition ease-out duration-150"
                          x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
@@ -260,8 +220,7 @@
                             <span class="text-xs text-gray-400 dark:text-gray-500">Hari ini</span>
                         </div>
                         <div class="px-4 py-8 text-center">
-                            <svg class="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" fill="none"
-                                 stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
@@ -295,7 +254,6 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
                     </button>
-
                     <div x-show="open" @click.away="open = false"
                          x-transition:enter="transition ease-out duration-150"
                          x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
@@ -306,7 +264,6 @@
                          class="absolute right-0 mt-2 w-60 bg-white dark:bg-navy-800 rounded-xl shadow-xl
                                 border border-gray-100 dark:border-navy-700 py-1 z-50 origin-top-right"
                          style="display:none;">
-
                         <div class="px-4 py-3 border-b border-gray-100 dark:border-navy-700">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 bg-gradient-to-br from-navy-500 to-navy-700 rounded-full
@@ -328,7 +285,6 @@
                                 </div>
                             </div>
                         </div>
-
                         <div class="py-1">
                             <a href="{{ route('profile') }}"
                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200
@@ -345,7 +301,6 @@
                                     <p class="text-xs text-gray-400 dark:text-gray-500">Lihat & edit profil</p>
                                 </div>
                             </a>
-
                             <a href="{{ route('profile') }}#password"
                                class="flex items-center px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200
                                       hover:bg-gray-50 dark:hover:bg-navy-700/70 transition-colors duration-100 group">
@@ -361,7 +316,6 @@
                                     <p class="text-xs text-gray-400 dark:text-gray-500">Password & keamanan</p>
                                 </div>
                             </a>
-
                             @hasrole('superadmin|admin')
                             <div class="mx-4 my-1 border-t border-gray-100 dark:border-navy-700"></div>
                             <a href="{{ route('roles.index') }}"
@@ -381,7 +335,6 @@
                             </a>
                             @endhasrole
                         </div>
-
                         <div class="border-t border-gray-100 dark:border-navy-700 pt-1 pb-1">
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
@@ -411,7 +364,6 @@
 {{-- ===== END NAVBAR ===== --}}
 
 <div class="flex pt-16 min-h-screen">
-
     {{-- ===== SIDEBAR ===== --}}
     <aside id="sidebar"
            class="fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-navy-800
@@ -419,7 +371,6 @@
                   transition-transform duration-300 ease-in-out flex flex-col"
            :class="$store.app.sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
            aria-label="Sidebar navigasi">
-
         <div class="p-4 border-b border-gray-200 dark:border-navy-700 pt-20">
             <div class="flex items-center gap-3 p-3 bg-gradient-to-r from-navy-50 to-navy-100 dark:from-navy-700 dark:to-navy-600 rounded-xl">
                 <div class="w-11 h-11 bg-gradient-to-br from-navy-500 to-navy-700 rounded-xl
@@ -434,9 +385,7 @@
                 </div>
             </div>
         </div>
-
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 scrollbar-thin" aria-label="Menu utama">
-
             @php $isDash = request()->routeIs('dashboard') @endphp
             <a href="{{ route('dashboard') }}" class="{{ $isDash ? 'nav-item-active' : 'nav-item-inactive' }}">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,12 +444,12 @@
                 </button>
                 <div x-show="open" x-collapse class="pl-10 space-y-0.5">
                     @php $anggaranLinks = [
-                        ['route' => 'anggaran.data.index',      'pattern' => 'anggaran.data.*',      'label' => 'Kelola Data Anggaran'],
-                        ['route' => 'anggaran.monitoring.index', 'pattern' => 'anggaran.monitoring.*','label' => 'Monitoring Anggaran'],
-                        ['route' => 'anggaran.spp.index',        'pattern' => 'anggaran.spp.*',       'label' => 'Data SPP'],
-                        ['route' => 'anggaran.usulan.index',     'pattern' => 'anggaran.usulan.*',    'label' => 'Usulan Penarikan Dana'],
-                        ['route' => 'anggaran.dokumen.index',    'pattern' => 'anggaran.dokumen.*',   'label' => 'Dokumen Capaian Output'],
-                        ['route' => 'anggaran.revisi.index',     'pattern' => 'anggaran.revisi.*',    'label' => 'Revisi Anggaran'],
+                        ['route' => 'anggaran.data.index',       'pattern' => 'anggaran.data.*',       'label' => 'Kelola Data Anggaran'],
+                        ['route' => 'anggaran.monitoring.index', 'pattern' => 'anggaran.monitoring.*', 'label' => 'Monitoring Anggaran'],
+                        ['route' => 'anggaran.spp.index',        'pattern' => 'anggaran.spp.*',        'label' => 'Data SPP'],
+                        ['route' => 'anggaran.usulan.index',     'pattern' => 'anggaran.usulan.*',     'label' => 'Usulan Penarikan Dana'],
+                        ['route' => 'anggaran.dokumen.index',    'pattern' => 'anggaran.dokumen.*',    'label' => 'Dokumen Capaian Output'],
+                        ['route' => 'anggaran.revisi.index',     'pattern' => 'anggaran.revisi.*',     'label' => 'Revisi Anggaran'],
                     ]; @endphp
                     @foreach($anggaranLinks as $link)
                     <a href="{{ route($link['route']) }}" class="{{ request()->routeIs($link['pattern']) ? 'nav-subitem-active' : 'nav-subitem-inactive' }}">
@@ -566,9 +515,7 @@
             </a>
             @endforeach
             @endcanaccess
-
         </nav>
-
         <div class="p-4 border-t border-gray-200 dark:border-navy-700">
             <div class="flex items-center justify-between text-xs text-gray-400 dark:text-gray-600">
                 <span>SiTUMAN v2.0</span>
@@ -578,6 +525,7 @@
     </aside>
     {{-- ===== END SIDEBAR ===== --}}
 
+    {{-- Overlay mobile --}}
     <div x-show="$store.app.sidebarOpen"
          @click="$store.app.sidebarOpen = false"
          class="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden"
@@ -611,10 +559,12 @@
                 @endif
             @endif
 
+            {{-- Flash messages --}}
             @foreach([
                 'success' => ['bg-green-50 dark:bg-green-900/20',   'border-green-200 dark:border-green-700',   'text-green-800 dark:text-green-400',   'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
                 'error'   => ['bg-red-50 dark:bg-red-900/20',       'border-red-200 dark:border-red-700',       'text-red-800 dark:text-red-400',       'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
                 'warning' => ['bg-yellow-50 dark:bg-yellow-900/20', 'border-yellow-200 dark:border-yellow-700', 'text-yellow-800 dark:text-yellow-400', 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'],
+                'info'    => ['bg-sky-50 dark:bg-sky-900/20',       'border-sky-200 dark:border-sky-700',       'text-sky-800 dark:text-sky-400',       'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
             ] as $type => [$bg, $border, $text, $path])
                 @if(session($type))
                 <div class="mb-5 {{ $bg }} border {{ $border }} {{ $text }} px-4 py-3 rounded-xl flex items-center gap-3"
@@ -634,6 +584,7 @@
     </main>
 </div>
 
+{{-- Scroll to top --}}
 <button x-show="isScrolled"
         @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
         x-transition:enter="transition ease-out duration-200"

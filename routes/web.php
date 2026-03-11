@@ -17,7 +17,7 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('login', [LoginController::class, 'login']);
 
-     //captcha
+    //captcha
     Route::get('captcha', [\App\Http\Controllers\Auth\CaptchaController::class, 'generate'])
         ->name('captcha');
 });
@@ -64,6 +64,9 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('anggaran')->name('anggaran.')->middleware(['auth', 'has.role'])->group(function () {
         Route::get('monitoring', [App\Http\Controllers\Anggaran\MonitoringAnggaranController::class, 'index'])
             ->name('monitoring.index');
+        Route::post('monitoring/recalculate', [App\Http\Controllers\Anggaran\MonitoringAnggaranController::class, 'recalculate'])
+            ->name('monitoring.recalculate')
+            ->middleware('role:superadmin,admin');
         Route::resource('spp', App\Http\Controllers\Anggaran\SPPController::class);
         Route::get('spp/ajax/subkomponen', [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
             ->name('spp.ajax.subkomponen');
@@ -95,6 +98,10 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('data.import');
         Route::get('data-export', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'export'])
             ->name('data.export');
+        Route::get('data-template', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'downloadTemplate'])
+            ->name('data.template');
+        Route::get('data-summary', [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'summary'])
+            ->name('data.summary');
     });
 
     // Inventaris

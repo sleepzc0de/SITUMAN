@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Anggaran;
 
+use App\Exports\DataAnggaranExport;
 use App\Http\Controllers\Controller;
+use App\Imports\DataAnggaranImport;
 use App\Models\Anggaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DataAnggaranController extends Controller
 {
@@ -106,10 +109,22 @@ class DataAnggaranController extends Controller
             $validated['tagihan_outstanding'] = 0;
 
             // Set bulan to 0
-            foreach ([
-                'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-                'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
-            ] as $bulan) {
+            foreach (
+                [
+                    'januari',
+                    'februari',
+                    'maret',
+                    'april',
+                    'mei',
+                    'juni',
+                    'juli',
+                    'agustus',
+                    'september',
+                    'oktober',
+                    'november',
+                    'desember'
+                ] as $bulan
+            ) {
                 $validated[$bulan] = 0;
             }
 
@@ -422,16 +437,79 @@ class DataAnggaranController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ]);
 
-        return back()->with('info', 'Fitur import Excel akan segera tersedia');
+        try {
+            $import = new DataAnggaranImport();
+            Excel::import($import, $request->file('file'));
+
+            $message = "Import berhasil! {$import->imported} data baru ditambahkan, {$import->updated} data diperbarui.";
+
+            if (!empty($import->errors)) {
+                $errorList = implode('<br>', $import->errors);
+                return back()->with('warning', $message . "<br><strong>Peringatan:</strong><br>{$errorList}");
+            }
+
+            return back()->with('success', $message);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errors = [];
+            foreach ($failures as $failure) {
+                $errors[] = "Baris {$failure->row()}: " . implode(', ', $failure->errors());
+            }
+            return back()->with('error', 'Validasi gagal:<br>' . implode('<br>', $errors));
+        } catch (\Exception $e) {
+            Log::error('Import anggaran error: ' . $e->getMessage());
+            return back()->with('error', 'Gagal import: ' . $e->getMessage());
+        }
     }
+
 
     /**
      * Export to Excel
      */
-    public function export()
+    public function export(Request $request)
     {
-        return back()->with('info', 'Fitur export Excel akan segera tersedia');
+        $ro    = $request->get('ro');
+        $level = $request->get('level');
+        $filename = 'data_anggaran_' . date('Ymd_His') . '.xlsx';
+
+        return Excel::download(new DataAnggaranExport($ro, $level), $filename);
     }
+
+    public function downloadTemplate()
+    {
+        // Buat template Excel dengan contoh data
+        return Excel::download(new class implements
+            \Maatwebsite\Excel\Concerns\FromArray,
+            \Maatwebsite\Excel\Concerns\WithHeadings,
+            \Maatwebsite\Excel\Concerns\WithStyles,
+            \Maatwebsite\Excel\Concerns\WithColumnWidths
+        {
+            public function array(): array
+            {
+                return [
+                    ['4753', 'EBA', '403', 'AA', '521211', 'Belanja Keperluan Perkantoran', 'SJ.7', 5000000],
+                    ['4753', 'EBA', '403', 'AA', '',       'Sub Komponen AA - Uraian',       'SJ.7', 0],
+                    ['4753', 'EBA', '403', '',   '',       'RO 403 - Uraian RO',             'SJ.7', 0],
+                ];
+            }
+
+            public function headings(): array
+            {
+                return ['kegiatan', 'kro', 'ro', 'kode_subkomponen', 'kode_akun', 'program_kegiatan', 'pic', 'pagu_anggaran'];
+            }
+
+            public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
+            {
+                return [1 => ['font' => ['bold' => true]]];
+            }
+
+            public function columnWidths(): array
+            {
+                return ['A' => 12, 'B' => 8, 'C' => 8, 'D' => 18, 'E' => 12, 'F' => 50, 'G' => 12, 'H' => 18];
+            }
+        }, 'template_anggaran.xlsx');
+    }
+
 
     /**
      * Get subkomponen list berdasarkan RO (untuk AJAX)
@@ -466,5 +544,45 @@ class DataAnggaranController extends Controller
             ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+
+    public function summary(Request $request)
+    {
+        $tahun = $request->get('tahun', date('Y'));
+
+        // Summary per RO
+        $summaryRO = Anggaran::whereNull('kode_subkomponen')
+            ->whereNull('kode_akun')
+            ->orderBy('ro')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'ro'              => $item->ro,
+                    'nama'            => get_ro_name($item->ro),
+                    'pagu'            => $item->pagu_anggaran,
+                    'realisasi'       => $item->total_penyerapan,
+                    'outstanding'     => $item->tagihan_outstanding,
+                    'sisa'            => $item->sisa,
+                    'persen_serap'    => $item->persentase_penyerapan,
+                    'status'          => $item->status_anggaran,
+                ];
+            });
+
+        // Total keseluruhan
+        $totals = Anggaran::whereNull('kode_subkomponen')
+            ->whereNull('kode_akun')
+            ->selectRaw('SUM(pagu_anggaran) as total_pagu, SUM(total_penyerapan) as total_realisasi, SUM(tagihan_outstanding) as total_outstanding, SUM(sisa) as total_sisa')
+            ->first();
+
+        // Realisasi per bulan (dari akun)
+        $bulanFields = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+        $selectFields = implode(', ', array_map(fn($b) => "SUM({$b}) as {$b}", $bulanFields));
+
+        $realisasiPerBulan = Anggaran::whereNotNull('kode_akun')
+            ->selectRaw($selectFields)
+            ->first();
+
+        return view('anggaran.data.summary', compact('summaryRO', 'totals', 'realisasiPerBulan', 'tahun'));
     }
 }

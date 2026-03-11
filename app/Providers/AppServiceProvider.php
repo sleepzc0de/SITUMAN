@@ -2,11 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\SPP;
 use App\Models\User;
+use App\Observers\SPPObserver;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use App\Services\AnggaranService;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,7 +18,12 @@ class AppServiceProvider extends ServiceProvider
         User::class => UserPolicy::class,
     ];
 
-    public function register(): void {}
+    public function register(): void
+    {
+
+        $this->app->singleton(AnggaranService::class);
+
+    }
 
     public function boot(): void
     {
@@ -50,5 +59,8 @@ class AppServiceProvider extends ServiceProvider
         Blade::directive('dateindo', function ($expression) {
             return "<?php echo \Carbon\Carbon::parse($expression)->translatedFormat('d F Y'); ?>";
         });
+
+
+        SPP::observe(SPPObserver::class);
     }
 }

@@ -13,8 +13,13 @@ class UsulanPenarikan extends Model
     protected $table = 'usulan_penarikan';
 
     protected $fillable = [
-        'ro', 'sub_komponen', 'bulan', 'nilai_usulan',
-        'keterangan', 'status', 'user_id'
+        'ro',
+        'sub_komponen',
+        'bulan',
+        'nilai_usulan',
+        'keterangan',
+        'status',
+        'user_id'
     ];
 
     protected $casts = [
@@ -45,5 +50,10 @@ class UsulanPenarikan extends Model
     public function scopeByBulan($query, $bulan)
     {
         return $query->where('bulan', $bulan);
+    }
+
+    public function anggaran()
+    {
+        return $this->belongsTo(Anggaran::class);
     }
 }

@@ -1,32 +1,31 @@
 <?php
+// app/Http/Controllers/Anggaran/DokumenCapaianController.php
 
 namespace App\Http\Controllers\Anggaran;
 
 use App\Http\Controllers\Controller;
-use App\Models\DokumenCapaian;
 use App\Models\Anggaran;
+use App\Models\DokumenCapaian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class DokumenCapaianController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DokumenCapaian::with('user')->orderBy('created_at', 'desc');
+        $query = DokumenCapaian::with(['user', 'anggaran'])->orderBy('created_at', 'desc');
 
-        if ($request->has('bulan') && $request->bulan !== 'all') {
+        if ($request->filled('bulan') && $request->bulan !== 'all') {
             $query->where('bulan', $request->bulan);
         }
-
-        if ($request->has('ro') && $request->ro !== 'all') {
+        if ($request->filled('ro') && $request->ro !== 'all') {
             $query->where('ro', $request->ro);
         }
 
         $dokumens = $query->paginate(20);
-
-        $roList = Anggaran::select('ro')->distinct()->pluck('ro');
+        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
             'januari', 'februari', 'maret', 'april', 'mei', 'juni',
             'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
@@ -37,7 +36,7 @@ class DokumenCapaianController extends Controller
 
     public function create()
     {
-        $roList = Anggaran::select('ro')->distinct()->pluck('ro');
+        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
         $bulanList = [
             'januari', 'februari', 'maret', 'april', 'mei', 'juni',
             'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
@@ -49,12 +48,13 @@ class DokumenCapaianController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'ro' => 'required|string|max:50',
+            'ro'           => 'required|string|max:50',
             'sub_komponen' => 'required|string|max:255',
-            'bulan' => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
+            'anggaran_id'  => 'nullable|exists:anggaran,id',
+            'bulan'        => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
             'nama_dokumen' => 'required|string|max:255',
-            'files.*' => 'required|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
-            'keterangan' => 'nullable|string',
+            'files.*'      => 'required|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            'keterangan'   => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -62,19 +62,36 @@ class DokumenCapaianController extends Controller
 
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $file) {
-                    $filename = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+                    $filename = time() . '_' . uniqid() . '_' .
+                        preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
                     $path = $file->storeAs('dokumen-capaian', $filename, 'public');
 
                     $uploadedFiles[] = [
-                        'path' => $path,
-                        'name' => $file->getClientOriginalName(),
-                        'size' => $file->getSize(),
+                        'path'      => $path,
+                        'name'      => $file->getClientOriginalName(),
+                        'size'      => $file->getSize(),
                         'extension' => $file->getClientOriginalExtension(),
                     ];
                 }
             }
 
-            $validated['files'] = $uploadedFiles;
+            if (empty($uploadedFiles)) {
+                return back()->withInput()->with('error', 'Minimal satu file harus diupload');
+            }
+
+            // Auto-set anggaran_id dari SubKomponen jika tidak diisi
+            if (empty($validated['anggaran_id'])) {
+                $subkomp = Anggaran::where('ro', $validated['ro'])
+                    ->where('kode_subkomponen', $validated['sub_komponen'])
+                    ->whereNull('kode_akun')
+                    ->first();
+
+                if ($subkomp) {
+                    $validated['anggaran_id'] = $subkomp->id;
+                }
+            }
+
+            $validated['files']   = $uploadedFiles;
             $validated['user_id'] = Auth::id();
 
             DokumenCapaian::create($validated);
@@ -83,19 +100,25 @@ class DokumenCapaianController extends Controller
                 ->with('success', 'Dokumen capaian output berhasil diupload (' . count($uploadedFiles) . ' file)');
 
         } catch (\Exception $e) {
-            Log::error('Error storing dokumen: ' . $e->getMessage());
-            return back()->withInput()
-                ->with('error', 'Gagal mengupload dokumen: ' . $e->getMessage());
+            Log::error('DokumenCapaian store error: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal mengupload dokumen: ' . $e->getMessage());
         }
     }
 
     public function show($id)
     {
         try {
-            $dokumen = DokumenCapaian::with('user')->findOrFail($id);
-            return view('anggaran.dokumen.show', compact('dokumen'));
+            $dokumen = DokumenCapaian::with(['user', 'anggaran'])->findOrFail($id);
+
+            // Ambil info anggaran subkomponen untuk ditampilkan
+            $anggaranSubkomp = $dokumen->anggaran ?? Anggaran::where('ro', $dokumen->ro)
+                ->where('kode_subkomponen', $dokumen->sub_komponen)
+                ->whereNull('kode_akun')
+                ->first();
+
+            return view('anggaran.dokumen.show', compact('dokumen', 'anggaranSubkomp'));
+
         } catch (\Exception $e) {
-            Log::error('Error showing dokumen: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Dokumen tidak ditemukan');
         }
@@ -104,17 +127,16 @@ class DokumenCapaianController extends Controller
     public function edit($id)
     {
         try {
-            $dokumen = DokumenCapaian::findOrFail($id);
-
-            $roList = Anggaran::select('ro')->distinct()->pluck('ro');
+            $dokumen  = DokumenCapaian::findOrFail($id);
+            $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
             $bulanList = [
                 'januari', 'februari', 'maret', 'april', 'mei', 'juni',
                 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
             ];
 
             return view('anggaran.dokumen.edit', compact('dokumen', 'roList', 'bulanList'));
+
         } catch (\Exception $e) {
-            Log::error('Error editing dokumen: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Dokumen tidak ditemukan');
         }
@@ -123,22 +145,20 @@ class DokumenCapaianController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $dokumen = DokumenCapaian::findOrFail($id);
-
+            $dokumen   = DokumenCapaian::findOrFail($id);
             $validated = $request->validate([
-                'ro' => 'required|string|max:50',
+                'ro'           => 'required|string|max:50',
                 'sub_komponen' => 'required|string|max:255',
-                'bulan' => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
+                'bulan'        => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
                 'nama_dokumen' => 'required|string|max:255',
-                'files.*' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
-                'keterangan' => 'nullable|string',
-                'remove_files' => 'nullable|array', // Files to remove
+                'files.*'      => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+                'keterangan'   => 'nullable|string|max:1000',
+                'remove_files' => 'nullable|array',
             ]);
 
-            // Get existing files
             $existingFiles = $dokumen->files ?? [];
 
-            // Remove selected files
+            // Hapus file yang dipilih
             if ($request->has('remove_files') && is_array($request->remove_files)) {
                 foreach ($request->remove_files as $fileIndex) {
                     if (isset($existingFiles[$fileIndex])) {
@@ -149,34 +169,42 @@ class DokumenCapaianController extends Controller
                         unset($existingFiles[$fileIndex]);
                     }
                 }
-                $existingFiles = array_values($existingFiles); // Re-index array
+                $existingFiles = array_values($existingFiles);
             }
 
-            // Upload new files
+            // Upload file baru
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $file) {
-                    $filename = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+                    $filename = time() . '_' . uniqid() . '_' .
+                        preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
                     $path = $file->storeAs('dokumen-capaian', $filename, 'public');
 
                     $existingFiles[] = [
-                        'path' => $path,
-                        'name' => $file->getClientOriginalName(),
-                        'size' => $file->getSize(),
+                        'path'      => $path,
+                        'name'      => $file->getClientOriginalName(),
+                        'size'      => $file->getSize(),
                         'extension' => $file->getClientOriginalExtension(),
                     ];
                 }
             }
 
-            $validated['files'] = $existingFiles;
+            // Update anggaran_id jika RO/subkomponen berubah
+            $subkomp = Anggaran::where('ro', $validated['ro'])
+                ->where('kode_subkomponen', $validated['sub_komponen'])
+                ->whereNull('kode_akun')
+                ->first();
+
+            $validated['anggaran_id'] = $subkomp?->id;
+            $validated['files']       = $existingFiles;
+
             $dokumen->update($validated);
 
             return redirect()->route('anggaran.dokumen.index')
                 ->with('success', 'Dokumen capaian output berhasil diupdate');
 
         } catch (\Exception $e) {
-            Log::error('Error updating dokumen: ' . $e->getMessage());
-            return back()->withInput()
-                ->with('error', 'Gagal mengupdate dokumen: ' . $e->getMessage());
+            Log::error('DokumenCapaian update error: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal mengupdate dokumen: ' . $e->getMessage());
         }
     }
 
@@ -185,24 +213,19 @@ class DokumenCapaianController extends Controller
         try {
             $dokumen = DokumenCapaian::findOrFail($id);
 
-            // Delete all files
-            $allFiles = $dokumen->getAllFiles();
-            foreach ($allFiles as $file) {
+            foreach ($dokumen->getAllFiles() as $file) {
                 if (Storage::disk('public')->exists($file['path'])) {
                     Storage::disk('public')->delete($file['path']);
                 }
             }
 
-            // Delete record
             $dokumen->delete();
-
-            Log::info('Dokumen deleted successfully', ['id' => $id]);
 
             return redirect()->route('anggaran.dokumen.index')
                 ->with('success', 'Dokumen capaian output berhasil dihapus');
 
         } catch (\Exception $e) {
-            Log::error('Error deleting dokumen: ' . $e->getMessage());
+            Log::error('DokumenCapaian destroy error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
         }
@@ -211,12 +234,15 @@ class DokumenCapaianController extends Controller
     public function download($id)
     {
         try {
-            $dokumen = DokumenCapaian::findOrFail($id);
+            $dokumen  = DokumenCapaian::findOrFail($id);
             $allFiles = $dokumen->getAllFiles();
 
-            // If only one file, download it directly
+            if (empty($allFiles)) {
+                throw new \Exception('Tidak ada file untuk didownload');
+            }
+
             if (count($allFiles) === 1) {
-                $file = $allFiles[0];
+                $file     = $allFiles[0];
                 $fullPath = storage_path('app/public/' . $file['path']);
 
                 if (!file_exists($fullPath)) {
@@ -226,36 +252,31 @@ class DokumenCapaianController extends Controller
                 return response()->download($fullPath, $file['name']);
             }
 
-            // If multiple files, create ZIP
-            $zip = new \ZipArchive();
+            // Multiple files: buat ZIP
+            $tempDir     = storage_path('app/temp');
+            if (!file_exists($tempDir)) mkdir($tempDir, 0755, true);
+
             $zipFileName = 'dokumen_' . $dokumen->id . '_' . time() . '.zip';
-            $zipPath = storage_path('app/temp/' . $zipFileName);
+            $zipPath     = $tempDir . '/' . $zipFileName;
 
-            // Create temp directory if not exists
-            if (!file_exists(storage_path('app/temp'))) {
-                mkdir(storage_path('app/temp'), 0755, true);
+            $zip = new \ZipArchive();
+            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                throw new \Exception('Gagal membuat file ZIP');
             }
 
-            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
-                foreach ($allFiles as $index => $file) {
-                    $fullPath = storage_path('app/public/' . $file['path']);
-                    if (file_exists($fullPath)) {
-                        $zip->addFile($fullPath, $file['name']);
-                    }
+            foreach ($allFiles as $file) {
+                $fullPath = storage_path('app/public/' . $file['path']);
+                if (file_exists($fullPath)) {
+                    $zip->addFile($fullPath, $file['name']);
                 }
-                $zip->close();
-
-                return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
             }
 
-            throw new \Exception('Gagal membuat file ZIP');
+            $zip->close();
+
+            return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
 
         } catch (\Exception $e) {
-            Log::error('Download error', [
-                'id' => $id,
-                'message' => $e->getMessage()
-            ]);
-
+            Log::error('DokumenCapaian download error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.index')
                 ->with('error', 'Gagal mendownload file: ' . $e->getMessage());
         }
@@ -264,14 +285,14 @@ class DokumenCapaianController extends Controller
     public function downloadSingle($id, $fileIndex)
     {
         try {
-            $dokumen = DokumenCapaian::findOrFail($id);
+            $dokumen  = DokumenCapaian::findOrFail($id);
             $allFiles = $dokumen->getAllFiles();
 
             if (!isset($allFiles[$fileIndex])) {
                 throw new \Exception('File tidak ditemukan');
             }
 
-            $file = $allFiles[$fileIndex];
+            $file     = $allFiles[$fileIndex];
             $fullPath = storage_path('app/public/' . $file['path']);
 
             if (!file_exists($fullPath)) {
@@ -281,12 +302,7 @@ class DokumenCapaianController extends Controller
             return response()->download($fullPath, $file['name']);
 
         } catch (\Exception $e) {
-            Log::error('Download single file error', [
-                'id' => $id,
-                'fileIndex' => $fileIndex,
-                'message' => $e->getMessage()
-            ]);
-
+            Log::error('DokumenCapaian downloadSingle error: ' . $e->getMessage());
             return redirect()->route('anggaran.dokumen.show', $id)
                 ->with('error', 'Gagal mendownload file: ' . $e->getMessage());
         }
@@ -299,18 +315,18 @@ class DokumenCapaianController extends Controller
                 return response()->json(['error' => 'RO harus diisi'], 400);
             }
 
+            // Sertakan info sisa anggaran untuk referensi
             $subkomponens = Anggaran::where('ro', $request->ro)
                 ->whereNotNull('kode_subkomponen')
-                ->where('kode_subkomponen', '!=', '')
                 ->whereNull('kode_akun')
                 ->distinct()
                 ->orderBy('kode_subkomponen')
-                ->get(['kode_subkomponen', 'program_kegiatan']);
+                ->get(['kode_subkomponen', 'program_kegiatan', 'pagu_anggaran', 'total_penyerapan', 'sisa']);
 
             return response()->json($subkomponens);
 
         } catch (\Exception $e) {
-            Log::error('getSubkomponen error: ' . $e->getMessage());
+            Log::error('DokumenCapaian getSubkomponen error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
