@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Check if current route matches given routes
  */
@@ -31,10 +32,16 @@ if (!function_exists('format_rupiah')) {
 
 /**
  * Alias format_rupiah (camelCase)
+ * Mendukung parameter ke-2 bool $singkat untuk format pendek
  */
 if (!function_exists('formatRupiah')) {
-    function formatRupiah($number, $prefix = 'Rp ')
+    function formatRupiah($number, bool|string $singkat = false): string
     {
+        if ($singkat === true) {
+            return format_rupiah_short($number);
+        }
+        // Jika $singkat berupa string (prefix lama), teruskan ke format_rupiah
+        $prefix = is_string($singkat) && $singkat !== '' ? $singkat : 'Rp ';
         return format_rupiah($number, $prefix);
     }
 }
@@ -60,6 +67,16 @@ if (!function_exists('format_rupiah_short')) {
             return 'Rp ' . rtrim(rtrim(number_format($value / 1_000, 1, ',', '.'), '0'), ',') . ' rb';
         }
         return 'Rp ' . number_format($value, 0, ',', '.');
+    }
+}
+
+/**
+ * Alias format_rupiah_short (camelCase)
+ */
+if (!function_exists('formatRupiahShort')) {
+    function formatRupiahShort($value): string
+    {
+        return format_rupiah_short($value);
     }
 }
 
@@ -172,6 +189,18 @@ if (!function_exists('format_percentage')) {
     function format_percentage($number, $decimals = 2)
     {
         return number_format((float) $number, $decimals, ',', '.') . '%';
+    }
+}
+
+/**
+ * Format percentage safely (no division by zero)
+ * Contoh: formatPersen(750000, 1000000) → "75,00%"
+ */
+if (!function_exists('formatPersen')) {
+    function formatPersen($nilai, $total, int $desimal = 2): string
+    {
+        if (!$total) return '0%';
+        return number_format(($nilai / $total) * 100, $desimal, ',', '.') . '%';
     }
 }
 
@@ -351,6 +380,7 @@ if (!function_exists('calculate_percentage')) {
 
 /**
  * Get Tailwind badge class based on percentage value
+ * Return full inline Tailwind classes (untuk @class / class="...")
  */
 if (!function_exists('percentage_color_class')) {
     function percentage_color_class($percentage)
@@ -362,6 +392,21 @@ if (!function_exists('percentage_color_class')) {
             return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
         }
         return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+    }
+}
+
+/**
+ * Get badge CSS class dari design system (.badge-* di app.css)
+ * berdasarkan persentase penyerapan anggaran
+ * Contoh: statusAnggaranBadge(75) → 'badge-warning'
+ * Dipakai di: anggaran.monitoring.index (inline di blade)
+ */
+if (!function_exists('statusAnggaranBadge')) {
+    function statusAnggaranBadge(float $persen): string
+    {
+        if ($persen >= 80) return 'badge-success';
+        if ($persen >= 50) return 'badge-warning';
+        return 'badge-danger';
     }
 }
 
@@ -383,7 +428,8 @@ if (!function_exists('percentage_text_class')) {
 }
 
 /**
- * Get progress bar color class based on percentage
+ * Get progress bar Tailwind color class based on percentage
+ * Contoh: progress_bar_color(75) → 'bg-amber-500'
  */
 if (!function_exists('progress_bar_color')) {
     function progress_bar_color($percentage)
@@ -391,6 +437,17 @@ if (!function_exists('progress_bar_color')) {
         if ($percentage >= 80) return 'bg-green-500';
         if ($percentage >= 50) return 'bg-amber-500';
         return 'bg-red-400';
+    }
+}
+
+/**
+ * Alias progress_bar_color (camelCase)
+ * Dipakai di: anggaran.monitoring.index
+ */
+if (!function_exists('progressBarColor')) {
+    function progressBarColor(float $persen): string
+    {
+        return progress_bar_color($persen);
     }
 }
 
@@ -455,8 +512,9 @@ if (!function_exists('to_slug')) {
 }
 
 /**
- * Format anggaran status label & badge class
- * Berdasarkan persentase serapan
+ * Format anggaran status label & badge class (dari design system)
+ * Berdasarkan persentase serapan — return array ['label', 'class']
+ * Contoh: anggaran_status(1000000, 750000) → ['label' => 'Baik', 'class' => 'badge-info']
  */
 if (!function_exists('anggaran_status')) {
     function anggaran_status($pagu, $realisasi): array
@@ -476,18 +534,22 @@ if (!function_exists('anggaran_status')) {
 /**
  * Format sisa anggaran dengan indikator visual
  * Return array ['value', 'class', 'warning']
+ * Contoh: sisa_anggaran_info(1000000, 40000) → ['value' => 'Rp 40.000', 'class' => '...red', 'warning' => '⚠ kritis']
  */
 if (!function_exists('sisa_anggaran_info')) {
     function sisa_anggaran_info($pagu, $sisa): array
     {
-        $isWarning  = $pagu > 0 && $sisa < ($pagu * 0.2);
-        $isDanger   = $pagu > 0 && $sisa < ($pagu * 0.05);
-        $textClass  = $isDanger  ? 'text-red-600 dark:text-red-400 font-bold'
-                    : ($isWarning ? 'text-amber-600 dark:text-amber-500 font-semibold'
-                    : 'text-gray-700 dark:text-gray-300');
-        $note       = $isDanger  ? '⚠ kritis'
-                    : ($isWarning ? '⚠ hampir habis'
-                    : null);
+        $isWarning = $pagu > 0 && $sisa < ($pagu * 0.2);
+        $isDanger  = $pagu > 0 && $sisa < ($pagu * 0.05);
+        $textClass = $isDanger
+            ? 'text-red-600 dark:text-red-400 font-bold'
+            : ($isWarning
+                ? 'text-amber-600 dark:text-amber-500 font-semibold'
+                : 'text-gray-700 dark:text-gray-300');
+        $note = $isDanger
+            ? '⚠ kritis'
+            : ($isWarning ? '⚠ hampir habis' : null);
+
         return [
             'value'   => format_rupiah($sisa),
             'class'   => $textClass,

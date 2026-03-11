@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers\Anggaran;
 
+use App\Exports\MonitoringAnggaranExport;
 use App\Http\Controllers\Controller;
 use App\Models\Anggaran;
 use App\Models\DokumenCapaian;
@@ -10,6 +11,7 @@ use App\Models\SPP;
 use App\Models\UsulanPenarikan;
 use App\Services\AnggaranService;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MonitoringAnggaranController extends Controller
 {
@@ -90,8 +92,18 @@ class MonitoringAnggaranController extends Controller
             ->mapWithKeys(fn($item) => [$item->kode_subkomponen => $item->program_kegiatan]);
 
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         // ===== Realisasi per Bulan (untuk chart) =====
@@ -115,13 +127,24 @@ class MonitoringAnggaranController extends Controller
         }
 
         return view('anggaran.monitoring.index', compact(
-            'groupedData', 'roList', 'subkomponenList', 'bulanList',
-            'totalPagu', 'totalRealisasi', 'totalSisa', 'totalOutstanding',
-            'ro', 'subkomponen', 'bulan',
-            'recentSPP', 'sppStats',
-            'usulanPending', 'totalUsulanPending',
+            'groupedData',
+            'roList',
+            'subkomponenList',
+            'bulanList',
+            'totalPagu',
+            'totalRealisasi',
+            'totalSisa',
+            'totalOutstanding',
+            'ro',
+            'subkomponen',
+            'bulan',
+            'recentSPP',
+            'sppStats',
+            'usulanPending',
+            'totalUsulanPending',
             'dokumenCount',
-            'chartLabels', 'chartData'
+            'chartLabels',
+            'chartData'
         ));
     }
 
@@ -134,13 +157,32 @@ class MonitoringAnggaranController extends Controller
             $stats = $this->anggaranService->recalculateAll();
 
             return redirect()->route('anggaran.monitoring.index')
-                ->with('success',
+                ->with(
+                    'success',
                     "Recalculate selesai: {$stats['akun']} akun, " .
-                    "{$stats['subkomp']} subkomponen, {$stats['ro']} RO diperbarui."
+                        "{$stats['subkomp']} subkomponen, {$stats['ro']} RO diperbarui."
                 );
-
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal recalculate: ' . $e->getMessage());
         }
+    }
+
+    public function export(Request $request)
+    {
+        $ro          = $request->get('ro', 'all');
+        $subkomponen = $request->get('subkomponen', 'all');
+
+        $query = Anggaran::query();
+        if ($ro !== 'all')          $query->where('ro', $ro);
+        if ($subkomponen !== 'all') $query->where('kode_subkomponen', $subkomponen);
+
+        $data = $query->orderBy('ro')
+            ->orderBy('kode_subkomponen')
+            ->orderBy('kode_akun')
+            ->get();
+
+        $filename = 'monitoring-anggaran-' . now()->format('Ymd-His') . '.xlsx';
+
+        return Excel::download(new MonitoringAnggaranExport($data, $ro), $filename);
     }
 }
