@@ -1,325 +1,300 @@
 @extends('layouts.app')
 
-@section('title', 'Detail SPP')
+@section('title', 'Detail SPP – ' . $spp->no_spp)
+
+@section('breadcrumb')
+<nav class="breadcrumb">
+    <a href="{{ route('dashboard') }}" class="breadcrumb-item">Dashboard</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="{{ route('anggaran.spp.index') }}" class="breadcrumb-item">Data SPP</a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">{{ $spp->no_spp }}</span>
+</nav>
+@endsection
+
+@section('page_header')
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="page-title">{{ $spp->no_spp }}</h1>
+            @if($spp->status === 'Tagihan Telah SP2D')
+                <span class="badge badge-success">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    Sudah SP2D
+                </span>
+            @else
+                <span class="badge badge-warning">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                    </svg>
+                    Belum SP2D
+                </span>
+            @endif
+        </div>
+        <p class="page-subtitle">
+            {{ ucfirst($spp->bulan) }} &middot; {{ $spp->jenis_belanja }} &middot; RO {{ $spp->ro }}
+        </p>
+    </div>
+    <div class="flex gap-2 flex-shrink-0">
+        <a href="{{ route('anggaran.spp.edit', $spp) }}" class="btn btn-secondary btn-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Edit
+        </a>
+        <a href="{{ route('anggaran.spp.index') }}" class="btn btn-ghost btn-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Kembali
+        </a>
+    </div>
+</div>
+@endsection
 
 @section('content')
-<div class="space-y-6">
-    <!-- Breadcrumb -->
-    <nav class="flex" aria-label="Breadcrumb">
-        <ol class="inline-flex items-center space-x-1 md:space-x-3">
-            <li>
-                <a href="{{ route('anggaran.spp.index') }}" class="text-gray-600 hover:text-navy-600 dark:text-gray-400 dark:hover:text-navy-400">
-                    Data SPP
-                </a>
-            </li>
-            <li>
-                <span class="mx-2 text-gray-400">/</span>
-            </li>
-            <li class="text-navy-600 dark:text-navy-400 font-medium">Detail SPP</li>
-        </ol>
-    </nav>
+<div class="space-y-5">
 
-    <!-- Header -->
-    <div class="card">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Detail SPP</h2>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ $spp->no_spp }}</p>
-            </div>
-
-            <div class="flex gap-2">
-                <a href="{{ route('anggaran.spp.edit', $spp) }}" class="btn btn-secondary">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                    </svg>
-                    Edit
-                </a>
-                <a href="{{ route('anggaran.spp.index') }}" class="btn btn-outline">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                    </svg>
-                    Kembali
-                </a>
-            </div>
+    {{-- ===== SUMMARY NILAI ===== --}}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card border-l-4 border-blue-400">
+            <p class="stat-card-label">Bruto</p>
+            <p class="stat-card-value text-lg">{{ format_rupiah_short($spp->bruto) }}</p>
+            <p class="stat-card-sub text-gray-400 text-xs">{{ format_rupiah($spp->bruto) }}</p>
         </div>
+        <div class="stat-card border-l-4 border-red-400">
+            <p class="stat-card-label">Pajak (PPN+PPh)</p>
+            <p class="stat-card-value text-lg text-red-600 dark:text-red-400">
+                {{ format_rupiah_short($spp->ppn + $spp->pph) }}
+            </p>
+            <p class="stat-card-sub text-gray-400 text-xs">
+                PPN {{ format_rupiah($spp->ppn) }} + PPh {{ format_rupiah($spp->pph) }}
+            </p>
+        </div>
+        <div class="stat-card border-l-4 border-emerald-400 col-span-2 lg:col-span-1">
+            <p class="stat-card-label">Netto</p>
+            <p class="stat-card-value text-xl text-emerald-600 dark:text-emerald-400">
+                {{ format_rupiah_short($spp->netto) }}
+            </p>
+            <p class="stat-card-sub text-gray-400 text-xs">{{ format_rupiah($spp->netto) }}</p>
+        </div>
+        @if($anggaran)
+        <div class="stat-card border-l-4 {{ $spp->status === 'Tagihan Telah SP2D' ? 'border-navy-400' : 'border-orange-400' }}">
+            <p class="stat-card-label">Sisa Pagu</p>
+            @php $sisaEfektif = $anggaran->sisa - ($spp->status === 'Tagihan Belum SP2D' ? 0 : 0); @endphp
+            <p class="stat-card-value text-lg {{ $anggaran->sisa < ($anggaran->pagu_anggaran * 0.2) ? 'text-red-600 dark:text-red-400' : '' }}">
+                {{ format_rupiah_short($anggaran->sisa) }}
+            </p>
+            <p class="stat-card-sub text-gray-400 text-xs">dari pagu {{ format_rupiah_short($anggaran->pagu_anggaran) }}</p>
+        </div>
+        @endif
     </div>
 
-    <!-- Status Card -->
-    <div class="card">
-        <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl border border-blue-200 dark:border-blue-700">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+    {{-- ===== INTEGRASI ANGGARAN ===== --}}
+    @if($anggaran)
+    <div class="card-flat">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-navy-100 dark:bg-navy-700 rounded-lg flex items-center justify-center">
+                    <svg class="w-4 h-4 text-navy-600 dark:text-navy-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                 </div>
                 <div>
-                    <p class="text-sm text-blue-600 dark:text-blue-400 font-medium">Status Pembayaran</p>
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ status_badge_class($spp->status) }} mt-1">
-                        {{ $spp->status === 'Tagihan Telah SP2D' ? 'Sudah SP2D' : 'Belum SP2D' }}
-                    </span>
+                    <p class="text-sm font-semibold text-gray-900 dark:text-white">Posisi Anggaran COA</p>
+                    <p class="text-xs text-gray-500 font-mono">{{ $spp->coa }}</p>
                 </div>
             </div>
-            <div class="text-right">
-                <p class="text-sm text-blue-600 dark:text-blue-400">Nilai Netto</p>
-                <p class="text-2xl font-bold text-blue-900 dark:text-blue-300">{{ format_rupiah($spp->netto) }}</p>
-            </div>
+            <a href="{{ route('anggaran.monitoring.index') }}"
+               class="btn btn-outline btn-sm">
+                Lihat Monitoring
+            </a>
         </div>
-    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Informasi Dasar -->
-        <div class="card">
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
-                Informasi Dasar
-            </h3>
+        @php
+            $persen = $anggaran->pagu_anggaran > 0
+                ? ($anggaran->total_penyerapan / $anggaran->pagu_anggaran) * 100
+                : 0;
+        @endphp
 
-            <div class="space-y-3">
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">No SPP</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->no_spp }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Nominatif</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->nominatif ?? '-' }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Tanggal SPP</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tgl_spp) }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Bulan</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ ucfirst($spp->bulan) }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Jenis Kegiatan</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->jenis_kegiatan }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Jenis Belanja</span>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-                        {{ $spp->jenis_belanja }}
-                    </span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Bagian</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->bagian }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">PIC</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->nama_pic }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">LS/Bendahara</span>
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
-                        {{ $spp->ls_bendahara }}
-                    </span>
-                </div>
-                @if($spp->staff_ppk)
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Staff PPK</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->staff_ppk }}</span>
-                </div>
-                @endif
+        <div class="grid grid-cols-3 gap-4 mb-3">
+            <div class="text-center p-3 bg-gray-50 dark:bg-navy-700/40 rounded-xl">
+                <p class="text-xs text-gray-500 mb-1">Pagu</p>
+                <p class="font-bold text-gray-900 dark:text-white text-sm">{{ format_rupiah_short($anggaran->pagu_anggaran) }}</p>
+            </div>
+            <div class="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl">
+                <p class="text-xs text-emerald-600 mb-1">Realisasi</p>
+                <p class="font-bold text-emerald-700 dark:text-emerald-400 text-sm">{{ format_rupiah_short($anggaran->total_penyerapan) }}</p>
+            </div>
+            <div class="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                <p class="text-xs text-orange-600 mb-1">Outstanding</p>
+                <p class="font-bold text-orange-700 dark:text-orange-400 text-sm">{{ format_rupiah_short($anggaran->tagihan_outstanding) }}</p>
             </div>
         </div>
 
-        <!-- Kode Anggaran -->
-        <div class="card">
-            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
-                Kode Anggaran (COA)
-            </h3>
-
-            <div class="space-y-3">
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">COA</span>
-                    <span class="font-mono font-semibold text-navy-600 dark:text-navy-400">{{ $spp->coa }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Kode Kegiatan</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->kode_kegiatan }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">KRO</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->kro }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">RO</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->ro }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">Sub Komponen</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->sub_komponen }}</span>
-                </div>
-                <div class="flex justify-between py-2">
-                    <span class="text-gray-600 dark:text-gray-400">MAK</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->mak }}</span>
-                </div>
+        <div>
+            <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+                <span>Penyerapan {{ formatPersen($anggaran->total_penyerapan, $anggaran->pagu_anggaran) }}</span>
+                <span class="{{ percentage_text_class($persen) }} font-semibold">{{ number_format($persen, 1) }}%</span>
             </div>
-        </div>
-    </div>
-
-    <!-- Uraian SPP -->
-    <div class="card">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Uraian SPP</h3>
-        <div class="bg-gray-50 dark:bg-navy-800 rounded-lg p-4">
-            <p class="text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ $spp->uraian_spp }}</p>
-        </div>
-    </div>
-
-    <!-- Dokumen Pendukung -->
-    @if($spp->nomor_kontrak || $spp->no_bast || $spp->id_eperjadin || $spp->nomor_surat_tugas || $spp->nomor_undangan)
-    <div class="card">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
-            Dokumen Pendukung
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            @if($spp->nomor_kontrak)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Nomor Kontrak/SPBy</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->nomor_kontrak }}</span>
+            <div class="progress-bar-wrap">
+                <div class="{{ progress_bar_color($persen) }} h-2 rounded-full transition-all duration-700"
+                     style="width: {{ min(100, $persen) }}%"></div>
             </div>
-            @endif
-
-            @if($spp->no_bast)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">No BAST/Kuitansi</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->no_bast }}</span>
-            </div>
-            @endif
-
-            @if($spp->id_eperjadin)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">ID e-Perjadin</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->id_eperjadin }}</span>
-            </div>
-            @endif
-
-            @if($spp->nomor_surat_tugas)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Nomor Surat Tugas</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->nomor_surat_tugas }}</span>
-            </div>
-            @endif
-
-            @if($spp->tanggal_st)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Tanggal ST/SK</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tanggal_st) }}</span>
-            </div>
-            @endif
-
-            @if($spp->nomor_undangan)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Nomor Undangan</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->nomor_undangan }}</span>
-            </div>
-            @endif
-
-            @if($spp->tanggal_mulai)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Tanggal Mulai</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tanggal_mulai) }}</span>
-            </div>
-            @endif
-
-            @if($spp->tanggal_selesai)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Tanggal Selesai</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tanggal_selesai) }}</span>
-            </div>
-            @endif
         </div>
     </div>
     @endif
 
-    <!-- Nilai & Pajak -->
-    <div class="card">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
-            Nilai & Pajak
-        </h3>
+    {{-- ===== DETAIL SECTION ===== --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-xl border border-blue-200 dark:border-blue-700">
-                <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Bruto</p>
-                <p class="text-xl font-bold text-blue-900 dark:text-blue-300 mt-1">{{ format_rupiah($spp->bruto) }}</p>
-            </div>
+        {{-- Informasi Dasar --}}
+        <div class="card">
+            <h3 class="section-title mb-4 pb-3 border-b border-gray-100 dark:border-navy-700">Informasi Dasar</h3>
+            <dl class="space-y-2.5">
+                @foreach([
+                    ['No SPP',          $spp->no_spp],
+                    ['Nominatif',       $spp->nominatif ?? '-'],
+                    ['Tanggal SPP',     formatTanggalIndo($spp->tgl_spp)],
+                    ['Bulan',           ucfirst($spp->bulan)],
+                    ['Jenis Kegiatan',  $spp->jenis_kegiatan],
+                    ['Bagian',          $spp->bagian],
+                    ['PIC',             $spp->nama_pic],
+                    ['LS / Bendahara',  $spp->ls_bendahara],
+                ] as [$label, $value])
+                <div class="flex justify-between py-1.5 border-b border-gray-50 dark:border-navy-700/50 last:border-0">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">{{ $label }}</dt>
+                    <dd class="text-sm font-medium text-gray-900 dark:text-white text-right ml-4">{{ $value }}</dd>
+                </div>
+                @endforeach
 
-            <div class="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 p-4 rounded-xl border border-red-200 dark:border-red-700">
-                <p class="text-sm font-medium text-red-600 dark:text-red-400">PPN</p>
-                <p class="text-xl font-bold text-red-900 dark:text-red-300 mt-1">{{ format_rupiah($spp->ppn) }}</p>
-            </div>
+                <div class="flex justify-between py-1.5">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400">Jenis Belanja</dt>
+                    <dd><span class="badge badge-purple">{{ $spp->jenis_belanja }}</span></dd>
+                </div>
 
-            <div class="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 p-4 rounded-xl border border-orange-200 dark:border-orange-700">
-                <p class="text-sm font-medium text-orange-600 dark:text-orange-400">PPh</p>
-                <p class="text-xl font-bold text-orange-900 dark:text-orange-300 mt-1">{{ format_rupiah($spp->pph) }}</p>
-            </div>
+                @if($spp->staff_ppk)
+                <div class="flex justify-between py-1.5">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400">Staff PPK</dt>
+                    <dd class="text-sm font-medium text-gray-900 dark:text-white">{{ $spp->staff_ppk }}</dd>
+                </div>
+                @endif
+            </dl>
+        </div>
 
-            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-xl border border-green-200 dark:border-green-700">
-                <p class="text-sm font-medium text-green-600 dark:text-green-400">Netto</p>
-                <p class="text-xl font-bold text-green-900 dark:text-green-300 mt-1">{{ format_rupiah($spp->netto) }}</p>
-            </div>
+        {{-- Kode Anggaran --}}
+        <div class="card">
+            <h3 class="section-title mb-4 pb-3 border-b border-gray-100 dark:border-navy-700">Kode Anggaran (COA)</h3>
+            <dl class="space-y-2.5">
+                <div class="flex justify-between py-1.5 border-b border-gray-50 dark:border-navy-700/50">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400">COA</dt>
+                    <dd class="font-mono text-sm font-bold text-navy-600 dark:text-navy-400">{{ $spp->coa }}</dd>
+                </div>
+                @foreach([
+                    ['Kode Kegiatan', $spp->kode_kegiatan],
+                    ['KRO',           $spp->kro],
+                    ['RO',            $spp->ro . ' – ' . get_ro_name($spp->ro)],
+                    ['Sub Komponen',  $spp->sub_komponen],
+                    ['MAK',           $spp->mak],
+                ] as [$label, $value])
+                <div class="flex justify-between py-1.5 border-b border-gray-50 dark:border-navy-700/50 last:border-0">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400">{{ $label }}</dt>
+                    <dd class="text-sm font-medium text-gray-900 dark:text-white text-right ml-4">{{ $value }}</dd>
+                </div>
+                @endforeach
+            </dl>
         </div>
     </div>
 
-    <!-- Informasi SP2D -->
-    @if($spp->status === 'Tagihan Telah SP2D')
+    {{-- Uraian SPP --}}
     <div class="card">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
+        <h3 class="section-title mb-3">Uraian SPP</h3>
+        <div class="bg-gray-50 dark:bg-navy-700/40 rounded-xl p-4">
+            <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">{{ $spp->uraian_spp }}</p>
+        </div>
+    </div>
+
+    {{-- Dokumen Pendukung --}}
+    @php
+        $hasDokumen = $spp->nomor_kontrak || $spp->no_bast || $spp->id_eperjadin
+                   || $spp->nomor_surat_tugas || $spp->nomor_undangan
+                   || $spp->tanggal_mulai || $spp->tanggal_selesai;
+    @endphp
+    @if($hasDokumen)
+    <div class="card">
+        <h3 class="section-title mb-4 pb-3 border-b border-gray-100 dark:border-navy-700">Dokumen Pendukung</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+            @foreach([
+                ['Nomor Kontrak / SPBy', $spp->nomor_kontrak],
+                ['No BAST / Kuitansi',  $spp->no_bast],
+                ['ID e-Perjadin',       $spp->id_eperjadin],
+                ['Nomor Surat Tugas',   $spp->nomor_surat_tugas],
+                ['Tanggal ST / SK',     $spp->tanggal_st ? formatTanggalIndo($spp->tanggal_st) : null],
+                ['Nomor Undangan',      $spp->nomor_undangan],
+                ['Tanggal Mulai',       $spp->tanggal_mulai ? formatTanggalIndo($spp->tanggal_mulai) : null],
+                ['Tanggal Selesai',     $spp->tanggal_selesai ? formatTanggalIndo($spp->tanggal_selesai) : null],
+            ] as [$label, $value])
+                @if($value)
+                <div class="flex justify-between py-1.5 border-b border-gray-50 dark:border-navy-700/50">
+                    <dt class="text-sm text-gray-500 dark:text-gray-400">{{ $label }}</dt>
+                    <dd class="text-sm font-medium text-gray-900 dark:text-white text-right ml-4">{{ $value }}</dd>
+                </div>
+                @endif
+            @endforeach
+        </div>
+    </div>
+    @endif
+
+    {{-- Informasi SP2D --}}
+    @if($spp->status === 'Tagihan Telah SP2D')
+    <div class="card border-l-4 border-emerald-400">
+        <h3 class="section-title mb-4 pb-3 border-b border-gray-100 dark:border-navy-700 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
             Informasi SP2D
         </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             @if($spp->no_sp2d)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">No SP2D</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ $spp->no_sp2d }}</span>
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl">
+                <p class="text-xs text-emerald-600 dark:text-emerald-400">No SP2D</p>
+                <p class="font-semibold text-emerald-900 dark:text-emerald-200 mt-1">{{ $spp->no_sp2d }}</p>
             </div>
             @endif
-
             @if($spp->tgl_sp2d)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Tanggal SP2D</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tgl_sp2d) }}</span>
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl">
+                <p class="text-xs text-emerald-600 dark:text-emerald-400">Tanggal SP2D</p>
+                <p class="font-semibold text-emerald-900 dark:text-emerald-200 mt-1">{{ formatTanggalIndo($spp->tgl_sp2d) }}</p>
             </div>
             @endif
-
             @if($spp->tgl_selesai_sp2d)
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Tanggal Selesai SP2D</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ formatTanggalIndo($spp->tgl_selesai_sp2d) }}</span>
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-xl">
+                <p class="text-xs text-emerald-600 dark:text-emerald-400">Selesai SP2D</p>
+                <p class="font-semibold text-emerald-900 dark:text-emerald-200 mt-1">{{ formatTanggalIndo($spp->tgl_selesai_sp2d) }}</p>
             </div>
             @endif
         </div>
-
         @if($spp->posisi_uang)
-        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-navy-700">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Posisi Uang</p>
-            <div class="bg-gray-50 dark:bg-navy-800 rounded-lg p-3">
-                <p class="text-gray-700 dark:text-gray-300">{{ $spp->posisi_uang }}</p>
-            </div>
+        <div class="mt-4 pt-3 border-t border-gray-100 dark:border-navy-700">
+            <p class="text-xs text-gray-500 mb-1.5">Posisi Uang</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-navy-700/40 rounded-lg px-3 py-2">
+                {{ $spp->posisi_uang }}
+            </p>
         </div>
         @endif
     </div>
     @endif
 
-    <!-- Metadata -->
-    <div class="card">
-        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4 pb-3 border-b border-gray-200 dark:border-navy-700">
-            Informasi Sistem
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Dibuat Pada</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ format_datetime($spp->created_at) }}</span>
-            </div>
-            <div class="flex justify-between py-2">
-                <span class="text-gray-600 dark:text-gray-400">Terakhir Diupdate</span>
-                <span class="font-semibold text-gray-900 dark:text-white">{{ format_datetime($spp->updated_at) }}</span>
-            </div>
+    {{-- Metadata --}}
+    <div class="card-flat">
+        <div class="flex flex-wrap gap-x-8 gap-y-2 text-xs text-gray-400 dark:text-gray-600">
+            <span>Dibuat: {{ format_datetime($spp->created_at) }}</span>
+            <span>Diperbarui: {{ format_datetime($spp->updated_at) }}</span>
+            <span>COA: <code class="font-mono">{{ $spp->coa }}</code></span>
         </div>
     </div>
+
 </div>
 @endsection
