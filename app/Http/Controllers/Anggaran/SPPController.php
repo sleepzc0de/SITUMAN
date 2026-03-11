@@ -36,16 +36,25 @@ class SPPController extends Controller
             });
         }
 
-        $spps = $query->orderBy('tgl_spp', 'desc')->paginate(20);
+        $spps = $query->orderBy('tgl_spp', 'desc')->paginate(20)->withQueryString();
 
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
-
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
-        // Apply filter untuk statistik juga
+        // Statistik tetap ikut filter RO & bulan
         $statsQuery = SPP::query();
         if ($request->filled('bulan') && $request->bulan !== 'all') {
             $statsQuery->where('bulan', $request->bulan);
@@ -54,14 +63,37 @@ class SPPController extends Controller
             $statsQuery->where('ro', $request->ro);
         }
 
-        $totalBruto       = (clone $statsQuery)->sum('bruto');
-        $totalNetto        = (clone $statsQuery)->sum('netto');
-        $totalSP2D         = (clone $statsQuery)->where('status', 'Tagihan Telah SP2D')->sum('netto');
-        $totalBelumSP2D    = (clone $statsQuery)->where('status', 'Tagihan Belum SP2D')->sum('netto');
+        $totalBruto     = (clone $statsQuery)->sum('bruto');
+        $totalNetto     = (clone $statsQuery)->sum('netto');
+        $totalSP2D      = (clone $statsQuery)->where('status', 'Tagihan Telah SP2D')->sum('netto');
+        $totalBelumSP2D = (clone $statsQuery)->where('status', 'Tagihan Belum SP2D')->sum('netto');
+
+        // Jika AJAX request, return partial view
+        if ($request->ajax()) {
+            return response()->json([
+                'table' => view('anggaran.spp._table_content', compact('spps'))->render(),
+                'stats' => [
+                    'totalBruto'     => (float) $totalBruto,
+                    'totalNetto'     => (float) $totalNetto,
+                    'totalSP2D'      => (float) $totalSP2D,
+                    'totalBelumSP2D' => (float) $totalBelumSP2D,
+                ],
+                'total'      => $spps->total(),
+                'hasFilters' => $request->hasAny(['bulan', 'status', 'ro', 'search'])
+                    && collect($request->only(['bulan', 'status', 'ro', 'search']))
+                    ->filter(fn($v) => $v && $v !== 'all')
+                    ->isNotEmpty(),
+            ]);
+        }
 
         return view('anggaran.spp.index', compact(
-            'spps', 'bulanList', 'roList',
-            'totalBruto', 'totalNetto', 'totalSP2D', 'totalBelumSP2D'
+            'spps',
+            'bulanList',
+            'roList',
+            'totalBruto',
+            'totalNetto',
+            'totalSP2D',
+            'totalBelumSP2D'
         ));
     }
 
@@ -70,8 +102,18 @@ class SPPController extends Controller
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
@@ -99,7 +141,6 @@ class SPPController extends Controller
 
             return redirect()->route('anggaran.spp.index')
                 ->with('success', 'Data SPP berhasil ditambahkan');
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('SPP store error: ' . $e->getMessage());
@@ -122,8 +163,18 @@ class SPPController extends Controller
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
         $bulanList = [
-            'januari', 'februari', 'maret', 'april', 'mei', 'juni',
-            'juli', 'agustus', 'september', 'oktober', 'november', 'desember'
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
         ];
 
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
@@ -141,8 +192,13 @@ class SPPController extends Controller
             ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan', 'pagu_anggaran', 'sisa']);
 
         return view('anggaran.spp.edit', compact(
-            'spp', 'roList', 'bulanList', 'jenisBelanja',
-            'lsBendahara', 'subkomponenList', 'akunList'
+            'spp',
+            'roList',
+            'bulanList',
+            'jenisBelanja',
+            'lsBendahara',
+            'subkomponenList',
+            'akunList'
         ));
     }
 
@@ -175,7 +231,6 @@ class SPPController extends Controller
 
             return redirect()->route('anggaran.spp.index')
                 ->with('success', 'Data SPP berhasil diupdate');
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('SPP update error: ' . $e->getMessage());
@@ -197,7 +252,6 @@ class SPPController extends Controller
 
             return redirect()->route('anggaran.spp.index')
                 ->with('success', 'Data SPP berhasil dihapus');
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('SPP destroy error: ' . $e->getMessage());
@@ -220,7 +274,6 @@ class SPPController extends Controller
                 ->get(['kode_subkomponen', 'program_kegiatan']);
 
             return response()->json($subkomponens);
-
         } catch (\Exception $e) {
             Log::error('getSubkomponen error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
@@ -247,7 +300,6 @@ class SPPController extends Controller
             });
 
             return response()->json($akuns);
-
         } catch (\Exception $e) {
             Log::error('getAkun error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
@@ -320,7 +372,7 @@ class SPPController extends Controller
             $fmt = fn($v) => 'Rp ' . number_format($v, 0, ',', '.');
             throw new \Exception(
                 "Nilai SPP ({$fmt($netto)}) melebihi sisa anggaran efektif ({$fmt($sisaEfektif)}). " .
-                "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}"
+                    "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}"
             );
         }
     }
