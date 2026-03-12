@@ -2,8 +2,7 @@
 @section('title', 'Rekomendasi Kenaikan Grading')
 
 @section('page_header')
-<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4"
-     x-data="gradingIndex()">
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
     <div>
         <nav class="breadcrumb mb-2" aria-label="Breadcrumb">
             <span class="text-gray-400 dark:text-gray-500 text-sm">Kepegawaian</span>
@@ -19,7 +18,20 @@
         </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+    {{--
+        Filter & Export dipindah ke dalam @section('content') supaya
+        berada dalam scope x-data="gradingIndex()" yang sama.
+        Di sini hanya tampilkan header teks saja.
+    --}}
+</div>
+@endsection
+
+@section('content')
+{{-- SATU x-data untuk seluruh halaman --}}
+<div class="space-y-6 animate-fade-in" x-data="gradingIndex()">
+
+    {{-- Toolbar: Filter + Export (dalam scope Alpine) --}}
+    <div class="flex flex-wrap items-center justify-end gap-2">
         {{-- Filter Tahun --}}
         <div class="relative">
             <select x-model="filters.tahun"
@@ -61,14 +73,10 @@
             Export Excel
         </a>
     </div>
-</div>
-@endsection
-
-@section('content')
-<div class="space-y-6 animate-fade-in" x-data="gradingIndex()">
 
     {{-- Summary Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
         <div class="card flex items-start gap-4 !p-5">
             <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30
                         flex items-center justify-center flex-shrink-0">
@@ -80,8 +88,7 @@
             </div>
             <div class="flex-1 min-w-0">
                 <p class="stat-card-label">Total Eligible</p>
-                <p class="stat-card-value text-emerald-600 dark:text-emerald-400"
-                   x-text="stats.total"></p>
+                <p class="stat-card-value text-emerald-600 dark:text-emerald-400" x-text="stats.total"></p>
                 <p class="stat-card-sub text-gray-400">
                     dari <span x-text="stats.totalAktif"></span> pegawai aktif
                 </p>
@@ -99,8 +106,7 @@
             </div>
             <div class="flex-1 min-w-0">
                 <p class="stat-card-label">Naik 1 Grade</p>
-                <p class="stat-card-value text-navy-700 dark:text-navy-200"
-                   x-text="stats.naik1"></p>
+                <p class="stat-card-value text-navy-700 dark:text-navy-200" x-text="stats.naik1"></p>
                 <p class="stat-card-sub text-gray-400">pegawai</p>
             </div>
         </div>
@@ -116,8 +122,7 @@
             </div>
             <div class="flex-1 min-w-0">
                 <p class="stat-card-label">Rata-rata Masa Kerja</p>
-                <p class="stat-card-value text-gold-600 dark:text-gold-400"
-                   x-text="stats.avgMasaKerja"></p>
+                <p class="stat-card-value text-gold-600 dark:text-gold-400" x-text="stats.avgMasaKerja"></p>
                 <p class="stat-card-sub text-gray-400">tahun</p>
             </div>
         </div>
@@ -133,17 +138,16 @@
             </div>
             <div class="flex-1 min-w-0">
                 <p class="stat-card-label">Grade Maks Rekomendasi</p>
-                <p class="stat-card-value text-purple-600 dark:text-purple-400"
-                   x-text="stats.maxGrade"></p>
+                <p class="stat-card-value text-purple-600 dark:text-purple-400" x-text="stats.maxGrade"></p>
                 <p class="stat-card-sub text-gray-400">tertinggi</p>
             </div>
         </div>
+
     </div>
 
     {{-- Chart + Per Bagian --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {{-- Chart --}}
         <div class="lg:col-span-2 card !p-0 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 dark:border-navy-700">
                 <h3 class="section-title">Distribusi Kenaikan Grade</h3>
@@ -154,7 +158,6 @@
             </div>
         </div>
 
-        {{-- Per Bagian --}}
         <div class="card !p-0 overflow-hidden">
             <div class="px-5 py-4 border-b border-gray-100 dark:border-navy-700">
                 <h3 class="section-title">Per Bagian</h3>
@@ -181,6 +184,7 @@
                 </template>
             </div>
         </div>
+
     </div>
 
     {{-- Tabel --}}
@@ -222,12 +226,11 @@
              x-transition:leave-end="opacity-0"
              class="flex items-center justify-center py-20 gap-3"
              style="display:none;">
-            <div class="w-6 h-6 border-2 border-navy-200 border-t-navy-600
-                        rounded-full animate-spin"></div>
+            <div class="w-6 h-6 border-2 border-navy-200 border-t-navy-600 rounded-full animate-spin"></div>
             <span class="text-sm text-gray-500 dark:text-gray-400">Memuat data...</span>
         </div>
 
-        {{-- Table --}}
+        {{-- Tabel Data --}}
         <div x-show="!loading" style="display:none;">
             <div class="table-wrapper !rounded-none !border-0">
                 <table class="table">
@@ -246,6 +249,7 @@
                         </tr>
                     </thead>
                     <tbody>
+
                         <template x-if="rows.length === 0">
                             <tr>
                                 <td colspan="10">
@@ -254,8 +258,7 @@
                                             <svg class="w-8 h-8 text-gray-400 dark:text-gray-500"
                                                  fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
-                                                      stroke-width="1.5"
-                                                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                                      stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
                                             </svg>
                                         </div>
                                         <p class="empty-state-title">Tidak ada rekomendasi</p>
@@ -380,6 +383,7 @@
 
                             </tr>
                         </template>
+
                     </tbody>
                 </table>
             </div>
@@ -396,16 +400,16 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 @php
                 $referensi = [
-                    ['label' => 'Eselon I',           'max' => 27, 'color' => 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'],
-                    ['label' => 'Eselon II',          'max' => 22, 'color' => 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'],
-                    ['label' => 'Eselon III',         'max' => 18, 'color' => 'bg-navy-100 dark:bg-navy-700 text-navy-700 dark:text-navy-200'],
-                    ['label' => 'Eselon IV',          'max' => 16, 'color' => 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300'],
-                    ['label' => 'Eselon V',           'max' => 13, 'color' => 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'],
-                    ['label' => 'Fngsional Utama',    'max' => 17, 'color' => 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'],
-                    ['label' => 'Fngsional Madya',    'max' => 14, 'color' => 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'],
-                    ['label' => 'Fngsional Muda',     'max' => 11, 'color' => 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'],
-                    ['label' => 'Fngsional Pertama',  'max' => 9,  'color' => 'bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-300'],
-                    ['label' => 'Pelaksana',          'max' => 12, 'color' => 'bg-gold-100 dark:bg-gold-900/20 text-gold-700 dark:text-gold-300'],
+                    ['label' => 'Eselon I',          'max' => 27, 'color' => 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'],
+                    ['label' => 'Eselon II',         'max' => 22, 'color' => 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'],
+                    ['label' => 'Eselon III',        'max' => 18, 'color' => 'bg-navy-100 dark:bg-navy-700 text-navy-700 dark:text-navy-200'],
+                    ['label' => 'Eselon IV',         'max' => 16, 'color' => 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300'],
+                    ['label' => 'Eselon V',          'max' => 13, 'color' => 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'],
+                    ['label' => 'Fung. Utama',       'max' => 17, 'color' => 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'],
+                    ['label' => 'Fung. Madya',       'max' => 14, 'color' => 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'],
+                    ['label' => 'Fung. Muda',        'max' => 11, 'color' => 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'],
+                    ['label' => 'Fung. Pertama',     'max' => 9,  'color' => 'bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-300'],
+                    ['label' => 'Pelaksana',         'max' => 12, 'color' => 'bg-gold-100 dark:bg-gold-900/20 text-gold-700 dark:text-gold-300'],
                 ];
                 @endphp
                 @foreach($referensi as $ref)
@@ -467,7 +471,10 @@ function gradingIndex() {
         chart: null,
 
         init() {
-            this.$nextTick(() => this.initChart());
+            // Pastikan chart hanya diinit sekali setelah DOM siap
+            this.$nextTick(() => {
+                this.initChart();
+            });
         },
 
         async fetchData() {
@@ -489,6 +496,7 @@ function gradingIndex() {
                 this.stats     = data.stats;
                 this.perBagian = data.perBagian;
 
+                // Update URL tanpa reload
                 const url = new URL(window.location);
                 url.searchParams.set('tahun',  this.filters.tahun);
                 url.searchParams.set('bagian', this.filters.bagian);
@@ -496,6 +504,7 @@ function gradingIndex() {
                 window.history.replaceState({}, '', url);
 
                 this.$nextTick(() => this.updateChart());
+
             } catch (e) {
                 console.error('Gagal memuat data grading:', e);
             } finally {
@@ -506,13 +515,28 @@ function gradingIndex() {
         initChart() {
             const ctx = document.getElementById('gradingChart');
             if (!ctx) return;
-            if (this.chart) { this.chart.destroy(); }
+
+            // Destroy dulu jika sudah ada instance sebelumnya
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
+
+            // Juga cek registry Chart.js (jaga-jaga double init)
+            const existing = Chart.getChart('gradingChart');
+            if (existing) {
+                existing.destroy();
+            }
+
             const isDark = document.documentElement.classList.contains('dark');
-            this.chart = new Chart(ctx, this.buildChartConfig(isDark));
+            this.chart   = new Chart(ctx, this.buildChartConfig(isDark));
         },
 
         updateChart() {
-            if (!this.chart) { this.initChart(); return; }
+            if (!this.chart) {
+                this.initChart();
+                return;
+            }
             const cfg = this.getChartData();
             this.chart.data.labels           = cfg.labels;
             this.chart.data.datasets[0].data = cfg.sekarang;
@@ -578,7 +602,7 @@ function gradingIndex() {
                         x: { grid: { color: grid }, ticks: { color: label } },
                         y: {
                             beginAtZero: true,
-                            grid: { color: grid },
+                            grid:  { color: grid },
                             ticks: { color: label, stepSize: 1 },
                         },
                     },
