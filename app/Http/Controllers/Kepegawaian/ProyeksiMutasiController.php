@@ -10,17 +10,65 @@ use Carbon\Carbon;
 
 class ProyeksiMutasiController extends Controller
 {
+    private const CACHE_TTL = 300;
+
     public function index(Request $request)
     {
-        $tahun = $request->input('tahun', date('Y'));
-        $bulan = $request->input('bulan');
+        $tahun     = (int) $request->input('tahun', date('Y'));
+        $bagian    = (string) ($request->input('bagian') ?? '');
+        $prioritas = (string) ($request->input('prioritas') ?? '');
+        $search    = (string) ($request->input('search') ?? '');
 
-        // Proyeksi mutasi berdasarkan masa jabatan dan pola historis
-        $proyeksi = Cache::remember("proyeksi_mutasi_{$tahun}_{$bulan}", 300, function() use ($tahun, $bulan) {
-            return Pegawai::where('status', 'AKTIF')
-                ->get()
-                ->map(function($pegawai) use ($tahun, $bulan) {
-                    $analisis = $this->analisisMutasi($pegawai, $tahun, $bulan);
+        $bagianList = Cache::remember('pegawai_bagian_list', 600, fn() =>
+            Pegawai::where('status', 'AKTIF')
+                ->whereNotNull('bagian')
+                ->distinct()
+                ->orderBy('bagian')
+                ->pluck('bagian')
+        );
+
+        $proyeksi    = $this->getProyeksi($tahun, $bagian, $prioritas, $search);
+        $statsBagian = $proyeksi->groupBy('bagian')->map(fn($g) => $g->count())->sortDesc();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'html'        => view('kepegawaian.mutasi._table',
+                                    compact('proyeksi', 'tahun', 'search', 'bagian', 'prioritas'))->render(),
+                'stats'       => view('kepegawaian.mutasi._stats',
+                                    compact('proyeksi'))->render(),
+                'statsBagian' => view('kepegawaian.mutasi._stats_bagian',
+                                    compact('statsBagian', 'proyeksi'))->render(),
+                'count'       => $proyeksi->count(),
+            ]);
+        }
+
+        return view('kepegawaian.mutasi.index', compact(
+            'proyeksi', 'tahun', 'bagian', 'prioritas',
+            'search', 'bagianList', 'statsBagian'
+        ));
+    }
+
+    private function getProyeksi(int $tahun, string $bagian, string $prioritas, string $search)
+    {
+        $cacheKey = "proyeksi_mutasi_{$tahun}_{$bagian}_{$prioritas}_{$search}";
+
+        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($tahun, $bagian, $prioritas, $search) {
+            $query = Pegawai::where('status', 'AKTIF');
+
+            if ($bagian !== '') {
+                $query->where('bagian', $bagian);
+            }
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('nama', 'like', "%{$search}%")
+                      ->orWhere('nip', 'like', "%{$search}%");
+                });
+            }
+
+            return $query->get()
+                ->map(function ($pegawai) use ($tahun) {
+                    $analisis = $this->analisisMutasi($pegawai, $tahun);
                     if ($analisis['perlu_mutasi']) {
                         $pegawai->analisis_mutasi = $analisis;
                         return $pegawai;
@@ -28,94 +76,127 @@ class ProyeksiMutasiController extends Controller
                     return null;
                 })
                 ->filter()
+                ->when($prioritas !== '', function ($col) use ($prioritas) {
+                    return $col->filter(function ($p) use ($prioritas) {
+                        $skor = $p->analisis_mutasi['prioritas'];
+                        return match ($prioritas) {
+                            'tinggi' => $skor >= 5,
+                            'sedang' => $skor >= 3 && $skor < 5,
+                            'rendah' => $skor < 3,
+                            default  => true,
+                        };
+                    });
+                })
                 ->sortByDesc('analisis_mutasi.prioritas')
                 ->values();
         });
-
-        return view('kepegawaian.mutasi.index', compact('proyeksi', 'tahun', 'bulan'));
     }
 
-    private function analisisMutasi(Pegawai $pegawai, int $tahun, ?int $bulan): array
+    private function analisisMutasi(Pegawai $pegawai, int $tahun): array
     {
         $perluMutasi = false;
-        $alasan = [];
-        $prioritas = 0;
+        $alasan      = [];
+        $prioritas   = 0;
+        $lamaJabatan = null;
 
-        // Analisis masa jabatan (asumsi TMT dari data proyeksi_kp_1)
-        if ($pegawai->proyeksi_kp_1) {
-            // Parse tanggal dari proyeksi_kp_1
-            // Contoh: "1 April 2023"
+        // ── Masa jabatan via tmt_jabatan, fallback proyeksi_kp_1 ──
+        $tmtSource = $pegawai->tmt_jabatan ?? null;
+        if (!$tmtSource && $pegawai->proyeksi_kp_1) {
+            try { $tmtSource = Carbon::parse($pegawai->proyeksi_kp_1); } catch (\Exception) {}
+        }
+
+        if ($tmtSource) {
             try {
-                $tmt = Carbon::parse($pegawai->proyeksi_kp_1);
-                $lamaJabatan = $tmt->diffInMonths(now());
+                $tmt         = $tmtSource instanceof Carbon ? $tmtSource : Carbon::parse($tmtSource);
+                $lamaJabatan = (int) $tmt->diffInMonths(now());
 
-                // Jika sudah lebih dari 24 bulan (2 tahun)
                 if ($lamaJabatan >= 24) {
                     $perluMutasi = true;
-                    $prioritas += 3;
-                    $alasan[] = "Sudah {$lamaJabatan} bulan di jabatan saat ini";
-                }
-
-                // Jika mendekati 2 tahun (18-24 bulan)
-                if ($lamaJabatan >= 18 && $lamaJabatan < 24) {
+                    $prioritas  += 3;
+                    $alasan[]    = "Masa jabatan {$lamaJabatan} bulan (≥24 bulan)";
+                } elseif ($lamaJabatan >= 18) {
                     $perluMutasi = true;
-                    $prioritas += 2;
-                    $alasan[] = "Mendekati batas masa jabatan (18-24 bulan)";
+                    $prioritas  += 2;
+                    $alasan[]    = "Mendekati batas masa jabatan ({$lamaJabatan} dari 24 bulan)";
                 }
-            } catch (\Exception $e) {
-                // Skip jika parsing gagal
-            }
+            } catch (\Exception) {}
         }
 
-        // Analisis berdasarkan usia menjelang pensiun
+        // ── Mendekati pensiun ──
         if ($pegawai->tanggal_pensiun) {
-            $bulanSampaiPensiun = Carbon::parse($pegawai->tanggal_pensiun)->diffInMonths(now());
+            try {
+                $bulanSampaiPensiun = (int) now()->diffInMonths(
+                    Carbon::parse($pegawai->tanggal_pensiun), false
+                );
 
-            if ($bulanSampaiPensiun <= 12 && $bulanSampaiPensiun > 0) {
-                $perluMutasi = true;
-                $prioritas += 5;
-                $alasan[] = "Akan pensiun dalam {$bulanSampaiPensiun} bulan";
-            }
+                if ($bulanSampaiPensiun > 0 && $bulanSampaiPensiun <= 12) {
+                    $perluMutasi = true;
+                    $prioritas  += 5;
+                    $alasan[]    = "Akan pensiun dalam {$bulanSampaiPensiun} bulan";
+                } elseif ($bulanSampaiPensiun > 12 && $bulanSampaiPensiun <= 24) {
+                    $perluMutasi = true;
+                    $prioritas  += 2;
+                    $alasan[]    = "Akan pensiun dalam {$bulanSampaiPensiun} bulan (2 tahun ke depan)";
+                }
+            } catch (\Exception) {}
         }
 
-        // Analisis berdasarkan jabatan struktural
+        // ── Booster pejabat struktural ──
         if ($pegawai->eselon && in_array($pegawai->eselon, ['Eselon III', 'Eselon IV'])) {
-            $prioritas += 1;
-            $alasan[] = "Pejabat struktural eselon " . $pegawai->eselon;
+            if ($perluMutasi) $prioritas += 1;
+            $alasan[] = "Pejabat struktural ({$pegawai->eselon})";
         }
 
         return [
-            'perlu_mutasi' => $perluMutasi,
-            'prioritas' => $prioritas,
-            'alasan' => $alasan,
+            'perlu_mutasi'      => $perluMutasi,
+            'prioritas'         => $prioritas,
+            'alasan'            => $alasan,
+            'lama_jabatan'      => $lamaJabatan,
             'rekomendasi_waktu' => $this->rekomendasiWaktuMutasi($pegawai, $tahun),
+            'progress_jabatan'  => $lamaJabatan !== null
+                ? min(100, (int) round(($lamaJabatan / 24) * 100))
+                : null,
         ];
     }
 
-    private function rekomendasiWaktuMutasi(Pegawai $pegawai, int $tahun): ?string
+    private function rekomendasiWaktuMutasi(Pegawai $pegawai, int $tahun): string
     {
-        // Rekomendasi waktu mutasi biasanya April atau Oktober
-        $bulanMutasi = ['April', 'Oktober'];
-
-        if ($pegawai->proyeksi_kp_1) {
-            try {
-                $tmt = Carbon::parse($pegawai->proyeksi_kp_1);
-                $duaTahun = $tmt->copy()->addYears(2);
-
-                if ($duaTahun->year == $tahun) {
-                    return $duaTahun->format('F Y');
-                }
-            } catch (\Exception $e) {
-                // Return default
-            }
+        $tmtSource = $pegawai->tmt_jabatan ?? null;
+        if (!$tmtSource && $pegawai->proyeksi_kp_1) {
+            try { $tmtSource = Carbon::parse($pegawai->proyeksi_kp_1); } catch (\Exception) {}
         }
 
-        return "April {$tahun} atau Oktober {$tahun}";
+        if ($tmtSource) {
+            try {
+                $tmt    = $tmtSource instanceof Carbon ? $tmtSource : Carbon::parse($tmtSource);
+                $target = $tmt->copy()->addYears(2);
+                $result = $target->month <= 6
+                    ? Carbon::create($target->year, 4, 1)
+                    : Carbon::create($target->year, 10, 1);
+                return $result->translatedFormat('F Y');
+            } catch (\Exception) {}
+        }
+
+        return now()->month <= 3
+            ? "April {$tahun}"
+            : (now()->month <= 9 ? "Oktober {$tahun}" : "April " . ($tahun + 1));
     }
 
     public function show(Pegawai $pegawai)
     {
-        $analisis = $this->analisisMutasi($pegawai, date('Y'), null);
-        return view('kepegawaian.mutasi.show', compact('pegawai', 'analisis'));
+        $analisis = $this->analisisMutasi($pegawai, (int) date('Y'));
+
+        $rekanSebagian = Pegawai::where('status', 'AKTIF')
+            ->where('bagian', $pegawai->bagian)
+            ->where('id', '!=', $pegawai->id)
+            ->select('id', 'nama', 'jabatan', 'tmt_jabatan', 'proyeksi_kp_1', 'nip')
+            ->limit(5)
+            ->get()
+            ->map(function ($r) {
+                $r->analisis_mutasi = $this->analisisMutasi($r, (int) date('Y'));
+                return $r;
+            });
+
+        return view('kepegawaian.mutasi.show', compact('pegawai', 'analisis', 'rekanSebagian'));
     }
 }

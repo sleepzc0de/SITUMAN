@@ -46,12 +46,14 @@ class Pegawai extends Model
         'proyeksi_kp_1',
         'proyeksi_kp_2',
         'keterangan_kp',
-        'jenis_kelamin'
+        'jenis_kelamin',
+        'tmt_jabatan',
     ];
 
     protected $casts = [
         'tmt_cpns' => 'date',
         'tanggal_lahir' => 'date',
         'tanggal_pensiun' => 'date',
+        'tmt_jabatan' => 'date',
     ];
 }

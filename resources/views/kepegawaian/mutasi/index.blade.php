@@ -1,211 +1,432 @@
 @extends('layouts.app')
 @section('title', 'Proyeksi Mutasi Pegawai')
 
+@section('page_header')
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <nav class="flex items-center gap-1.5 text-xs mb-2">
+            <span class="text-gray-400 dark:text-gray-500">Kepegawaian</span>
+            <svg class="w-3 h-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="text-navy-600 dark:text-navy-400 font-semibold">Proyeksi Mutasi</span>
+        </nav>
+        <h1 class="page-title">Proyeksi Mutasi <span class="text-gradient animate-gradient">Pegawai</span></h1>
+        <p class="page-subtitle mt-1">Analisis cerdas berdasarkan masa jabatan & data kepegawaian · Tahun <span id="header-tahun" class="font-semibold text-gray-700 dark:text-gray-300">{{ $tahun }}</span></p>
+    </div>
+    <button id="btn-export"
+            class="btn btn-secondary self-start flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        Export Excel
+    </button>
+</div>
+@endsection
+
 @section('content')
 <div class="space-y-6 animate-fade-in">
 
-    {{-- Header --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <x-breadcrumb :items="[
-                ['title' => 'Kepegawaian', 'url' => null, 'active' => false],
-                ['title' => 'Proyeksi Mutasi', 'url' => null, 'active' => true],
-            ]"/>
-            <h1 class="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mt-1">Proyeksi Mutasi Pegawai</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Analisis dan proyeksi mutasi berdasarkan masa jabatan</p>
-        </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-            <form method="GET">
-                <select name="tahun" class="py-2 px-3 text-sm border-2 border-gray-200 dark:border-navy-600 rounded-xl bg-white dark:bg-navy-700 text-gray-900 dark:text-white focus:border-navy-400 transition-all" onchange="this.form.submit()">
-                    @for($y = date('Y'); $y <= date('Y') + 2; $y++)
-                    <option value="{{ $y }}" {{ $tahun == $y ? 'selected' : '' }}>{{ $y }}</option>
-                    @endfor
-                </select>
-            </form>
-            <button class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl border-2 border-gold-400 text-gold-700 dark:text-gold-400 hover:bg-gold-50 dark:hover:bg-navy-700 transition-all">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                </svg>
-                Export
-            </button>
+    {{-- ── Stat Cards ── --}}
+    <div id="stats-container" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        @include('kepegawaian.mutasi._stats', ['proyeksi' => $proyeksi])
+    </div>
+
+    {{-- ── Filter Bar ── --}}
+    <div class="relative overflow-hidden rounded-2xl bg-white dark:bg-navy-800
+                border border-gray-100 dark:border-navy-700 shadow-sm">
+
+        {{-- Top accent line --}}
+        <div class="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-navy-500 via-gold-400 to-navy-500"></div>
+
+        <div class="px-5 py-4">
+            <div class="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+
+                {{-- Search --}}
+                <div class="flex-1 min-w-0 w-full lg:w-auto">
+                    <label class="input-label">Cari Pegawai</label>
+                    <div class="relative">
+                        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4
+                                    text-gray-400 pointer-events-none"
+                             fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+                        </svg>
+                        <input type="text" id="filter-search" value="{{ $search ?? '' }}"
+                               placeholder="Nama atau NIP…"
+                               class="input-field pl-10 pr-10 w-full"
+                               autocomplete="off">
+                        <button id="btn-clear-search"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300
+                                       hover:text-gray-500 dark:hover:text-gray-300 transition-colors
+                                       {{ ($search ?? '') ? '' : 'hidden' }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Tahun --}}
+                <div class="w-full sm:w-auto">
+                    <label class="input-label">Tahun</label>
+                    <select id="filter-tahun" class="input-field w-full sm:w-28">
+                        @for($y = date('Y') - 1; $y <= date('Y') + 2; $y++)
+                        <option value="{{ $y }}" @selected($tahun == $y)>{{ $y }}</option>
+                        @endfor
+                    </select>
+                </div>
+
+                {{-- Bagian --}}
+                <div class="w-full sm:w-auto">
+                    <label class="input-label">Unit / Bagian</label>
+                    <select id="filter-bagian" class="input-field w-full sm:w-44">
+                        <option value="">Semua Bagian</option>
+                        @foreach($bagianList as $b)
+                        <option value="{{ $b }}" @selected(($bagian ?? '') == $b)>{{ $b }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Prioritas --}}
+                <div class="w-full sm:w-auto">
+                    <label class="input-label">Prioritas</label>
+                    <div class="flex items-center gap-2" id="filter-prioritas-group">
+                        @foreach(['' => 'Semua', 'tinggi' => 'Tinggi', 'sedang' => 'Sedang', 'rendah' => 'Rendah'] as $val => $lbl)
+                        <button type="button"
+                                data-value="{{ $val }}"
+                                class="prioritas-btn px-3 py-2 rounded-xl text-xs font-semibold
+                                       border-2 transition-all duration-150 whitespace-nowrap
+                                       {{ ($prioritas ?? '') === $val
+                                           ? 'border-navy-600 bg-navy-600 text-white shadow-sm'
+                                           : 'border-gray-200 dark:border-navy-600 text-gray-600 dark:text-gray-400 hover:border-navy-400 hover:text-navy-600 dark:hover:border-navy-400 dark:hover:text-navy-300' }}">
+                            {{ $lbl }}
+                        </button>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            {{-- Active filters & result count --}}
+            <div class="flex items-center justify-between mt-3 pt-3
+                        border-t border-gray-100 dark:border-navy-700">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Menampilkan</span>
+                    <span id="result-count"
+                          class="px-2 py-0.5 rounded-full text-xs font-bold
+                                 bg-navy-100 dark:bg-navy-700 text-navy-700 dark:text-navy-300">
+                        {{ $proyeksi->count() }}
+                    </span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">pegawai</span>
+                </div>
+
+                {{-- Loading indicator --}}
+                <div id="filter-loading" class="hidden items-center gap-2">
+                    <div class="w-3.5 h-3.5 border-2 border-navy-300 border-t-navy-600
+                                rounded-full animate-spin"></div>
+                    <span class="text-xs text-gray-400 dark:text-gray-500">Memuat…</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    {{-- Priority Stats --}}
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-gradient-to-br from-red-500 to-red-700 rounded-2xl p-5 text-white shadow-lg">
-            <div class="flex items-start justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-red-100 uppercase tracking-wide">Prioritas Tinggi</p>
-                    <p class="text-4xl font-bold mt-1">{{ $proyeksi->filter(fn($p) => $p->analisis_mutasi['prioritas'] >= 5)->count() }}</p>
-                    <p class="text-xs text-red-100 mt-1">Segera dimutasi</p>
+    {{-- ── Main Content Grid ── --}}
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+
+        {{-- Table (3/4) --}}
+        <div class="xl:col-span-3">
+            <div class="overflow-hidden rounded-2xl bg-white dark:bg-navy-800
+                        border border-gray-100 dark:border-navy-700 shadow-sm">
+
+                {{-- Table header --}}
+                <div class="px-5 py-3.5 border-b border-gray-100 dark:border-navy-700
+                            bg-gray-50/80 dark:bg-navy-750">
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-4 rounded-full bg-gradient-to-b from-navy-500 to-navy-700"></div>
+                        <h3 class="text-sm font-bold text-gray-900 dark:text-white">
+                            Daftar Proyeksi Mutasi
+                        </h3>
+                        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1" id="table-year-label">
+                            · {{ $tahun }}
+                        </span>
+                    </div>
                 </div>
-                <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 dark:border-navy-700/80">
+                                <th class="pl-6 pr-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest w-10">#</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Pegawai</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Jabatan</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest min-w-[140px]">Masa Jabatan</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Prioritas</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Waktu</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Pertimbangan</th>
+                                <th class="pl-3 pr-6 py-3 text-left text-xs font-bold text-gray-400
+                                           dark:text-gray-500 uppercase tracking-widest">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-gray-50 dark:divide-navy-700/50">
+                            @include('kepegawaian.mutasi._table', ['proyeksi' => $proyeksi])
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-br from-orange-500 to-orange-700 rounded-2xl p-5 text-white shadow-lg">
-            <div class="flex items-start justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-orange-100 uppercase tracking-wide">Prioritas Sedang</p>
-                    <p class="text-4xl font-bold mt-1">{{ $proyeksi->filter(fn($p) => $p->analisis_mutasi['prioritas'] >= 3 && $p->analisis_mutasi['prioritas'] < 5)->count() }}</p>
-                    <p class="text-xs text-orange-100 mt-1">Dipertimbangkan</p>
-                </div>
-                <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                </div>
-            </div>
-        </div>
+        {{-- Sidebar (1/4) --}}
+        <div class="xl:col-span-1 space-y-5">
 
-        <div class="bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl p-5 text-white shadow-lg">
-            <div class="flex items-start justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-amber-100 uppercase tracking-wide">Prioritas Rendah</p>
-                    <p class="text-4xl font-bold mt-1">{{ $proyeksi->filter(fn($p) => $p->analisis_mutasi['prioritas'] < 3)->count() }}</p>
-                    <p class="text-xs text-amber-100 mt-1">Dipantau</p>
+            {{-- Sebaran Bagian --}}
+            <div class="rounded-2xl bg-white dark:bg-navy-800
+                        border border-gray-100 dark:border-navy-700 shadow-sm overflow-hidden">
+                <div class="px-4 py-3.5 border-b border-gray-100 dark:border-navy-700
+                            bg-gray-50/80 dark:bg-navy-750">
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-4 rounded-full bg-gradient-to-b from-gold-400 to-gold-600"></div>
+                        <h3 class="text-sm font-bold text-gray-900 dark:text-white">Sebaran Bagian</h3>
+                    </div>
                 </div>
-                <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <div class="p-4" id="stats-bagian-container">
+                    @include('kepegawaian.mutasi._stats_bagian', ['statsBagian' => $statsBagian, 'proyeksi' => $proyeksi])
                 </div>
             </div>
-        </div>
 
-        <div class="bg-gradient-to-br from-navy-600 to-navy-800 rounded-2xl p-5 text-white shadow-lg">
-            <div class="flex items-start justify-between">
-                <div>
-                    <p class="text-xs font-semibold text-navy-200 uppercase tracking-wide">Total Proyeksi</p>
-                    <p class="text-4xl font-bold mt-1">{{ $proyeksi->count() }}</p>
-                    <p class="text-xs text-navy-200 mt-1">Pegawai</p>
+            {{-- Kriteria --}}
+            <div class="rounded-2xl border border-navy-200 dark:border-navy-700
+                        bg-gradient-to-br from-navy-50 to-white dark:from-navy-800/80 dark:to-navy-800
+                        overflow-hidden shadow-sm">
+                <div class="px-4 py-3.5 border-b border-navy-100 dark:border-navy-700">
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-4 rounded-full bg-gradient-to-b from-navy-500 to-navy-700"></div>
+                        <h3 class="text-sm font-bold text-gray-900 dark:text-white">Kriteria Penilaian</h3>
+                    </div>
                 </div>
-                <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <div class="p-4 space-y-3">
+                    @php
+                    $kriteria = [
+                        ['dot' => 'bg-rose-400', 'color' => 'text-rose-600 dark:text-rose-400',
+                         'label' => 'Tinggi (≥5)',
+                         'desc' => 'Masa jabatan ≥24 bln atau pensiun ≤12 bln'],
+                        ['dot' => 'bg-orange-400', 'color' => 'text-orange-600 dark:text-orange-400',
+                         'label' => 'Sedang (3–4)',
+                         'desc' => 'Masa jabatan 18–24 bln atau pensiun 12–24 bln'],
+                        ['dot' => 'bg-amber-400', 'color' => 'text-amber-600 dark:text-amber-400',
+                         'label' => 'Rendah (<3)',
+                         'desc' => 'Pejabat struktural, masa jabatan normal'],
+                    ];
+                    @endphp
+                    @foreach($kriteria as $k)
+                    <div class="flex items-start gap-3 p-3 rounded-xl
+                                bg-white dark:bg-navy-700/50
+                                border border-gray-100 dark:border-navy-600">
+                        <div class="w-2.5 h-2.5 rounded-full {{ $k['dot'] }} mt-1 flex-shrink-0"></div>
+                        <div>
+                            <p class="text-xs font-bold {{ $k['color'] }}">{{ $k['label'] }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                                {{ $k['desc'] }}
+                            </p>
+                        </div>
+                    </div>
+                    @endforeach
+                    <div class="flex items-start gap-3 p-3 rounded-xl
+                                bg-gold-50 dark:bg-gold-900/10
+                                border border-gold-100 dark:border-gold-900/20 mt-1">
+                        <svg class="w-3.5 h-3.5 text-gold-500 mt-0.5 flex-shrink-0"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                            Mutasi umumnya dilaksanakan <strong class="text-gold-700 dark:text-gold-400">April</strong>
+                            atau <strong class="text-gold-700 dark:text-gold-400">Oktober</strong>
+                        </p>
+                    </div>
                 </div>
             </div>
+
         </div>
     </div>
 
-    {{-- Table --}}
-    <div class="bg-white dark:bg-navy-800 rounded-2xl shadow-sm border border-gray-100 dark:border-navy-700 overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-100 dark:border-navy-700 bg-gray-50/50 dark:bg-navy-750">
-            <h3 class="text-sm font-bold text-gray-900 dark:text-white">Daftar Proyeksi Mutasi {{ $tahun }}</h3>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="min-w-full">
-                <thead>
-                    <tr class="bg-gray-50 dark:bg-navy-750 border-b border-gray-200 dark:border-navy-700">
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-10">No</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pegawai</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">NIP</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jabatan</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bagian</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prioritas</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rekomendasi Waktu</th>
-                        <th class="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Alasan</th>
-                        <th class="px-5 py-3.5 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-navy-700">
-                    @forelse($proyeksi as $index => $p)
-                    <tr class="hover:bg-navy-50/30 dark:hover:bg-navy-700/30 transition-colors">
-                        <td class="px-5 py-4 text-sm text-gray-400 dark:text-gray-500">{{ $index + 1 }}</td>
-                        <td class="px-5 py-4">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-9 h-9 bg-gradient-to-br from-navy-500 to-navy-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                                    <span class="text-xs font-bold text-white uppercase">{{ substr($p->nama, 0, 2) }}</span>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="text-sm font-semibold text-gray-900 dark:text-white truncate max-w-40">{{ $p->nama }}</p>
-                                    @if($p->usia)<p class="text-xs text-gray-500 dark:text-gray-400">{{ $p->usia }} tahun</p>@endif
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-5 py-4 text-sm font-mono text-gray-700 dark:text-gray-300">{{ $p->nip }}</td>
-                        <td class="px-5 py-4">
-                            <p class="text-sm text-gray-900 dark:text-white">{{ $p->jabatan ?? '—' }}</p>
-                            @if($p->eselon)<p class="text-xs text-purple-600 dark:text-purple-400 mt-0.5">{{ $p->eselon }}</p>@endif
-                        </td>
-                        <td class="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{{ $p->bagian ?? '—' }}</td>
-                        <td class="px-5 py-4">
-                            @php
-                            $priority = $p->analisis_mutasi['prioritas'];
-                            if ($priority >= 5) {
-                                $badgeClass = 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
-                                $label = 'Tinggi';
-                            } elseif ($priority >= 3) {
-                                $badgeClass = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400';
-                                $label = 'Sedang';
-                            } else {
-                                $badgeClass = 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400';
-                                $label = 'Rendah';
-                            }
-                            @endphp
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold {{ $badgeClass }}">
-                                {{ $label }} ({{ $priority }})
-                            </span>
-                        </td>
-                        <td class="px-5 py-4 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {{ $p->analisis_mutasi['rekomendasi_waktu'] }}
-                        </td>
-                        <td class="px-5 py-4 max-w-xs">
-                            <ul class="space-y-0.5">
-                                @foreach($p->analisis_mutasi['alasan'] as $alasan)
-                                <li class="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1.5">
-                                    <span class="w-1.5 h-1.5 bg-orange-400 rounded-full mt-1 flex-shrink-0"></span>
-                                    {{ $alasan }}
-                                </li>
-                                @endforeach
-                            </ul>
-                        </td>
-                        <td class="px-5 py-4 text-center">
-                            <a href="{{ route('kepegawaian.mutasi.show', $p) }}"
-                                class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-navy-600 dark:text-navy-400 bg-navy-50 dark:bg-navy-700 hover:bg-navy-100 dark:hover:bg-navy-600 transition-colors">
-                                <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                                Detail
-                            </a>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="9" class="px-6 py-16 text-center">
-                            <div class="flex flex-col items-center">
-                                <div class="w-16 h-16 bg-gray-100 dark:bg-navy-700 rounded-2xl flex items-center justify-center mb-4">
-                                    <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
-                                    </svg>
-                                </div>
-                                <p class="text-gray-500 dark:text-gray-400 font-semibold">Tidak ada proyeksi mutasi untuk tahun {{ $tahun }}</p>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    {{-- Info Box --}}
-    <div class="bg-navy-50 dark:bg-navy-800/50 border border-navy-200 dark:border-navy-700 rounded-2xl p-5">
-        <div class="flex items-start gap-3">
-            <div class="w-8 h-8 bg-navy-100 dark:bg-navy-700 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg class="w-4 h-4 text-navy-600 dark:text-navy-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-                </svg>
-            </div>
-            <div>
-                <h4 class="text-sm font-semibold text-navy-800 dark:text-navy-200 mb-2">Kriteria Proyeksi Mutasi</h4>
-                <ul class="space-y-1 text-sm text-navy-700 dark:text-navy-300">
-                    <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 bg-red-400 rounded-full mt-1.5 flex-shrink-0"></span><span><strong>Prioritas Tinggi (5+):</strong> Masa jabatan ≥24 bulan atau mendekati pensiun (≤12 bulan)</span></li>
-                    <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 bg-orange-400 rounded-full mt-1.5 flex-shrink-0"></span><span><strong>Prioritas Sedang (3–4):</strong> Masa jabatan 18–24 bulan</span></li>
-                    <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0"></span><span><strong>Prioritas Rendah (&lt;3):</strong> Pejabat struktural dengan masa jabatan normal</span></li>
-                    <li class="flex items-start gap-2"><span class="w-1.5 h-1.5 bg-navy-400 rounded-full mt-1.5 flex-shrink-0"></span><span>Mutasi umumnya dilakukan pada bulan <strong>April</strong> atau <strong>Oktober</strong> setiap tahun</span></li>
-                </ul>
-            </div>
-        </div>
-    </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    'use strict';
+
+    /* ── State ─────────────────────────────────────────── */
+    let state = {
+        search:    '{{ $search ?? '' }}',
+        tahun:     '{{ $tahun }}',
+        bagian:    '{{ $bagian ?? '' }}',
+        prioritas: '{{ $prioritas ?? '' }}',
+    };
+
+    let debounceTimer = null;
+    let abortCtrl    = null;
+
+    /* ── Elements ──────────────────────────────────────── */
+    const elSearch       = document.getElementById('filter-search');
+    const elClearSearch  = document.getElementById('btn-clear-search');
+    const elTahun        = document.getElementById('filter-tahun');
+    const elBagian       = document.getElementById('filter-bagian');
+    const elPrioGroup    = document.getElementById('filter-prioritas-group');
+    const elTableBody    = document.getElementById('table-body');
+    const elStats        = document.getElementById('stats-container');
+    const elStatsBagian  = document.getElementById('stats-bagian-container');
+    const elCount        = document.getElementById('result-count');
+    const elLoading      = document.getElementById('filter-loading');
+    const elYearLabel    = document.getElementById('table-year-label');
+    const elHeaderTahun  = document.getElementById('header-tahun');
+    const elBtnExport    = document.getElementById('btn-export');
+
+    /* ── Fetch ─────────────────────────────────────────── */
+    function fetchData(immediate = false) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(_doFetch, immediate ? 0 : 380);
+    }
+
+    function _doFetch() {
+        if (abortCtrl) abortCtrl.abort();
+        abortCtrl = new AbortController();
+
+        elLoading.classList.remove('hidden');
+        elLoading.classList.add('flex');
+        elTableBody.style.opacity = '0.4';
+
+        const params = new URLSearchParams({
+            search:    state.search,
+            tahun:     state.tahun,
+            bagian:    state.bagian,
+            prioritas: state.prioritas,
+        });
+
+        /* Update URL tanpa reload */
+        window.history.replaceState(null, '', '?' + params.toString());
+
+        /* Update export link */
+        elBtnExport.href = '?' + params.toString() + '&export=1';
+
+        /* Update label tahun */
+        elYearLabel.textContent  = '· ' + state.tahun;
+        elHeaderTahun.textContent = state.tahun;
+
+        fetch('{{ route('kepegawaian.mutasi') }}?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal:  abortCtrl.signal,
+        })
+        .then(r => r.json())
+        .then(data => {
+            /* Table */
+            elTableBody.innerHTML    = data.html;
+            elTableBody.style.opacity = '1';
+
+            /* Stats */
+            elStats.innerHTML        = data.stats;
+            elStatsBagian.innerHTML  = data.statsBagian;
+
+            /* Count */
+            elCount.textContent      = data.count;
+
+            /* Animate rows */
+            elTableBody.querySelectorAll('tr').forEach((row, i) => {
+                row.style.opacity   = '0';
+                row.style.transform = 'translateY(6px)';
+                setTimeout(() => {
+                    row.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+                    row.style.opacity    = '1';
+                    row.style.transform  = 'translateY(0)';
+                }, i * 30);
+            });
+        })
+        .catch(err => {
+            if (err.name !== 'AbortError') {
+                elTableBody.style.opacity = '1';
+                console.error('Fetch error:', err);
+            }
+        })
+        .finally(() => {
+            elLoading.classList.add('hidden');
+            elLoading.classList.remove('flex');
+        });
+    }
+
+    /* ── Event Listeners ───────────────────────────────── */
+    /* Search — debounce 380ms */
+    elSearch.addEventListener('input', function () {
+        state.search = this.value.trim();
+        elClearSearch.classList.toggle('hidden', !state.search);
+        fetchData();
+    });
+
+    /* Clear search */
+    elClearSearch.addEventListener('click', function () {
+        elSearch.value = '';
+        state.search   = '';
+        elClearSearch.classList.add('hidden');
+        fetchData(true);
+        elSearch.focus();
+    });
+
+    /* Tahun */
+    elTahun.addEventListener('change', function () {
+        state.tahun = this.value;
+        fetchData(true);
+    });
+
+    /* Bagian */
+    elBagian.addEventListener('change', function () {
+        state.bagian = this.value;
+        fetchData(true);
+    });
+
+    /* Prioritas pills */
+    elPrioGroup.addEventListener('click', function (e) {
+        const btn = e.target.closest('.prioritas-btn');
+        if (!btn) return;
+
+        state.prioritas = btn.dataset.value;
+
+        /* Update active style */
+        elPrioGroup.querySelectorAll('.prioritas-btn').forEach(b => {
+            const active = b.dataset.value === state.prioritas;
+            b.classList.toggle('border-navy-600',  active);
+            b.classList.toggle('bg-navy-600',      active);
+            b.classList.toggle('text-white',        active);
+            b.classList.toggle('shadow-sm',         active);
+            b.classList.toggle('border-gray-200',  !active);
+            b.classList.toggle('dark:border-navy-600', !active);
+            b.classList.toggle('text-gray-600',    !active);
+            b.classList.toggle('dark:text-gray-400',!active);
+        });
+
+        fetchData(true);
+    });
+
+    /* Export */
+    elBtnExport.addEventListener('click', function () {
+        const params = new URLSearchParams({
+            search:    state.search,
+            tahun:     state.tahun,
+            bagian:    state.bagian,
+            prioritas: state.prioritas,
+            export:    '1',
+        });
+        window.location.href = '{{ route('kepegawaian.mutasi') }}?' + params.toString();
+    });
+
+})();
+</script>
+@endpush
