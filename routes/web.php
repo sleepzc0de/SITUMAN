@@ -44,6 +44,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('kepegawaian')->name('kepegawaian.')->group(function () {
 
         Route::get('sebaran',            [SebaranPegawaiController::class, 'index'])->name('sebaran');
+         Route::get('sebaran/data', [SebaranPegawaiController::class, 'data'])->name('sebaran.data');
         Route::get('sebaran/{pegawai}',  [SebaranPegawaiController::class, 'show'])->name('sebaran.show');
         Route::get('grading',            [KenaikanGradingController::class, 'index'])->name('grading');
         Route::get('grading/{pegawai}',  [KenaikanGradingController::class, 'show'])->name('grading.show');
@@ -51,20 +52,30 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::get('mutasi/{pegawai}',   [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
 
         Route::resource('pegawai', \App\Http\Controllers\Kepegawaian\PegawaiController::class);
-        Route::get('pegawai-export',
-            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export'])
+        Route::get(
+            'pegawai-export',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export']
+        )
             ->name('pegawai.export');
-        Route::get('pegawai-template',
-            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'downloadTemplate'])
+        Route::get(
+            'pegawai-template',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'downloadTemplate']
+        )
             ->name('pegawai.template');
-        Route::get('pegawai-import',
-            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'importForm'])
+        Route::get(
+            'pegawai-import',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'importForm']
+        )
             ->name('pegawai.import-form');
-        Route::post('pegawai-import',
-            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'import'])
+        Route::post(
+            'pegawai-import',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'import']
+        )
             ->name('pegawai.import');
-        Route::get('pegawai/analytics/data',
-            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'analyticsData'])
+        Route::get(
+            'pegawai/analytics/data',
+            [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'analyticsData']
+        )
             ->name('pegawai.analytics');
     });
 
@@ -74,83 +85,121 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('anggaran')->name('anggaran.')->group(function () {
 
         // ── Monitoring (urutan penting: spesifik dulu, resource belakangan) ──
-        Route::get('monitoring',
-            [MonitoringAnggaranController::class, 'index'])
+        Route::get(
+            'monitoring',
+            [MonitoringAnggaranController::class, 'index']
+        )
             ->name('monitoring.index');
 
-        Route::get('monitoring/data',
-            [MonitoringAnggaranController::class, 'data'])
+        Route::get(
+            'monitoring/data',
+            [MonitoringAnggaranController::class, 'data']
+        )
             ->name('monitoring.data');
 
-        Route::get('monitoring/export',
-            [MonitoringAnggaranController::class, 'export'])
+        Route::get(
+            'monitoring/export',
+            [MonitoringAnggaranController::class, 'export']
+        )
             ->name('monitoring.export');
 
-        Route::post('monitoring/recalculate',
-            [MonitoringAnggaranController::class, 'recalculate'])
+        Route::post(
+            'monitoring/recalculate',
+            [MonitoringAnggaranController::class, 'recalculate']
+        )
             ->name('monitoring.recalculate')
             ->middleware('role:superadmin,admin');
 
         // ── SPP ──────────────────────────────────────────────
         Route::resource('spp', App\Http\Controllers\Anggaran\SPPController::class);
-        Route::get('spp/ajax/subkomponen',
-            [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
+        Route::get(
+            'spp/ajax/subkomponen',
+            [App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen']
+        )
             ->name('spp.ajax.subkomponen');
-        Route::get('spp/ajax/akun',
-            [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun'])
+        Route::get(
+            'spp/ajax/akun',
+            [App\Http\Controllers\Anggaran\SPPController::class, 'getAkun']
+        )
             ->name('spp.ajax.akun');
 
         // ── Usulan Penarikan ──────────────────────────────────
         Route::resource('usulan', App\Http\Controllers\Anggaran\UsulanPenarikanController::class);
-        Route::get('usulan/ajax/subkomponen',
-            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
+        Route::get(
+            'usulan/ajax/subkomponen',
+            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen']
+        )
             ->name('usulan.ajax.subkomponen');
-        Route::post('usulan/{usulan}/approve',
-            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'approve'])
+        Route::post(
+            'usulan/{usulan}/approve',
+            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'approve']
+        )
             ->name('usulan.approve')
             ->middleware('role:superadmin,admin');
-        Route::post('usulan/{usulan}/reject',
-            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'reject'])
+        Route::post(
+            'usulan/{usulan}/reject',
+            [App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'reject']
+        )
             ->name('usulan.reject')
             ->middleware('role:superadmin,admin');
 
         // ── Dokumen Capaian ───────────────────────────────────
         Route::resource('dokumen', App\Http\Controllers\Anggaran\DokumenCapaianController::class);
-        Route::get('dokumen/ajax/subkomponen',
-            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen'])
+        Route::get(
+            'dokumen/ajax/subkomponen',
+            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen']
+        )
             ->name('dokumen.ajax.subkomponen');
-        Route::get('dokumen/{dokumen}/download',
-            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'download'])
+        Route::get(
+            'dokumen/{dokumen}/download',
+            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'download']
+        )
             ->name('dokumen.download');
-        Route::get('dokumen/{dokumen}/download/{file}',
-            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'downloadSingle'])
+        Route::get(
+            'dokumen/{dokumen}/download/{file}',
+            [App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'downloadSingle']
+        )
             ->name('dokumen.download-single');
 
         // ── Revisi Anggaran ───────────────────────────────────
         Route::resource('revisi', App\Http\Controllers\Anggaran\RevisiAnggaranController::class);
-        Route::get('revisi/{revisi}/download-dokumen',
-            [App\Http\Controllers\Anggaran\RevisiAnggaranController::class, 'downloadDokumen'])
+        Route::get(
+            'revisi/{revisi}/download-dokumen',
+            [App\Http\Controllers\Anggaran\RevisiAnggaranController::class, 'downloadDokumen']
+        )
             ->name('revisi.download-dokumen');
 
         // ── Data Anggaran ─────────────────────────────────────
         Route::resource('data', App\Http\Controllers\Anggaran\DataAnggaranController::class);
-        Route::get('data/ajax/subkomponen',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'getSubkomponen'])
+        Route::get(
+            'data/ajax/subkomponen',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'getSubkomponen']
+        )
             ->name('data.ajax.subkomponen');
-        Route::get('data-import',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'importForm'])
+        Route::get(
+            'data-import',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'importForm']
+        )
             ->name('data.import-form');
-        Route::post('data-import',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'import'])
+        Route::post(
+            'data-import',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'import']
+        )
             ->name('data.import');
-        Route::get('data-export',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'export'])
+        Route::get(
+            'data-export',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'export']
+        )
             ->name('data.export');
-        Route::get('data-template',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'downloadTemplate'])
+        Route::get(
+            'data-template',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'downloadTemplate']
+        )
             ->name('data.template');
-        Route::get('data-summary',
-            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'summary'])
+        Route::get(
+            'data-summary',
+            [App\Http\Controllers\Anggaran\DataAnggaranController::class, 'summary']
+        )
             ->name('data.summary');
     });
 
@@ -160,67 +209,105 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('inventaris')->name('inventaris.')->group(function () {
 
         // Monitoring ATK
-        Route::resource('monitoring-atk',
-            App\Http\Controllers\Inventaris\MonitoringAtkController::class);
-        Route::get('monitoring-atk-export',
-            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'export'])
+        Route::resource(
+            'monitoring-atk',
+            App\Http\Controllers\Inventaris\MonitoringAtkController::class
+        );
+        Route::get(
+            'monitoring-atk-export',
+            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'export']
+        )
             ->name('monitoring-atk.export');
-        Route::get('monitoring-atk-template',
-            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'downloadTemplate'])
+        Route::get(
+            'monitoring-atk-template',
+            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'downloadTemplate']
+        )
             ->name('monitoring-atk.template');
-        Route::get('monitoring-atk-import',
-            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'importForm'])
+        Route::get(
+            'monitoring-atk-import',
+            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'importForm']
+        )
             ->name('monitoring-atk.import-form');
-        Route::post('monitoring-atk-import',
-            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'import'])
+        Route::post(
+            'monitoring-atk-import',
+            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'import']
+        )
             ->name('monitoring-atk.import');
-        Route::post('monitoring-atk/{monitoringAtk}/update-stok',
-            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'updateStok'])
+        Route::post(
+            'monitoring-atk/{monitoringAtk}/update-stok',
+            [App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'updateStok']
+        )
             ->name('monitoring-atk.update-stok');
 
         // Permintaan ATK
-        Route::resource('permintaan-atk',
-            App\Http\Controllers\Inventaris\PermintaanAtkController::class);
-        Route::post('permintaan-atk/{permintaanAtk}/approve',
-            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'approve'])
+        Route::resource(
+            'permintaan-atk',
+            App\Http\Controllers\Inventaris\PermintaanAtkController::class
+        );
+        Route::post(
+            'permintaan-atk/{permintaanAtk}/approve',
+            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'approve']
+        )
             ->name('permintaan-atk.approve')
             ->middleware('role:superadmin,admin');
-        Route::post('permintaan-atk/{permintaanAtk}/reject',
-            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'reject'])
+        Route::post(
+            'permintaan-atk/{permintaanAtk}/reject',
+            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'reject']
+        )
             ->name('permintaan-atk.reject')
             ->middleware('role:superadmin,admin');
-        Route::post('permintaan-atk/{permintaanAtk}/complete',
-            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'complete'])
+        Route::post(
+            'permintaan-atk/{permintaanAtk}/complete',
+            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'complete']
+        )
             ->name('permintaan-atk.complete')
             ->middleware('role:superadmin,admin');
 
         // Aset End User
-        Route::resource('aset-end-user',
-            App\Http\Controllers\Inventaris\AsetEndUserController::class);
-        Route::get('aset-end-user-export',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'export'])
+        Route::resource(
+            'aset-end-user',
+            App\Http\Controllers\Inventaris\AsetEndUserController::class
+        );
+        Route::get(
+            'aset-end-user-export',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'export']
+        )
             ->name('aset-end-user.export');
-        Route::get('aset-end-user-template',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'downloadTemplate'])
+        Route::get(
+            'aset-end-user-template',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'downloadTemplate']
+        )
             ->name('aset-end-user.template');
-        Route::get('aset-end-user-import',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'importForm'])
+        Route::get(
+            'aset-end-user-import',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'importForm']
+        )
             ->name('aset-end-user.import-form');
-        Route::post('aset-end-user-import',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'import'])
+        Route::post(
+            'aset-end-user-import',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'import']
+        )
             ->name('aset-end-user.import');
-        Route::post('aset-end-user/{asetEndUser}/pinjam',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'pinjam'])
+        Route::post(
+            'aset-end-user/{asetEndUser}/pinjam',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'pinjam']
+        )
             ->name('aset-end-user.pinjam');
-        Route::post('aset-end-user/{asetEndUser}/kembalikan',
-            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'kembalikan'])
+        Route::post(
+            'aset-end-user/{asetEndUser}/kembalikan',
+            [App\Http\Controllers\Inventaris\AsetEndUserController::class, 'kembalikan']
+        )
             ->name('aset-end-user.kembalikan');
 
         // Kategori
-        Route::resource('kategori-atk',
-            App\Http\Controllers\Inventaris\KategoriAtkController::class);
-        Route::resource('kategori-aset',
-            App\Http\Controllers\Inventaris\KategoriAsetController::class);
+        Route::resource(
+            'kategori-atk',
+            App\Http\Controllers\Inventaris\KategoriAtkController::class
+        );
+        Route::resource(
+            'kategori-aset',
+            App\Http\Controllers\Inventaris\KategoriAsetController::class
+        );
     });
 
     // ════════════════════════════════════════════════════
@@ -229,13 +316,15 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::middleware('role:superadmin,admin')->group(function () {
 
         Route::resource('users', UserManagementController::class);
-        Route::post('users/{user}/assign-role',
-            [RoleManagementController::class, 'assignRole'])
+        Route::post(
+            'users/{user}/assign-role',
+            [RoleManagementController::class, 'assignRole']
+        )
             ->name('users.assign-role');
 
-        Route::get('roles',           [RoleManagementController::class, 'rolesIndex'])  ->name('roles.index');
-        Route::post('roles',          [RoleManagementController::class, 'rolesStore'])  ->name('roles.store');
-        Route::put('roles/{role}',    [RoleManagementController::class, 'rolesUpdate']) ->name('roles.update');
+        Route::get('roles',           [RoleManagementController::class, 'rolesIndex'])->name('roles.index');
+        Route::post('roles',          [RoleManagementController::class, 'rolesStore'])->name('roles.store');
+        Route::put('roles/{role}',    [RoleManagementController::class, 'rolesUpdate'])->name('roles.update');
         Route::delete('roles/{role}', [RoleManagementController::class, 'rolesDestroy'])->name('roles.destroy');
 
         Route::get('permissions', [RoleManagementController::class, 'permissionsIndex'])
