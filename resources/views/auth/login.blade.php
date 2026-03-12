@@ -669,7 +669,7 @@
             </form>
 
             <!-- Card Footer -->
-            <div class="mt-7 pt-5 card-footer-border">
+            {{-- <div class="mt-7 pt-5 card-footer-border">
                 <div class="flex items-center justify-center gap-4">
                     <div class="flex items-center gap-1.5">
                         <svg class="w-3.5 h-3.5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
@@ -689,13 +689,16 @@
                         <span class="text-xs meta-text">Data Terenkripsi</span>
                     </div>
                 </div>
-            </div>
+            </div> --}}
         </div>
 
         <!-- Footer -->
         <div class="text-center mt-6 animate-slide-up" style="animation-delay:0.3s;">
             <p class="text-xs footer-text">
                 © 2026 Biro Manajemen BMN dan Pengadaan · Hak Cipta Dilindungi
+            </p>
+             <p class="text-xs footer-text">
+                Versi 2.0
             </p>
         </div>
     </div>
