@@ -44,7 +44,7 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     Route::prefix('kepegawaian')->name('kepegawaian.')->group(function () {
 
         Route::get('sebaran',            [SebaranPegawaiController::class, 'index'])->name('sebaran');
-         Route::get('sebaran/data', [SebaranPegawaiController::class, 'data'])->name('sebaran.data');
+        Route::get('sebaran/data', [SebaranPegawaiController::class, 'data'])->name('sebaran.data');
         Route::get('sebaran/{pegawai}',  [SebaranPegawaiController::class, 'show'])->name('sebaran.show');
         Route::get('grading',            [KenaikanGradingController::class, 'index'])->name('grading');
         Route::get('grading/{pegawai}',  [KenaikanGradingController::class, 'show'])->name('grading.show');
@@ -240,6 +240,11 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('monitoring-atk.update-stok');
 
         // Permintaan ATK
+        Route::get(
+            'permintaan-atk-data',
+            [App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'data']
+        )
+            ->name('permintaan-atk.data');
         Route::resource(
             'permintaan-atk',
             App\Http\Controllers\Inventaris\PermintaanAtkController::class

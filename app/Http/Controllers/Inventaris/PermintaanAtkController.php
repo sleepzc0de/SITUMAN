@@ -194,9 +194,10 @@ class PermintaanAtkController extends Controller
             // Check stock availability
             foreach ($permintaanAtk->details as $detail) {
                 if ($detail->atk->stok_tersedia < $detail->jumlah) {
-                    return back()->with('error',
+                    return back()->with(
+                        'error',
                         'Stok ' . $detail->atk->nama . ' tidak mencukupi. Tersedia: ' .
-                        $detail->atk->stok_tersedia . ' ' . $detail->atk->satuan
+                            $detail->atk->stok_tersedia . ' ' . $detail->atk->satuan
                     );
                 }
             }
@@ -251,5 +252,87 @@ class PermintaanAtkController extends Controller
 
         $permintaanAtk->update(['status' => 'selesai']);
         return back()->with('success', 'Permintaan ATK ditandai sebagai selesai');
+    }
+
+
+    public function data(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $query = PermintaanAtk::with(['user', 'pegawai', 'details']);
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('nomor_permintaan', 'like', '%' . $request->search . '%')
+                    ->orWhereHas(
+                        'pegawai',
+                        fn($qq) =>
+                        $qq->where('nama', 'like', '%' . $request->search . '%')
+                    );
+            });
+        }
+
+        if ($request->filled('tanggal_dari')) {
+            $query->whereDate('tanggal_permintaan', '>=', $request->tanggal_dari);
+        }
+        if ($request->filled('tanggal_sampai')) {
+            $query->whereDate('tanggal_permintaan', '<=', $request->tanggal_sampai);
+        }
+
+        $paginator = $query->latest()->paginate(15);
+
+        $badgeMap = [
+            'pending'  => 'badge-warning',
+            'disetujui' => 'badge-success',
+            'ditolak'  => 'badge-danger',
+            'selesai'  => 'badge-info',
+        ];
+        $labelMap = [
+            'pending'  => 'Pending',
+            'disetujui' => 'Disetujui',
+            'ditolak'  => 'Ditolak',
+            'selesai'  => 'Selesai',
+        ];
+
+        $data = $paginator->getCollection()->map(function ($item) use ($badgeMap, $labelMap) {
+            $nama = $item->pegawai->nama ?? '?';
+            $words = explode(' ', trim($nama));
+            $initial = implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_slice($words, 0, 2)));
+
+            return [
+                'id'               => $item->id,
+                'nomor_permintaan' => $item->nomor_permintaan,
+                'tanggal_formatted' => \Carbon\Carbon::parse($item->tanggal_permintaan)->translatedFormat('d M Y'),
+                'pegawai_nama'     => $nama,
+                'pegawai_initial'  => $initial,
+                'user_nama'        => $item->user->nama ?? '-',
+                'jumlah_item'      => $item->details->count(),
+                'status'           => $item->status,
+                'status_badge'     => $badgeMap[$item->status] ?? 'badge-gray',
+                'status_label'     => $labelMap[$item->status] ?? $item->status,
+                'url_show'         => route('inventaris.permintaan-atk.show', $item->id),
+                'url_edit'         => route('inventaris.permintaan-atk.edit', $item->id),
+                'url_destroy'      => route('inventaris.permintaan-atk.destroy', $item->id),
+            ];
+        });
+
+        return response()->json([
+            'data'  => $data,
+            'stats' => [
+                'total'    => PermintaanAtk::count(),
+                'pending'  => PermintaanAtk::where('status', 'pending')->count(),
+                'disetujui' => PermintaanAtk::where('status', 'disetujui')->count(),
+                'ditolak'  => PermintaanAtk::where('status', 'ditolak')->count(),
+                'selesai'  => PermintaanAtk::where('status', 'selesai')->count(),
+            ],
+            'meta'  => [
+                'current_page' => $paginator->currentPage(),
+                'last_page'    => $paginator->lastPage(),
+                'per_page'     => $paginator->perPage(),
+                'total'        => $paginator->total(),
+            ],
+        ]);
     }
 }
