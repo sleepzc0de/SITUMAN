@@ -7,6 +7,7 @@ use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\CheckUserHasRole;
 use App\Http\Middleware\SecureHeaders;
 use App\Http\Middleware\VerifyCsrfToken;
+use App\Http\Middleware\EncryptCookies;
 use App\Support\HttpMessages;
 use Illuminate\Http\Request;
 use Illuminate\Auth\AuthenticationException;
@@ -25,19 +26,25 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
 
-        // ── Ganti VerifyCsrfToken default ──────────────────────
-        // XSRF-TOKEN cookie sekarang HttpOnly=true (fix C06)
+        // ── Ganti EncryptCookies dengan versi custom ───────────
+        // Ini yang patch XSRF-TOKEN menjadi HttpOnly=true
+        $middleware->web(replace: [
+            \Illuminate\Cookie\Middleware\EncryptCookies::class
+                => EncryptCookies::class,
+        ]);
+
+        // ── Ganti VerifyCsrfToken dengan versi custom ──────────
         $middleware->web(replace: [
             \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class
                 => VerifyCsrfToken::class,
         ]);
 
-        // ── Tambah SecureHeaders ke semua request web ──────────
+        // ── Append SecureHeaders ───────────────────────────────
         $middleware->web(append: [
             SecureHeaders::class,
         ]);
 
-        // ── Alias middleware ───────────────────────────────────
+        // ── Alias ──────────────────────────────────────────────
         $middleware->alias([
             'role'     => CheckRole::class,
             'has.role' => CheckUserHasRole::class,
@@ -47,7 +54,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (\Throwable $e, Request $request) {
 
-            // Log detail lengkap — TIDAK pernah ke response user (fix D02)
             if (!($e instanceof ValidationException)) {
                 Log::error('Application Exception: ' . get_class($e), [
                     'message' => $e->getMessage(),
@@ -61,7 +67,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 ]);
             }
 
-            // 401
             if ($e instanceof AuthenticationException) {
                 if ($request->expectsJson()) {
                     return response()->json(
@@ -73,12 +78,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     ->with('error', 'Sesi Anda telah berakhir. Silakan login kembali.');
             }
 
-            // 422 — biarkan Laravel handle
             if ($e instanceof ValidationException) {
                 return null;
             }
 
-            // 404
             if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
                 if ($request->expectsJson()) {
                     return response()->json(['message' => HttpMessages::safe(404)], 404);
@@ -86,7 +89,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->view('errors.404', [], 404);
             }
 
-            // 405
             if ($e instanceof MethodNotAllowedHttpException) {
                 if ($request->expectsJson()) {
                     return response()->json(['message' => HttpMessages::safe(405)], 405);
@@ -94,7 +96,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->view('errors.404', [], 405);
             }
 
-            // HTTP Exception lainnya
             if ($e instanceof HttpException) {
                 $code = $e->getStatusCode();
                 if ($request->expectsJson()) {
@@ -104,7 +105,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->view($view, [], $code);
             }
 
-            // Semua exception lain
             if ($request->expectsJson()) {
                 return response()->json(['message' => HttpMessages::safe(500)], 500);
             }
