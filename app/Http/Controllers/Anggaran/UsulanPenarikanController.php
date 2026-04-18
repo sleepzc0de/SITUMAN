@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Anggaran/UsulanPenarikanController.php
 
 namespace App\Http\Controllers\Anggaran;
 
@@ -9,21 +8,110 @@ use App\Models\UsulanPenarikan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class UsulanPenarikanController extends Controller
 {
+    // ── Whitelist Helpers ──────────────────────────────────────
+
+    private function getValidRoList(): array
+    {
+        return Anggaran::select('ro')
+            ->distinct()
+            ->orderBy('ro')
+            ->pluck('ro')
+            ->toArray();
+    }
+
+    private function getValidBulanList(): array
+    {
+        return [
+            'januari', 'februari', 'maret', 'april',
+            'mei', 'juni', 'juli', 'agustus',
+            'september', 'oktober', 'november', 'desember',
+        ];
+    }
+
+    private function validationRules(): array
+    {
+        return [
+            'ro' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::in($this->getValidRoList()),
+            ],
+            'sub_komponen' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-zA-Z0-9\s\-\_\.]+$/',
+            ],
+            'bulan' => [
+                'required',
+                'string',
+                Rule::in($this->getValidBulanList()),
+            ],
+            'nilai_usulan' => [
+                'required',
+                'numeric',
+                'min:1',
+                'max:999999999999',
+            ],
+            'keterangan' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
+        ];
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'ro.required'           => 'RO wajib dipilih.',
+            'ro.in'                 => 'Nilai RO tidak valid.',
+            'sub_komponen.required' => 'Sub komponen wajib dipilih.',
+            'sub_komponen.regex'    => 'Format sub komponen tidak valid.',
+            'bulan.required'        => 'Bulan wajib dipilih.',
+            'bulan.in'              => 'Nilai bulan tidak valid.',
+            'nilai_usulan.required' => 'Nilai usulan wajib diisi.',
+            'nilai_usulan.numeric'  => 'Nilai usulan harus berupa angka.',
+            'nilai_usulan.min'      => 'Nilai usulan minimal Rp 1.',
+            'nilai_usulan.max'      => 'Nilai usulan terlalu besar.',
+            'keterangan.max'        => 'Keterangan maksimal 500 karakter.',
+        ];
+    }
+
+    private function sanitizeString(?string $value): ?string
+    {
+        if ($value === null) return null;
+        $value = strip_tags($value);
+        $value = str_replace("\0", '', $value);
+        return trim($value);
+    }
+
+    // ── Index ──────────────────────────────────────────────────
+
     public function index(Request $request)
     {
+        $validRoList    = $this->getValidRoList();
+        $validBulanList = $this->getValidBulanList();
+
         $query = UsulanPenarikan::with(['user', 'anggaran'])->orderBy('created_at', 'desc');
 
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
         if ($request->filled('bulan') && $request->bulan !== 'all') {
-            $query->where('bulan', $request->bulan);
+            if (in_array($request->bulan, $validBulanList)) {
+                $query->where('bulan', $request->bulan);
+            }
         }
         if ($request->filled('ro') && $request->ro !== 'all') {
-            $query->where('ro', $request->ro);
+            if (in_array($request->ro, $validRoList)) {
+                $query->where('ro', $request->ro);
+            }
         }
 
         $usulans = $query->paginate(20)->withQueryString();
@@ -34,23 +122,9 @@ class UsulanPenarikanController extends Controller
             'rejected' => UsulanPenarikan::where('status', 'rejected')->count(),
         ];
 
-        $roList    = Anggaran::select('ro')->distinct()->pluck('ro');
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember',
-        ];
+        $roList    = $validRoList;
+        $bulanList = $validBulanList;
 
-        // ── AJAX: kembalikan JSON dengan HTML tabel --
         if ($request->ajax() || $request->get('ajax') === '1') {
             $tableHtml = $this->renderTableHtml($usulans);
             return response()->json([
@@ -60,12 +134,237 @@ class UsulanPenarikanController extends Controller
         }
 
         return view('anggaran.usulan.index', compact(
-            'usulans',
-            'summary',
-            'roList',
-            'bulanList'
+            'usulans', 'summary', 'roList', 'bulanList'
         ));
     }
+
+    // ── Create ─────────────────────────────────────────────────
+
+    public function create()
+    {
+        $roList    = $this->getValidRoList();
+        $bulanList = $this->getValidBulanList();
+
+        return view('anggaran.usulan.create', compact('roList', 'bulanList'));
+    }
+
+    // ── Get Subkomponen (AJAX) ─────────────────────────────────
+
+    public function getSubkomponen(Request $request)
+    {
+        try {
+            if (!$request->ro || !in_array($request->ro, $this->getValidRoList())) {
+                return response()->json(['error' => 'RO tidak valid.'], 400);
+            }
+
+            $subkomponens = Anggaran::where('ro', $request->ro)
+                ->whereNotNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->distinct()
+                ->orderBy('kode_subkomponen')
+                ->get(['kode_subkomponen', 'program_kegiatan', 'pagu_anggaran', 'sisa', 'total_penyerapan']);
+
+            return response()->json($subkomponens);
+        } catch (\Exception $e) {
+            Log::error('Usulan getSubkomponen error: ' . $e->getMessage());
+            return response()->json(['error' => 'Gagal mengambil data subkomponen.'], 500);
+        }
+    }
+
+    // ── Store ──────────────────────────────────────────────────
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate(
+            $this->validationRules(),
+            $this->validationMessages()
+        );
+
+        // Sanitasi
+        $validated['ro']           = $this->sanitizeString($validated['ro']);
+        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen']);
+        $validated['bulan']        = $this->sanitizeString($validated['bulan']);
+        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null);
+
+        // Double-check whitelist setelah sanitasi
+        if (!in_array($validated['ro'], $this->getValidRoList())) {
+            return back()->withInput()->with('error', 'Nilai RO tidak valid.');
+        }
+        if (!in_array($validated['bulan'], $this->getValidBulanList())) {
+            return back()->withInput()->with('error', 'Nilai bulan tidak valid.');
+        }
+
+        // Validasi sisa anggaran
+        $subkomp = Anggaran::where('ro', $validated['ro'])
+            ->where('kode_subkomponen', $validated['sub_komponen'])
+            ->whereNull('kode_akun')
+            ->first();
+
+        if ($subkomp && $validated['nilai_usulan'] > $subkomp->sisa) {
+            return back()->withInput()->with(
+                'error',
+                'Nilai usulan (Rp ' . number_format($validated['nilai_usulan'], 0, ',', '.') . ') ' .
+                'melebihi sisa anggaran subkomponen (Rp ' . number_format($subkomp->sisa, 0, ',', '.') . ').'
+            );
+        }
+
+        if (empty($validated['anggaran_id'] ?? null) && $subkomp) {
+            $validated['anggaran_id'] = $subkomp->id;
+        }
+
+        $validated['user_id'] = Auth::id();
+        $validated['status']  = 'pending';
+
+        UsulanPenarikan::create($validated);
+
+        return redirect()->route('anggaran.usulan.index')
+            ->with('success', 'Usulan penarikan dana berhasil diajukan.');
+    }
+
+    // ── Show ───────────────────────────────────────────────────
+
+    public function show(UsulanPenarikan $usulan)
+    {
+        $usulan->load(['user', 'anggaran']);
+
+        $anggaranSubkomp = null;
+        if ($usulan->anggaran_id) {
+            $anggaranSubkomp = $usulan->anggaran;
+        } else {
+            $anggaranSubkomp = Anggaran::where('ro', $usulan->ro)
+                ->where('kode_subkomponen', $usulan->sub_komponen)
+                ->whereNull('kode_akun')
+                ->first();
+        }
+
+        return view('anggaran.usulan.show', compact('usulan', 'anggaranSubkomp'));
+    }
+
+    // ── Edit ───────────────────────────────────────────────────
+
+    public function edit(UsulanPenarikan $usulan)
+    {
+        if ($usulan->status !== 'pending') {
+            return redirect()->route('anggaran.usulan.index')
+                ->with('error', 'Usulan yang sudah diproses tidak dapat diedit.');
+        }
+
+        $roList    = $this->getValidRoList();
+        $bulanList = $this->getValidBulanList();
+
+        return view('anggaran.usulan.edit', compact('usulan', 'roList', 'bulanList'));
+    }
+
+    // ── Update ─────────────────────────────────────────────────
+
+    public function update(Request $request, UsulanPenarikan $usulan)
+    {
+        if ($usulan->status !== 'pending') {
+            return redirect()->route('anggaran.usulan.index')
+                ->with('error', 'Usulan yang sudah diproses tidak dapat diedit.');
+        }
+
+        $validated = $request->validate(
+            $this->validationRules(),
+            $this->validationMessages()
+        );
+
+        // Sanitasi
+        $validated['ro']           = $this->sanitizeString($validated['ro']);
+        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen']);
+        $validated['bulan']        = $this->sanitizeString($validated['bulan']);
+        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null);
+
+        // Double-check whitelist setelah sanitasi
+        if (!in_array($validated['ro'], $this->getValidRoList())) {
+            return back()->withInput()->with('error', 'Nilai RO tidak valid.');
+        }
+        if (!in_array($validated['bulan'], $this->getValidBulanList())) {
+            return back()->withInput()->with('error', 'Nilai bulan tidak valid.');
+        }
+
+        // Validasi sisa anggaran
+        $subkomp = Anggaran::where('ro', $validated['ro'])
+            ->where('kode_subkomponen', $validated['sub_komponen'])
+            ->whereNull('kode_akun')
+            ->first();
+
+        if ($subkomp && $validated['nilai_usulan'] > $subkomp->sisa) {
+            return back()->withInput()->with(
+                'error',
+                'Nilai usulan melebihi sisa anggaran subkomponen (Rp ' .
+                number_format($subkomp->sisa, 0, ',', '.') . ').'
+            );
+        }
+
+        if ($subkomp) {
+            $validated['anggaran_id'] = $subkomp->id;
+        }
+
+        $usulan->update($validated);
+
+        return redirect()->route('anggaran.usulan.index')
+            ->with('success', 'Usulan penarikan dana berhasil diupdate.');
+    }
+
+    // ── Destroy ────────────────────────────────────────────────
+
+    public function destroy(UsulanPenarikan $usulan)
+    {
+        if ($usulan->status !== 'pending') {
+            return redirect()->route('anggaran.usulan.index')
+                ->with('error', 'Usulan yang sudah diproses tidak dapat dihapus.');
+        }
+
+        $usulan->delete();
+
+        return redirect()->route('anggaran.usulan.index')
+            ->with('success', 'Usulan penarikan dana berhasil dihapus.');
+    }
+
+    // ── Approve ────────────────────────────────────────────────
+
+    public function approve(Request $request, UsulanPenarikan $usulan)
+    {
+        if ($usulan->status !== 'pending') {
+            return back()->with('error', 'Usulan sudah diproses sebelumnya.');
+        }
+
+        $validated = $request->validate([
+            'catatan' => 'nullable|string|max:500',
+        ]);
+
+        $usulan->update([
+            'status'     => 'approved',
+            'keterangan' => $this->sanitizeString($validated['catatan'] ?? $usulan->keterangan),
+        ]);
+
+        return redirect()->route('anggaran.usulan.index')
+            ->with('success', 'Usulan penarikan dana berhasil disetujui.');
+    }
+
+    // ── Reject ─────────────────────────────────────────────────
+
+    public function reject(Request $request, UsulanPenarikan $usulan)
+    {
+        if ($usulan->status !== 'pending') {
+            return back()->with('error', 'Usulan sudah diproses sebelumnya.');
+        }
+
+        $validated = $request->validate([
+            'keterangan' => 'required|string|max:500',
+        ]);
+
+        $usulan->update([
+            'status'     => 'rejected',
+            'keterangan' => $this->sanitizeString($validated['keterangan']),
+        ]);
+
+        return redirect()->route('anggaran.usulan.index')
+            ->with('success', 'Usulan penarikan dana berhasil ditolak.');
+    }
+
+    // ── Render Table HTML (untuk AJAX) ─────────────────────────
 
     private function renderTableHtml($usulans): string
     {
@@ -78,21 +377,21 @@ class UsulanPenarikanController extends Controller
         $html  = '<div class="table-wrapper">';
         $html .= '<table class="table">';
         $html .= '<thead><tr>';
-        foreach (
-            [
-                'w-10' => 'No',
-                '' => 'RO',
-                '' => 'Sub Komponen',
-                '' => 'Bulan',
-                'text-right' => 'Nilai Usulan',
-                '' => 'Pengusul',
-                '' => 'Tgl Pengajuan',
-                '' => 'Status',
-                'text-center w-32' => 'Aksi'
-            ] as $cls => $label
-        ) {
+
+        foreach ([
+            'w-10'             => 'No',
+            ''                 => 'RO',
+            ''                 => 'Sub Komponen',
+            ''                 => 'Bulan',
+            'text-right'       => 'Nilai Usulan',
+            ''                 => 'Pengusul',
+            ''                 => 'Tgl Pengajuan',
+            ''                 => 'Status',
+            'text-center w-32' => 'Aksi',
+        ] as $cls => $label) {
             $html .= '<th' . ($cls ? ' class="' . e($cls) . '"' : '') . '>' . e($label) . '</th>';
         }
+
         $html .= '</tr></thead><tbody>';
 
         if ($usulans->isEmpty()) {
@@ -106,14 +405,14 @@ class UsulanPenarikanController extends Controller
             foreach ($usulans as $index => $usulan) {
                 $no       = table_row_number($usulans, $index);
                 $badge    = $badgeMap[$usulan->status] ?? 'badge-gray';
-                $statusTx = status_text($usulan->status);
-                $initial  = get_initials($usulan->user->nama);
-                $nama     = e($usulan->user->nama);
+                $statusTx = e(status_text($usulan->status));
+                $initial  = e(get_initials($usulan->user->nama ?? ''));
+                $nama     = e($usulan->user->nama ?? '-');
                 $subkomp  = e(truncate_text($usulan->sub_komponen, 45));
                 $subFull  = e($usulan->sub_komponen);
-                $nilai    = format_rupiah($usulan->nilai_usulan);
-                $tgl      = format_tanggal_short($usulan->created_at);
-                $bulan    = ucfirst($usulan->bulan);
+                $nilai    = e(format_rupiah($usulan->nilai_usulan));
+                $tgl      = e(format_tanggal_short($usulan->created_at));
+                $bulan    = e(ucfirst($usulan->bulan));
                 $ro       = e($usulan->ro);
 
                 $showUrl    = route('anggaran.usulan.show',    $usulan);
@@ -158,7 +457,7 @@ HTML;
         </svg>
       </a>
 HTML;
-                    // Approve & Reject hanya untuk admin — cek role
+
                     if (auth()->user() && (auth()->user()->hasRole('superadmin') || auth()->user()->hasRole('admin'))) {
                         $html .= <<<HTML
       <form action="{$approveUrl}" method="POST" class="inline" x-data @submit.prevent="if(confirm('Setujui usulan ini?')) \$el.submit()">
@@ -195,7 +494,6 @@ HTML;
 
         $html .= '</tbody></table></div>';
 
-        // Pagination
         if ($usulans->hasPages()) {
             $cur  = $usulans->currentPage();
             $last = $usulans->lastPage();
@@ -209,15 +507,13 @@ HTML;
   <div class="flex items-center gap-1">
 HTML;
 
-            // Prev
             if ($cur <= 1) {
                 $html .= '<span class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></span>';
             } else {
-                $prev = $cur - 1;
+                $prev  = $cur - 1;
                 $html .= "<button type=\"button\" x-data @click=\"\$dispatch('change-page',{page:{$prev}})\" class=\"btn btn-ghost btn-sm\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 19l-7-7 7-7\"/></svg></button>";
             }
 
-            // Page numbers
             $rangeStart = max(1, $cur - 2);
             $rangeEnd   = min($last, $cur + 2);
             for ($pg = $rangeStart; $pg <= $rangeEnd; $pg++) {
@@ -225,11 +521,10 @@ HTML;
                 $html  .= "<button type=\"button\" x-data @click=\"\$dispatch('change-page',{page:{$pg}})\" class=\"btn btn-sm {$active}\">{$pg}</button>";
             }
 
-            // Next
             if (!$usulans->hasMorePages()) {
                 $html .= '<span class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></span>';
             } else {
-                $next = $cur + 1;
+                $next  = $cur + 1;
                 $html .= "<button type=\"button\" x-data @click=\"\$dispatch('change-page',{page:{$next}})\" class=\"btn btn-ghost btn-sm\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 5l7 7-7 7\"/></svg></button>";
             }
 
@@ -237,216 +532,5 @@ HTML;
         }
 
         return $html;
-    }
-    public function create()
-    {
-        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
-
-        return view('anggaran.usulan.create', compact('roList', 'bulanList'));
-    }
-
-    public function getSubkomponen(Request $request)
-    {
-        try {
-            if (!$request->ro) {
-                return response()->json(['error' => 'RO harus diisi'], 400);
-            }
-
-            // Kembalikan info sisa anggaran subkomponen untuk referensi user
-            $subkomponens = Anggaran::where('ro', $request->ro)
-                ->whereNotNull('kode_subkomponen')
-                ->whereNull('kode_akun')
-                ->distinct()
-                ->orderBy('kode_subkomponen')
-                ->get(['kode_subkomponen', 'program_kegiatan', 'pagu_anggaran', 'sisa', 'total_penyerapan']);
-
-            return response()->json($subkomponens);
-        } catch (\Exception $e) {
-            Log::error('Usulan getSubkomponen error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'ro'           => 'required|string|max:50|in:Z06,403,405,994',
-            'sub_komponen' => 'required|string|max:255',
-            'bulan'        => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
-            'nilai_usulan' => 'required|numeric|min:1',
-            'keterangan'   => 'nullable|string|max:500',
-        ]);
-
-        // Validasi nilai usulan tidak melebihi sisa subkomponen
-        $subkomp = Anggaran::where('ro', $validated['ro'])
-            ->where('kode_subkomponen', $validated['sub_komponen'])
-            ->whereNull('kode_akun')
-            ->first();
-
-        if ($subkomp && $validated['nilai_usulan'] > $subkomp->sisa) {
-            return back()->withInput()->with(
-                'error',
-                'Nilai usulan (Rp ' . number_format($validated['nilai_usulan'], 0, ',', '.') . ') ' .
-                    'melebihi sisa anggaran subkomponen (Rp ' . number_format($subkomp->sisa, 0, ',', '.') . ')'
-            );
-        }
-
-        // Auto-set anggaran_id dari SubKomponen jika tidak diisi
-        if (empty($validated['anggaran_id']) && $subkomp) {
-            $validated['anggaran_id'] = $subkomp->id;
-        }
-
-        $validated['user_id'] = Auth::id();
-        $validated['status']  = 'pending';
-
-        UsulanPenarikan::create($validated);
-
-        return redirect()->route('anggaran.usulan.index')
-            ->with('success', 'Usulan penarikan dana berhasil diajukan');
-    }
-
-    public function show(UsulanPenarikan $usulan)
-    {
-        $usulan->load(['user', 'anggaran']);
-
-        // Ambil info anggaran terkait untuk konteks
-        $anggaranSubkomp = null;
-        if ($usulan->anggaran_id) {
-            $anggaranSubkomp = $usulan->anggaran;
-        } else {
-            $anggaranSubkomp = Anggaran::where('ro', $usulan->ro)
-                ->where('kode_subkomponen', $usulan->sub_komponen)
-                ->whereNull('kode_akun')
-                ->first();
-        }
-
-        return view('anggaran.usulan.show', compact('usulan', 'anggaranSubkomp'));
-    }
-
-    public function edit(UsulanPenarikan $usulan)
-    {
-        if ($usulan->status !== 'pending') {
-            return redirect()->route('anggaran.usulan.index')
-                ->with('error', 'Usulan yang sudah diproses tidak dapat diedit');
-        }
-
-        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
-
-        return view('anggaran.usulan.edit', compact('usulan', 'roList', 'bulanList'));
-    }
-
-    public function update(Request $request, UsulanPenarikan $usulan)
-    {
-        if ($usulan->status !== 'pending') {
-            return redirect()->route('anggaran.usulan.index')
-                ->with('error', 'Usulan yang sudah diproses tidak dapat diedit');
-        }
-
-        $validated = $request->validate([
-            'ro'           => 'required|string|max:50',
-            'sub_komponen' => 'required|string|max:255',
-            'bulan'        => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
-            'nilai_usulan' => 'required|numeric|min:1',
-            'keterangan'   => 'nullable|string|max:500',
-        ]);
-
-        // Re-validasi sisa
-        $subkomp = Anggaran::where('ro', $validated['ro'])
-            ->where('kode_subkomponen', $validated['sub_komponen'])
-            ->whereNull('kode_akun')
-            ->first();
-
-        if ($subkomp && $validated['nilai_usulan'] > $subkomp->sisa) {
-            return back()->withInput()->with(
-                'error',
-                'Nilai usulan melebihi sisa anggaran subkomponen (Rp ' .
-                    number_format($subkomp->sisa, 0, ',', '.') . ')'
-            );
-        }
-
-        // Update anggaran_id jika RO/subkomponen berubah
-        if ($subkomp) {
-            $validated['anggaran_id'] = $subkomp->id;
-        }
-
-        $usulan->update($validated);
-
-        return redirect()->route('anggaran.usulan.index')
-            ->with('success', 'Usulan penarikan dana berhasil diupdate');
-    }
-
-    public function destroy(UsulanPenarikan $usulan)
-    {
-        if ($usulan->status !== 'pending') {
-            return redirect()->route('anggaran.usulan.index')
-                ->with('error', 'Usulan yang sudah diproses tidak dapat dihapus');
-        }
-
-        $usulan->delete();
-
-        return redirect()->route('anggaran.usulan.index')
-            ->with('success', 'Usulan penarikan dana berhasil dihapus');
-    }
-
-    public function approve(Request $request, UsulanPenarikan $usulan)
-    {
-        if ($usulan->status !== 'pending') {
-            return back()->with('error', 'Usulan sudah diproses sebelumnya');
-        }
-
-        $usulan->update([
-            'status'     => 'approved',
-            'keterangan' => $request->get('catatan', $usulan->keterangan),
-        ]);
-
-        return redirect()->route('anggaran.usulan.index')
-            ->with('success', 'Usulan penarikan dana berhasil disetujui');
-    }
-
-    public function reject(Request $request, UsulanPenarikan $usulan)
-    {
-        if ($usulan->status !== 'pending') {
-            return back()->with('error', 'Usulan sudah diproses sebelumnya');
-        }
-
-        $request->validate([
-            'keterangan' => 'required|string|max:500',
-        ]);
-
-        $usulan->update([
-            'status'     => 'rejected',
-            'keterangan' => $request->keterangan,
-        ]);
-
-        return redirect()->route('anggaran.usulan.index')
-            ->with('success', 'Usulan penarikan dana berhasil ditolak');
     }
 }
