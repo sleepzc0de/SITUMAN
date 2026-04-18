@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Kepegawaian;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pegawai;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ProyeksiMutasiController extends Controller
 {
@@ -18,6 +20,11 @@ class ProyeksiMutasiController extends Controller
         $bagian    = (string) ($request->input('bagian') ?? '');
         $prioritas = (string) ($request->input('prioritas') ?? '');
         $search    = (string) ($request->input('search') ?? '');
+
+        // ── Handle Export Excel ────────────────────────────────
+        if ($request->input('export') == '1') {
+            return $this->exportExcel($tahun, $bagian, $prioritas, $search);
+        }
 
         $bagianList = Cache::remember('pegawai_bagian_list', 600, fn() =>
             Pegawai::where('status', 'AKTIF')
@@ -48,6 +55,104 @@ class ProyeksiMutasiController extends Controller
         ));
     }
 
+    // ── Export Excel ───────────────────────────────────────────
+    private function exportExcel(int $tahun, string $bagian, string $prioritas, string $search)
+    {
+        try {
+            $proyeksi = $this->getProyeksi($tahun, $bagian, $prioritas, $search);
+            $filename = 'proyeksi_mutasi_' . $tahun . '_' . date('Ymd') . '.xlsx';
+
+            return Excel::download(
+                new class($proyeksi, $tahun) implements
+                    \Maatwebsite\Excel\Concerns\FromArray,
+                    \Maatwebsite\Excel\Concerns\WithHeadings,
+                    \Maatwebsite\Excel\Concerns\WithStyles,
+                    \Maatwebsite\Excel\Concerns\ShouldAutoSize,
+                    \Maatwebsite\Excel\Concerns\WithTitle
+                {
+                    public function __construct(
+                        private $proyeksi,
+                        private int $tahun
+                    ) {}
+
+                    public function title(): string
+                    {
+                        return 'Proyeksi Mutasi ' . $this->tahun;
+                    }
+
+                    public function headings(): array
+                    {
+                        return [
+                            'No', 'Nama', 'NIP', 'Jabatan', 'Eselon',
+                            'Bagian', 'Lama Jabatan (Bulan)',
+                            'Prioritas', 'Alasan', 'Rekomendasi Waktu Mutasi',
+                        ];
+                    }
+
+                    public function array(): array
+                    {
+                        return $this->proyeksi->values()->map(function ($p, $i) {
+                            $analisis = $p->analisis_mutasi;
+                            $prioritasLabel = match (true) {
+                                $analisis['prioritas'] >= 5 => 'Tinggi',
+                                $analisis['prioritas'] >= 3 => 'Sedang',
+                                default                     => 'Rendah',
+                            };
+
+                            return [
+                                $i + 1,
+                                $p->nama,
+                                $p->nip,
+                                $p->jabatan ?? '-',
+                                $p->eselon ?? '-',
+                                $p->bagian ?? '-',
+                                $analisis['lama_jabatan'] ?? '-',
+                                $prioritasLabel,
+                                implode('; ', $analisis['alasan'] ?? []),
+                                $analisis['rekomendasi_waktu'] ?? '-',
+                            ];
+                        })->toArray();
+                    }
+
+                    public function styles(Worksheet $sheet): array
+                    {
+                        return [
+                            1 => [
+                                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                                'fill' => [
+                                    'fillType'   => 'solid',
+                                    'startColor' => ['rgb' => '1e3a5f'],
+                                ],
+                            ],
+                        ];
+                    }
+                },
+                $filename
+            );
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal export data proyeksi mutasi.');
+            return back()->with('error', 'Gagal melakukan export. Silakan coba lagi.');
+        }
+    }
+
+    public function show(Pegawai $pegawai)
+    {
+        $analisis = $this->analisisMutasi($pegawai, (int) date('Y'));
+
+        $rekanSebagian = Pegawai::where('status', 'AKTIF')
+            ->where('bagian', $pegawai->bagian)
+            ->where('id', '!=', $pegawai->id)
+            ->select('id', 'nama', 'jabatan', 'tmt_jabatan', 'proyeksi_kp_1', 'nip')
+            ->limit(5)
+            ->get()
+            ->map(function ($r) {
+                $r->analisis_mutasi = $this->analisisMutasi($r, (int) date('Y'));
+                return $r;
+            });
+
+        return view('kepegawaian.mutasi.show', compact('pegawai', 'analisis', 'rekanSebagian'));
+    }
+
     private function getProyeksi(int $tahun, string $bagian, string $prioritas, string $search)
     {
         $cacheKey = "proyeksi_mutasi_{$tahun}_{$bagian}_{$prioritas}_{$search}";
@@ -58,7 +163,6 @@ class ProyeksiMutasiController extends Controller
             if ($bagian !== '') {
                 $query->where('bagian', $bagian);
             }
-
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
                     $q->where('nama', 'like', "%{$search}%")
@@ -99,7 +203,6 @@ class ProyeksiMutasiController extends Controller
         $prioritas   = 0;
         $lamaJabatan = null;
 
-        // ── Masa jabatan via tmt_jabatan, fallback proyeksi_kp_1 ──
         $tmtSource = $pegawai->tmt_jabatan ?? null;
         if (!$tmtSource && $pegawai->proyeksi_kp_1) {
             try { $tmtSource = Carbon::parse($pegawai->proyeksi_kp_1); } catch (\Exception) {}
@@ -122,7 +225,6 @@ class ProyeksiMutasiController extends Controller
             } catch (\Exception) {}
         }
 
-        // ── Mendekati pensiun ──
         if ($pegawai->tanggal_pensiun) {
             try {
                 $bulanSampaiPensiun = (int) now()->diffInMonths(
@@ -141,7 +243,6 @@ class ProyeksiMutasiController extends Controller
             } catch (\Exception) {}
         }
 
-        // ── Booster pejabat struktural ──
         if ($pegawai->eselon && in_array($pegawai->eselon, ['Eselon III', 'Eselon IV'])) {
             if ($perluMutasi) $prioritas += 1;
             $alasan[] = "Pejabat struktural ({$pegawai->eselon})";
@@ -180,23 +281,5 @@ class ProyeksiMutasiController extends Controller
         return now()->month <= 3
             ? "April {$tahun}"
             : (now()->month <= 9 ? "Oktober {$tahun}" : "April " . ($tahun + 1));
-    }
-
-    public function show(Pegawai $pegawai)
-    {
-        $analisis = $this->analisisMutasi($pegawai, (int) date('Y'));
-
-        $rekanSebagian = Pegawai::where('status', 'AKTIF')
-            ->where('bagian', $pegawai->bagian)
-            ->where('id', '!=', $pegawai->id)
-            ->select('id', 'nama', 'jabatan', 'tmt_jabatan', 'proyeksi_kp_1', 'nip')
-            ->limit(5)
-            ->get()
-            ->map(function ($r) {
-                $r->analisis_mutasi = $this->analisisMutasi($r, (int) date('Y'));
-                return $r;
-            });
-
-        return view('kepegawaian.mutasi.show', compact('pegawai', 'analisis', 'rekanSebagian'));
     }
 }

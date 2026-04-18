@@ -57,8 +57,9 @@ class SPPObserver
         try {
             // Cari anggaran level Akun berdasarkan COA
             $anggaran = Anggaran::whereNotNull('kode_akun')
-                ->whereRaw("CONCAT(kegiatan, kro, ro, kode_akun) = ?", [$coa])
+                ->whereRaw("kegiatan + kro + ro + kode_akun = ?", [$coa])
                 ->first();
+
 
             if (!$anggaran) {
                 Log::warning("SPPObserver: Anggaran tidak ditemukan untuk COA {$coa}");
@@ -70,7 +71,6 @@ class SPPObserver
 
             // Propagate ke parent (SubKomponen & RO)
             $this->propagateToParents($anggaran);
-
         } catch (\Exception $e) {
             Log::error("SPPObserver error: " . $e->getMessage(), [
                 'coa' => $coa,

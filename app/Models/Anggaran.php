@@ -12,12 +12,34 @@ class Anggaran extends Model
     protected $table = 'anggaran';
 
     protected $fillable = [
-        'kegiatan', 'kro', 'ro', 'tahun', 'kode_subkomponen', 'kode_akun',
-        'program_kegiatan', 'pic', 'pagu_anggaran', 'referensi',
-        'referensi2', 'ref_output', 'len', 'januari', 'februari',
-        'maret', 'april', 'mei', 'juni', 'juli', 'agustus',
-        'september', 'oktober', 'november', 'desember',
-        'tagihan_outstanding', 'total_penyerapan', 'sisa'
+        'kegiatan',
+        'kro',
+        'ro',
+        'tahun',
+        'kode_subkomponen',
+        'kode_akun',
+        'program_kegiatan',
+        'pic',
+        'pagu_anggaran',
+        'referensi',
+        'referensi2',
+        'ref_output',
+        'len',
+        'januari',
+        'februari',
+        'maret',
+        'april',
+        'mei',
+        'juni',
+        'juli',
+        'agustus',
+        'september',
+        'oktober',
+        'november',
+        'desember',
+        'tagihan_outstanding',
+        'total_penyerapan',
+        'sisa'
     ];
 
     protected $casts = [
@@ -144,17 +166,25 @@ class Anggaran extends Model
 
         // Update per bulan
         $bulanMap = [
-            '01' => 'januari', '02' => 'februari', '03' => 'maret',
-            '04' => 'april', '05' => 'mei', '06' => 'juni',
-            '07' => 'juli', '08' => 'agustus', '09' => 'september',
-            '10' => 'oktober', '11' => 'november', '12' => 'desember',
+            '01' => 'januari',
+            '02' => 'februari',
+            '03' => 'maret',
+            '04' => 'april',
+            '05' => 'mei',
+            '06' => 'juni',
+            '07' => 'juli',
+            '08' => 'agustus',
+            '09' => 'september',
+            '10' => 'oktober',
+            '11' => 'november',
+            '12' => 'desember',
         ];
 
         $realisasiPerBulan = SPP::where('coa', $coa)
             ->where('status', 'Tagihan Telah SP2D')
             ->whereNull('deleted_at')
-            ->selectRaw('MONTH(tgl_sp2d) as bulan_num, SUM(netto) as total')
-            ->groupBy('bulan_num')
+            ->selectRaw('DATEPART(month, tgl_sp2d) as bulan_num, SUM(netto) as total')
+            ->groupByRaw('DATEPART(month, tgl_sp2d)')
             ->pluck('total', 'bulan_num');
 
         $updates = [

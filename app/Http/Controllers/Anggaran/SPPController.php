@@ -36,8 +36,20 @@ class SPPController extends Controller
         }
 
         $spps      = $query->orderBy('tgl_spp', 'desc')->paginate(20)->withQueryString();
-        $bulanList = ['januari','februari','maret','april','mei','juni',
-                      'juli','agustus','september','oktober','november','desember'];
+        $bulanList = [
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
+        ];
         $roList    = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
         $statsQuery = SPP::query();
@@ -71,16 +83,33 @@ class SPPController extends Controller
         }
 
         return view('anggaran.spp.index', compact(
-            'spps', 'bulanList', 'roList',
-            'totalBruto', 'totalNetto', 'totalSP2D', 'totalBelumSP2D'
+            'spps',
+            'bulanList',
+            'roList',
+            'totalBruto',
+            'totalNetto',
+            'totalSP2D',
+            'totalBelumSP2D'
         ));
     }
 
     public function create()
     {
         $roList       = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
-        $bulanList    = ['januari','februari','maret','april','mei','juni',
-                         'juli','agustus','september','oktober','november','desember'];
+        $bulanList    = [
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
+        ];
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
         $lsBendahara  = ['LS', 'Bendahara'];
 
@@ -126,8 +155,20 @@ class SPPController extends Controller
     public function edit(SPP $spp)
     {
         $roList      = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
-        $bulanList   = ['januari','februari','maret','april','mei','juni',
-                        'juli','agustus','september','oktober','november','desember'];
+        $bulanList   = [
+            'januari',
+            'februari',
+            'maret',
+            'april',
+            'mei',
+            'juni',
+            'juli',
+            'agustus',
+            'september',
+            'oktober',
+            'november',
+            'desember'
+        ];
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
         $lsBendahara  = ['LS', 'Bendahara'];
 
@@ -143,8 +184,13 @@ class SPPController extends Controller
             ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan', 'pagu_anggaran', 'sisa']);
 
         return view('anggaran.spp.edit', compact(
-            'spp', 'roList', 'bulanList', 'jenisBelanja',
-            'lsBendahara', 'subkomponenList', 'akunList'
+            'spp',
+            'roList',
+            'bulanList',
+            'jenisBelanja',
+            'lsBendahara',
+            'subkomponenList',
+            'akunList'
         ));
     }
 
@@ -297,12 +343,15 @@ class SPPController extends Controller
      */
     private function validateSisaAnggaran(string $coa, float $netto, ?string $excludeSppId = null): void
     {
+        // ── Fix SQL Server: gunakan string concatenation yang benar ──
         $anggaran = Anggaran::whereNotNull('kode_akun')
-            ->whereRaw("CONCAT(kegiatan, kro, ro, kode_akun) = ?", [$coa])
+            ->whereRaw("kegiatan + kro + ro + kode_akun = ?", [$coa])
             ->first();
 
         if (!$anggaran) {
-            throw new \InvalidArgumentException("COA tidak ditemukan dalam data anggaran. Pastikan data anggaran sudah diinput.");
+            throw new \InvalidArgumentException(
+                "COA tidak ditemukan dalam data anggaran. Pastikan data anggaran sudah diinput."
+            );
         }
 
         $query = SPP::where('coa', $coa)
@@ -320,7 +369,7 @@ class SPPController extends Controller
             $fmt = fn($v) => 'Rp ' . number_format($v, 0, ',', '.');
             throw new \InvalidArgumentException(
                 "Nilai SPP ({$fmt($netto)}) melebihi sisa anggaran efektif ({$fmt($sisaEfektif)}). " .
-                "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}."
+                    "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}."
             );
         }
     }

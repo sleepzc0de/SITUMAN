@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Pegawai;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class KenaikanGradingController extends Controller
 {
@@ -28,48 +30,131 @@ class KenaikanGradingController extends Controller
     ];
 
     public function index(Request $request)
-{
-    $tahun  = (int) $request->input('tahun', date('Y'));
-    $bagian = (string) ($request->input('bagian') ?? '');  // ← fix null
-    $search = (string) ($request->input('search') ?? '');  // ← fix null
-    $isAjax = $request->ajax() || $request->input('ajax');
+    {
+        $tahun  = (int) $request->input('tahun', date('Y'));
+        $bagian = (string) ($request->input('bagian') ?? '');
+        $search = (string) ($request->input('search') ?? '');
+        $isAjax = $request->ajax() || $request->input('ajax');
 
-    $semuaRekomendasi = $this->getRekomendasi($tahun);
+        // ── Handle Export Excel ────────────────────────────────
+        if ($request->input('export') == '1') {
+            return $this->exportExcel($tahun, $bagian, $search);
+        }
 
-    $bagianList = Pegawai::where('status', 'AKTIF')
-        ->whereNotNull('bagian')
-        ->distinct()
-        ->orderBy('bagian')
-        ->pluck('bagian');
+        $semuaRekomendasi = $this->getRekomendasi($tahun);
 
-    $filtered  = $this->applyFilters($semuaRekomendasi, $bagian, $search);
-    $rows      = $this->buildRows($filtered);
-    $stats     = $this->buildStats($filtered, $tahun);
-    $perBagian = $this->buildPerBagian($filtered);
+        $bagianList = Pegawai::where('status', 'AKTIF')
+            ->whereNotNull('bagian')
+            ->distinct()
+            ->orderBy('bagian')
+            ->pluck('bagian');
 
-    if ($isAjax) {
-        return response()->json([
-            'rows'      => $rows,
-            'stats'     => $stats,
-            'perBagian' => $perBagian,
+        $filtered  = $this->applyFilters($semuaRekomendasi, $bagian, $search);
+        $rows      = $this->buildRows($filtered);
+        $stats     = $this->buildStats($filtered, $tahun);
+        $perBagian = $this->buildPerBagian($filtered);
+
+        if ($isAjax) {
+            return response()->json([
+                'rows'      => $rows,
+                'stats'     => $stats,
+                'perBagian' => $perBagian,
+            ]);
+        }
+
+        return view('kepegawaian.grading.index', [
+            'tahun'            => $tahun,
+            'bagianList'       => $bagianList,
+            'initialRows'      => $rows,
+            'initialStats'     => $stats,
+            'initialPerBagian' => $perBagian,
         ]);
     }
-
-    return view('kepegawaian.grading.index', [
-        'tahun'            => $tahun,
-        'bagianList'       => $bagianList,
-        'initialRows'      => $rows,
-        'initialStats'     => $stats,
-        'initialPerBagian' => $perBagian,
-    ]);
-}
-
 
     public function show(Pegawai $pegawai)
     {
         $rekomendasi = $this->hitungRekomendasi($pegawai, (int) date('Y'));
         return view('kepegawaian.grading.show', compact('pegawai', 'rekomendasi'));
     }
+
+    // ── Export Excel ───────────────────────────────────────────
+    private function exportExcel(int $tahun, string $bagian, string $search)
+    {
+        try {
+            $semuaRekomendasi = $this->getRekomendasi($tahun);
+            $filtered         = $this->applyFilters($semuaRekomendasi, $bagian, $search);
+            $rows             = $this->buildRows($filtered);
+            $filename         = 'rekomendasi_grading_' . $tahun . '_' . date('Ymd') . '.xlsx';
+
+            return Excel::download(
+                new class($rows, $tahun) implements
+                    \Maatwebsite\Excel\Concerns\FromArray,
+                    \Maatwebsite\Excel\Concerns\WithHeadings,
+                    \Maatwebsite\Excel\Concerns\WithStyles,
+                    \Maatwebsite\Excel\Concerns\ShouldAutoSize,
+                    \Maatwebsite\Excel\Concerns\WithTitle
+                {
+                    public function __construct(
+                        private array $rows,
+                        private int   $tahun
+                    ) {}
+
+                    public function title(): string
+                    {
+                        return 'Grading ' . $this->tahun;
+                    }
+
+                    public function headings(): array
+                    {
+                        return [
+                            'No', 'Nama', 'NIP', 'Jabatan', 'Bagian',
+                            'Masa Kerja (Tahun)', 'Level Jabatan',
+                            'Grade Sekarang', 'Grade Rekomendasi', 'Grade Maks',
+                            'Alasan',
+                        ];
+                    }
+
+                    public function array(): array
+                    {
+                        return collect($this->rows)->map(function ($row, $i) {
+                            return [
+                                $i + 1,
+                                $row['nama'],
+                                $row['nip'],
+                                $row['jabatan'] ?? '-',
+                                $row['bagian'] ?? '-',
+                                $row['masa_kerja_tahun'],
+                                $row['level_jabatan'],
+                                'G' . $row['grading_sekarang'],
+                                'G' . $row['grading_baru'],
+                                'G' . $row['grading_max'],
+                                implode('; ', $row['alasan'] ?? []),
+                            ];
+                        })->toArray();
+                    }
+
+                    public function styles(Worksheet $sheet): array
+                    {
+                        return [
+                            1 => [
+                                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                                'fill' => [
+                                    'fillType'   => 'solid',
+                                    'startColor' => ['rgb' => '1e3a5f'],
+                                ],
+                            ],
+                        ];
+                    }
+                },
+                $filename
+            );
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal export data grading.');
+            return back()->with('error', 'Gagal melakukan export. Silakan coba lagi.');
+        }
+    }
+
+    // ── Private Helpers (sama seperti sebelumnya) ──────────────
 
     private function getRekomendasi(int $tahun)
     {
@@ -91,16 +176,15 @@ class KenaikanGradingController extends Controller
     }
 
     private function applyFilters($collection, string $bagian, string $search)
-{
-    return $collection
-        ->when($bagian !== '', fn($col) => $col->where('bagian', $bagian))  // ← fix empty check
-        ->when($search !== '', fn($col) => $col->filter(                    // ← fix empty check
-            fn($p) => str_contains(mb_strtolower($p->nama ?? ''), mb_strtolower($search))
-                   || str_contains($p->nip ?? '', $search)
-        ))
-        ->values();
-}
-
+    {
+        return $collection
+            ->when($bagian !== '', fn($col) => $col->where('bagian', $bagian))
+            ->when($search !== '', fn($col) => $col->filter(
+                fn($p) => str_contains(mb_strtolower($p->nama ?? ''), mb_strtolower($search))
+                       || str_contains($p->nip ?? '', $search)
+            ))
+            ->values();
+    }
 
     private function buildRows($collection): array
     {
@@ -175,26 +259,14 @@ class KenaikanGradingController extends Controller
         $jenisJabatan = strtolower(trim($pegawai->jenis_jabatan ?? ''));
         $namaJabatan  = strtolower(trim($pegawai->nama_jabatan ?? $pegawai->jabatan ?? ''));
 
-        // Deteksi Eselon
         if ($eselon) {
-            if (preg_match('/^i[ab]?$/i', $eselon) || $eselon === '1') {
-                return ['key' => 'eselon_i', 'label' => 'Eselon I'];
-            }
-            if (preg_match('/^ii[ab]?$/i', $eselon) || $eselon === '2') {
-                return ['key' => 'eselon_ii', 'label' => 'Eselon II'];
-            }
-            if (preg_match('/^iii[ab]?$/i', $eselon) || $eselon === '3') {
-                return ['key' => 'eselon_iii', 'label' => 'Eselon III'];
-            }
-            if (preg_match('/^iv[ab]?$/i', $eselon) || $eselon === '4') {
-                return ['key' => 'eselon_iv', 'label' => 'Eselon IV'];
-            }
-            if (preg_match('/^v[ab]?$/i', $eselon) || $eselon === '5') {
-                return ['key' => 'eselon_v', 'label' => 'Eselon V'];
-            }
+            if (preg_match('/^i[ab]?$/i', $eselon) || $eselon === '1')  return ['key' => 'eselon_i',   'label' => 'Eselon I'];
+            if (preg_match('/^ii[ab]?$/i', $eselon) || $eselon === '2') return ['key' => 'eselon_ii',  'label' => 'Eselon II'];
+            if (preg_match('/^iii[ab]?$/i', $eselon) || $eselon === '3')return ['key' => 'eselon_iii', 'label' => 'Eselon III'];
+            if (preg_match('/^iv[ab]?$/i', $eselon) || $eselon === '4') return ['key' => 'eselon_iv',  'label' => 'Eselon IV'];
+            if (preg_match('/^v[ab]?$/i', $eselon) || $eselon === '5')  return ['key' => 'eselon_v',   'label' => 'Eselon V'];
         }
 
-        // Deteksi Fungsional
         if (str_contains($jenisJabatan, 'fungsional') || str_contains($namaJabatan, 'fungsional')) {
             foreach ([
                 'utama'    => 'fungsional_utama',
@@ -213,7 +285,6 @@ class KenaikanGradingController extends Controller
             return ['key' => 'fungsional_pertama', 'label' => 'Fungsional'];
         }
 
-        // Pelaksana / default
         if (str_contains($jenisJabatan, 'pelaksana') || str_contains($namaJabatan, 'pelaksana')) {
             return ['key' => 'pelaksana', 'label' => 'Pelaksana'];
         }
@@ -230,12 +301,6 @@ class KenaikanGradingController extends Controller
         $level      = $this->resolveLevel($pegawai);
         $gradingMax = self::GRADING_MAX[$level['key']] ?? self::GRADING_MAX['default'];
 
-        $eligible    = false;
-        $alasan      = [];
-        $catatan     = [];
-        $gradingBaru = $gradingSekarang;
-
-        // Sudah di batas maksimal
         if ($gradingSekarang >= $gradingMax) {
             return [
                 'eligible'         => false,
@@ -244,14 +309,16 @@ class KenaikanGradingController extends Controller
                 'grading_max'      => $gradingMax,
                 'level_jabatan'    => $level['label'],
                 'alasan'           => [],
-                'catatan'          => [
-                    "Grading sudah mencapai batas maksimal untuk level {$level['label']} (G{$gradingMax})"
-                ],
-                'tahun' => $tahun,
+                'catatan'          => ["Grading sudah mencapai batas maksimal untuk level {$level['label']} (G{$gradingMax})"],
+                'tahun'            => $tahun,
             ];
         }
 
-        // Kriteria 1: Masa kerja minimal 4 tahun
+        $eligible    = false;
+        $alasan      = [];
+        $catatan     = [];
+        $gradingBaru = $gradingSekarang;
+
         if ($masaKerja >= 4) {
             $eligible    = true;
             $gradingBaru = min($gradingSekarang + 1, $gradingMax);
@@ -261,7 +328,6 @@ class KenaikanGradingController extends Controller
             $catatan[] = "Masa kerja {$masaKerja} tahun, perlu {$sisaTahun} tahun lagi untuk kenaikan reguler";
         }
 
-        // Kriteria 2: Pendidikan S2/S3
         if (in_array($pendidikan, ['S2', 'S3'])) {
             if (!$eligible) {
                 $eligible    = true;
@@ -270,7 +336,6 @@ class KenaikanGradingController extends Controller
             $alasan[] = "Pendidikan {$pendidikan} memberikan pertimbangan akselerasi";
         }
 
-        // Catatan jika sudah di batas setelah kenaikan
         if ($eligible && $gradingBaru >= $gradingMax) {
             $catatan[] = "Grade {$gradingMax} adalah batas maksimal untuk level {$level['label']}";
         }

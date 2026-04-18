@@ -284,12 +284,11 @@ HTML;
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'ro'            => 'required|string|max:50',
-            'sub_komponen'  => 'required|string|max:255',
-            'anggaran_id'   => 'nullable|exists:anggaran,id',
-            'bulan'         => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
-            'nilai_usulan'  => 'required|numeric|min:1',
-            'keterangan'    => 'nullable|string|max:500',
+            'ro'           => 'required|string|max:50|in:Z06,403,405,994',
+            'sub_komponen' => 'required|string|max:255',
+            'bulan'        => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
+            'nilai_usulan' => 'required|numeric|min:1',
+            'keterangan'   => 'nullable|string|max:500',
         ]);
 
         // Validasi nilai usulan tidak melebihi sisa subkomponen

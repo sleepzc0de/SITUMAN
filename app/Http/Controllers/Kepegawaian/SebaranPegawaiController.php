@@ -25,10 +25,12 @@ class SebaranPegawaiController extends Controller
         return view('kepegawaian.sebaran.index', compact('bagianList', 'sebaranStats'));
     }
 
-    /**
-     * AJAX endpoint — dipanggil Alpine.js setiap kali filter berubah.
-     * Mengembalikan JSON: { data, pagination, stats, meta }
-     */
+    public function show(Pegawai $pegawai)
+    {
+        // Tidak perlu try-catch karena Laravel auto 404 jika model tidak ditemukan
+        return view('kepegawaian.sebaran.show', compact('pegawai'));
+    }
+
     public function data(Request $request)
     {
         abort_unless($request->ajax() || $request->wantsJson(), 403);
@@ -45,17 +47,15 @@ class SebaranPegawaiController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('nip',  'like', "%{$search}%");
+                    ->orWhere('nip', 'like', "%{$search}%");
             });
         }
 
-        // Clone sebelum paginate agar stats pakai query yg sama
         $statsQuery = clone $query;
 
-        $perPage  = max(1, min(100, (int) $request->input('per_page', 20)));
-        $pegawai  = $query->orderBy('nama')->paginate($perPage)->withQueryString();
+        $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
+        $pegawai = $query->orderBy('nama')->paginate($perPage)->withQueryString();
 
-        // Stats dari hasil filter
         $stats = [
             'per_bagian' => (clone $statsQuery)
                 ->select('bagian', DB::raw('count(*) as total'))
@@ -77,30 +77,29 @@ class SebaranPegawaiController extends Controller
                 ->get(),
         ];
 
-        // Format rows untuk response
         $rows = $pegawai->getCollection()->map(function ($p, $i) use ($pegawai) {
             return [
-                'no'            => $pegawai->firstItem() + $i,
-                'id'            => $p->id,
-                'nama'          => $p->nama,
-                'nama_gelar'    => $p->nama_gelar,
-                'nip'           => $p->nip,
-                'email'         => $p->email_kemenkeu,
-                'bagian'        => $p->bagian,
-                'subbagian'     => $p->subbagian,
-                'jabatan'       => $p->jabatan,
-                'eselon'        => $p->eselon,
-                'grading'       => $p->grading,
-                'status'        => $p->status,
-                'initials'      => strtoupper(substr($p->nama, 0, 2)),
-                'show_url'      => route('kepegawaian.sebaran.show', $p),
-                'edit_url'      => route('kepegawaian.pegawai.edit', $p),
+                'no'         => $pegawai->firstItem() + $i,
+                'id'         => $p->id,
+                'nama'       => $p->nama,
+                'nama_gelar' => $p->nama_gelar,
+                'nip'        => $p->nip,
+                'email'      => $p->email_kemenkeu,
+                'bagian'     => $p->bagian,
+                'subbagian'  => $p->subbagian,
+                'jabatan'    => $p->jabatan,
+                'eselon'     => $p->eselon,
+                'grading'    => $p->grading,
+                'status'     => $p->status,
+                'initials'   => strtoupper(substr($p->nama ?? '', 0, 2)),
+                'show_url'   => route('kepegawaian.sebaran.show', $p),
+                'edit_url'   => route('kepegawaian.pegawai.edit', $p),
             ];
         });
 
         return response()->json([
-            'data'  => $rows,
-            'meta'  => [
+            'data' => $rows,
+            'meta' => [
                 'total'        => $pegawai->total(),
                 'per_page'     => $pegawai->perPage(),
                 'current_page' => $pegawai->currentPage(),
@@ -116,8 +115,6 @@ class SebaranPegawaiController extends Controller
             ],
         ]);
     }
-
-    // ── Helper ────────────────────────────────────────────────────────────────
 
     private function getStats(): array
     {
