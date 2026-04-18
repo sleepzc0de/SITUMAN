@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Http\Controllers\Anggaran;
+
 use App\Http\Controllers\Controller;
 use App\Models\Anggaran;
 use App\Models\RevisiAnggaran;
@@ -8,13 +10,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+
 class RevisiAnggaranController extends Controller
 {
     public function __construct(private AnggaranService $anggaranService) {}
 
     public function index(Request $request)
     {
-        // Jika AJAX/JSON request → kembalikan data saja
         if ($request->expectsJson() || $request->ajax()) {
             return $this->fetchData($request);
         }
@@ -28,7 +30,6 @@ class RevisiAnggaranController extends Controller
             'selisih' => RevisiAnggaran::selectRaw('SUM(pagu_sesudah - pagu_sebelum) as net')->value('net') ?? 0,
         ];
 
-        // Data awal (tanpa filter)
         $revisis = RevisiAnggaran::with(['anggaran', 'user'])
             ->orderBy('tanggal_revisi', 'desc')
             ->paginate(20);
@@ -36,77 +37,75 @@ class RevisiAnggaranController extends Controller
         return view('anggaran.revisi.index', compact('revisis', 'roList', 'jenisRevisi', 'stats'));
     }
 
-    /**
-     * Endpoint khusus AJAX filter — dipanggil dari blade via fetch()
-     */
     private function fetchData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $query = RevisiAnggaran::with(['anggaran', 'user'])->orderBy('tanggal_revisi', 'desc');
+        try {
+            $query = RevisiAnggaran::with(['anggaran', 'user'])->orderBy('tanggal_revisi', 'desc');
 
-        if ($request->filled('jenis_revisi') && $request->jenis_revisi !== 'all') {
-            $query->where('jenis_revisi', $request->jenis_revisi);
-        }
-        if ($request->filled('ro')) {
-            $query->whereHas('anggaran', fn($q) => $q->where('ro', $request->ro));
-        }
+            if ($request->filled('jenis_revisi') && $request->jenis_revisi !== 'all') {
+                $query->where('jenis_revisi', $request->jenis_revisi);
+            }
+            if ($request->filled('ro')) {
+                $query->whereHas('anggaran', fn($q) => $q->where('ro', $request->ro));
+            }
 
-        $revisis = $query->paginate(20)->withQueryString();
+            $revisis = $query->paginate(20)->withQueryString();
 
-        // Stats berdasarkan filter yang sama
-        $statsQuery = RevisiAnggaran::query();
-        if ($request->filled('jenis_revisi') && $request->jenis_revisi !== 'all') {
-            $statsQuery->where('jenis_revisi', $request->jenis_revisi);
-        }
-        if ($request->filled('ro')) {
-            $statsQuery->whereHas('anggaran', fn($q) => $q->where('ro', $request->ro));
-        }
+            $statsQuery = RevisiAnggaran::query();
+            if ($request->filled('jenis_revisi') && $request->jenis_revisi !== 'all') {
+                $statsQuery->where('jenis_revisi', $request->jenis_revisi);
+            }
+            if ($request->filled('ro')) {
+                $statsQuery->whereHas('anggaran', fn($q) => $q->where('ro', $request->ro));
+            }
 
-        $stats = [
-            'total'   => $statsQuery->count(),
-            'naik'    => (clone $statsQuery)->whereColumn('pagu_sesudah', '>', 'pagu_sebelum')->count(),
-            'turun'   => (clone $statsQuery)->whereColumn('pagu_sesudah', '<', 'pagu_sebelum')->count(),
-            'selisih' => (clone $statsQuery)->selectRaw('SUM(pagu_sesudah - pagu_sebelum) as net')->value('net') ?? 0,
-        ];
-
-        $rows = $revisis->getCollection()->map(function ($revisi, $index) use ($revisis) {
-            $selisih = $revisi->pagu_sesudah - $revisi->pagu_sebelum;
-            return [
-                'id'               => $revisi->id,
-                'no'               => ($revisis->currentPage() - 1) * $revisis->perPage() + $index + 1,
-                'tanggal'          => formatTanggalIndo($revisi->tanggal_revisi),
-                'user'             => $revisi->user->nama ?? '-',
-                'jenis_revisi'     => $revisi->jenis_revisi,
-                'program_kegiatan' => truncate_text($revisi->anggaran->program_kegiatan ?? '-', 45),
-                'ro'               => $revisi->anggaran->ro ?? '',
-                'kode_akun'        => $revisi->anggaran->kode_akun ?? '',
-                'pagu_sebelum'     => format_rupiah($revisi->pagu_sebelum),
-                'pagu_sesudah'     => format_rupiah($revisi->pagu_sesudah),
-                'selisih_raw'      => $selisih,
-                'selisih'          => ($selisih > 0 ? '+' : '') . format_rupiah($selisih),
-                'selisih_class'    => $selisih > 0 ? 'naik' : ($selisih < 0 ? 'turun' : 'netral'),
-                'dokumen'          => $revisi->dokumen_pendukung ? route('anggaran.revisi.download-dokumen', $revisi) : null,
-                'show_url'         => route('anggaran.revisi.show', $revisi),
-                'delete_url'       => route('anggaran.revisi.destroy', $revisi),
+            $stats = [
+                'total'   => $statsQuery->count(),
+                'naik'    => (clone $statsQuery)->whereColumn('pagu_sesudah', '>', 'pagu_sebelum')->count(),
+                'turun'   => (clone $statsQuery)->whereColumn('pagu_sesudah', '<', 'pagu_sebelum')->count(),
+                'selisih' => (clone $statsQuery)->selectRaw('SUM(pagu_sesudah - pagu_sebelum) as net')->value('net') ?? 0,
             ];
-        });
 
-        return response()->json([
-            'rows'         => $rows,
-            'total'        => $revisis->total(),
-            'stats'        => $stats,
-            'pagination'   => $revisis->links()->toHtml(),
-            'current_page' => $revisis->currentPage(),
-            'last_page'    => $revisis->lastPage(),
-        ]);
+            $rows = $revisis->getCollection()->map(function ($revisi, $index) use ($revisis) {
+                $selisih = $revisi->pagu_sesudah - $revisi->pagu_sebelum;
+                return [
+                    'id'               => $revisi->id,
+                    'no'               => ($revisis->currentPage() - 1) * $revisis->perPage() + $index + 1,
+                    'tanggal'          => formatTanggalIndo($revisi->tanggal_revisi),
+                    'user'             => $revisi->user->nama ?? '-',
+                    'jenis_revisi'     => $revisi->jenis_revisi,
+                    'program_kegiatan' => truncate_text($revisi->anggaran->program_kegiatan ?? '-', 45),
+                    'ro'               => $revisi->anggaran->ro ?? '',
+                    'kode_akun'        => $revisi->anggaran->kode_akun ?? '',
+                    'pagu_sebelum'     => format_rupiah($revisi->pagu_sebelum),
+                    'pagu_sesudah'     => format_rupiah($revisi->pagu_sesudah),
+                    'selisih_raw'      => $selisih,
+                    'selisih'          => ($selisih > 0 ? '+' : '') . format_rupiah($selisih),
+                    'selisih_class'    => $selisih > 0 ? 'naik' : ($selisih < 0 ? 'turun' : 'netral'),
+                    'dokumen'          => $revisi->dokumen_pendukung ? route('anggaran.revisi.download-dokumen', $revisi) : null,
+                    'show_url'         => route('anggaran.revisi.show', $revisi),
+                    'delete_url'       => route('anggaran.revisi.destroy', $revisi),
+                ];
+            });
+
+            return response()->json([
+                'rows'         => $rows,
+                'total'        => $revisis->total(),
+                'stats'        => $stats,
+                'pagination'   => $revisis->links()->toHtml(),
+                'current_page' => $revisis->currentPage(),
+                'last_page'    => $revisis->lastPage(),
+            ]);
+        } catch (\Exception $e) {
+            return $this->handleExceptionJson($e, 'Gagal mengambil data revisi anggaran.', 500, [
+                'action' => 'fetchData',
+            ]);
+        }
     }
 
     public function create()
     {
-        $anggarans   = Anggaran::whereNotNull('kode_akun')
-            ->orderBy('ro')
-            ->orderBy('kode_subkomponen')
-            ->orderBy('kode_akun')
-            ->get();
+        $anggarans   = Anggaran::whereNotNull('kode_akun')->orderBy('ro')->orderBy('kode_subkomponen')->orderBy('kode_akun')->get();
         $jenisRevisi = ['POK', 'DIPA', 'Revisi Anggaran', 'Pergeseran'];
         return view('anggaran.revisi.create', compact('anggarans', 'jenisRevisi'));
     }
@@ -142,11 +141,20 @@ class RevisiAnggaranController extends Controller
             RevisiAnggaran::create($validated);
             $this->anggaranService->updatePaguFromRevisi($anggaran, (float) $validated['pagu_sesudah']);
             DB::commit();
+
             return redirect()->route('anggaran.revisi.index')
-                ->with('success', 'Revisi anggaran berhasil disimpan');
+                ->with('success', 'Revisi anggaran berhasil disimpan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withInput()->with('error', 'Gagal menyimpan revisi: ' . $e->getMessage());
+            // Hapus file yang sudah terupload jika transaksi gagal
+            if (isset($validated['dokumen_pendukung'])) {
+                Storage::disk('public')->delete($validated['dokumen_pendukung']);
+            }
+            $this->handleException($e, 'Gagal menyimpan revisi anggaran.', [
+                'action'      => 'store',
+                'anggaran_id' => $validated['anggaran_id'],
+            ]);
+            return back()->withInput()->with('error', 'Gagal menyimpan revisi anggaran. Silakan coba lagi.');
         }
     }
 
@@ -182,24 +190,40 @@ class RevisiAnggaranController extends Controller
         try {
             $anggaran = $revisi->anggaran;
             $this->anggaranService->updatePaguFromRevisi($anggaran, $revisi->pagu_sebelum);
+
             if ($revisi->dokumen_pendukung) {
                 Storage::disk('public')->delete($revisi->dokumen_pendukung);
             }
+
             $revisi->delete();
             DB::commit();
+
             return redirect()->route('anggaran.revisi.index')
                 ->with('success', 'Revisi berhasil dibatalkan dan pagu dikembalikan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menghapus revisi: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal menghapus revisi anggaran.', [
+                'action'    => 'destroy',
+                'revisi_id' => $revisi->id,
+            ]);
+            return back()->with('error', 'Gagal membatalkan revisi. Silakan coba lagi.');
         }
     }
 
     public function downloadDokumen(RevisiAnggaran $revisi)
     {
         if (!$revisi->dokumen_pendukung || !Storage::disk('public')->exists($revisi->dokumen_pendukung)) {
-            return back()->with('error', 'Dokumen tidak ditemukan');
+            return back()->with('error', 'Dokumen tidak ditemukan.');
         }
-        return Storage::disk('public')->download($revisi->dokumen_pendukung);
+
+        try {
+            return Storage::disk('public')->download($revisi->dokumen_pendukung);
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal mendownload dokumen revisi.', [
+                'action'    => 'downloadDokumen',
+                'revisi_id' => $revisi->id,
+            ]);
+            return back()->with('error', 'Gagal mendownload dokumen. Silakan coba lagi.');
+        }
     }
 }

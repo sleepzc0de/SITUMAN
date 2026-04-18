@@ -17,12 +17,10 @@ class DataAnggaranController extends Controller
     {
         $query = Anggaran::query();
 
-        // Filter by RO
         if ($request->has('ro') && $request->ro !== 'all') {
             $query->where('ro', $request->ro);
         }
 
-        // Filter by level (parent/child)
         if ($request->has('level')) {
             if ($request->level === 'ro') {
                 $query->whereNull('kode_subkomponen')->whereNull('kode_akun');
@@ -33,7 +31,6 @@ class DataAnggaranController extends Controller
             }
         }
 
-        // Search
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -48,7 +45,6 @@ class DataAnggaranController extends Controller
             ->orderBy('kode_akun')
             ->paginate(20);
 
-        // Get RO list for filter
         $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
         return view('anggaran.data.index', compact('anggarans', 'roList'));
@@ -57,8 +53,6 @@ class DataAnggaranController extends Controller
     public function create()
     {
         $roList = ['Z06', '403', '405', '994'];
-
-        // Get existing parent items
         $roParents = Anggaran::whereNull('kode_subkomponen')->whereNull('kode_akun')->get();
         $subkomponenParents = Anggaran::whereNotNull('kode_subkomponen')->whereNull('kode_akun')->get();
 
@@ -68,69 +62,50 @@ class DataAnggaranController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'kegiatan' => 'required|string|max:50',
-            'kro' => 'required|string|max:50',
-            'ro' => 'required|string|max:50',
+            'kegiatan'         => 'required|string|max:50',
+            'kro'              => 'required|string|max:50',
+            'ro'               => 'required|string|max:50',
             'kode_subkomponen' => 'nullable|string|max:50',
-            'kode_akun' => 'nullable|string|max:50',
+            'kode_akun'        => 'nullable|string|max:50',
             'program_kegiatan' => 'required|string',
-            'pic' => 'required|string|max:100',
-            'pagu_anggaran' => $request->kode_akun ? 'required|numeric|min:0' : 'nullable',
+            'pic'              => 'required|string|max:100',
+            'pagu_anggaran'    => $request->kode_akun ? 'required|numeric|min:0' : 'nullable',
         ]);
 
         DB::beginTransaction();
         try {
-            // Generate referensi
             $baseRef = $validated['kegiatan'] . $validated['kro'] . $validated['ro'];
-            $validated['referensi'] = $baseRef;
+            $validated['referensi']  = $baseRef;
             $validated['referensi2'] = $baseRef;
             $validated['ref_output'] = $baseRef;
-            $validated['len'] = strlen($baseRef);
+            $validated['len']        = strlen($baseRef);
 
             if (!empty($validated['kode_subkomponen'])) {
-                $validated['referensi'] .= $validated['kode_subkomponen'];
-                $validated['referensi2'] = $baseRef . $validated['kode_subkomponen'];
-                $validated['len'] = strlen($validated['referensi2']);
+                $validated['referensi']  .= $validated['kode_subkomponen'];
+                $validated['referensi2']  = $baseRef . $validated['kode_subkomponen'];
+                $validated['len']         = strlen($validated['referensi2']);
             }
 
             if (!empty($validated['kode_akun'])) {
                 $validated['referensi'] .= $validated['kode_akun'];
-                $validated['len'] = strlen($validated['referensi']);
+                $validated['len']        = strlen($validated['referensi']);
             }
 
-            // Set pagu anggaran
             if (empty($validated['kode_akun'])) {
                 $validated['pagu_anggaran'] = 0;
             }
 
-            // Set initial values
-            $validated['sisa'] = $validated['pagu_anggaran'];
-            $validated['total_penyerapan'] = 0;
-            $validated['tagihan_outstanding'] = 0;
+            $validated['sisa']                 = $validated['pagu_anggaran'];
+            $validated['total_penyerapan']      = 0;
+            $validated['tagihan_outstanding']   = 0;
 
-            // Set bulan to 0
-            foreach (
-                [
-                    'januari',
-                    'februari',
-                    'maret',
-                    'april',
-                    'mei',
-                    'juni',
-                    'juli',
-                    'agustus',
-                    'september',
-                    'oktober',
-                    'november',
-                    'desember'
-                ] as $bulan
-            ) {
+            foreach (['januari','februari','maret','april','mei','juni',
+                      'juli','agustus','september','oktober','november','desember'] as $bulan) {
                 $validated[$bulan] = 0;
             }
 
             $anggaran = Anggaran::create($validated);
 
-            // Update parent totals if this is a child item (level Akun)
             if (!empty($validated['kode_akun'])) {
                 $this->updateParentTotals($anggaran);
             }
@@ -138,23 +113,23 @@ class DataAnggaranController extends Controller
             DB::commit();
 
             return redirect()->route('anggaran.data.index')
-                ->with('success', 'Data anggaran berhasil ditambahkan');
+                ->with('success', 'Data anggaran berhasil ditambahkan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()
-                ->withInput()
-                ->with('error', 'Gagal menambahkan data anggaran: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal menambahkan data anggaran.', [
+                'action'    => 'store',
+                'validated' => array_keys($validated),
+            ]);
+            return back()->withInput()->with('error', 'Gagal menambahkan data anggaran. Silakan coba lagi.');
         }
     }
 
     public function show(Anggaran $data)
     {
-        // Get children if this is a parent item
         $children = null;
 
         if (!$data->kode_akun) {
             if (!$data->kode_subkomponen) {
-                // RO level - get all subkomponen
                 $children = Anggaran::where('kegiatan', $data->kegiatan)
                     ->where('kro', $data->kro)
                     ->where('ro', $data->ro)
@@ -162,7 +137,6 @@ class DataAnggaranController extends Controller
                     ->whereNull('kode_akun')
                     ->get();
             } else {
-                // Subkomponen level - get all akun
                 $children = Anggaran::where('kegiatan', $data->kegiatan)
                     ->where('kro', $data->kro)
                     ->where('ro', $data->ro)
@@ -178,32 +152,24 @@ class DataAnggaranController extends Controller
     public function edit(Anggaran $data)
     {
         $roList = ['Z06', '403', '405', '994'];
-
         return view('anggaran.data.edit', compact('data', 'roList'));
     }
 
     public function update(Request $request, Anggaran $data)
     {
-        // PERBAIKAN: Validation rules yang dinamis berdasarkan level yang sedang diedit
         $rules = [
-            'kegiatan' => 'required|string|max:50',
-            'kro' => 'required|string|max:50',
-            'ro' => 'required|string|max:50',
+            'kegiatan'         => 'required|string|max:50',
+            'kro'              => 'required|string|max:50',
+            'ro'               => 'required|string|max:50',
             'program_kegiatan' => 'required|string',
-            'pic' => 'required|string|max:100',
+            'pic'              => 'required|string|max:100',
         ];
 
-        // Tambahkan rules untuk kode_subkomponen dan kode_akun hanya jika ada di data
         if ($data->kode_subkomponen) {
             $rules['kode_subkomponen'] = 'nullable|string|max:50';
         }
-
         if ($data->kode_akun) {
-            $rules['kode_akun'] = 'nullable|string|max:50';
-        }
-
-        // Pagu hanya required untuk level Akun
-        if ($data->kode_akun) {
+            $rules['kode_akun']     = 'nullable|string|max:50';
             $rules['pagu_anggaran'] = 'required|numeric|min:0';
         }
 
@@ -213,50 +179,40 @@ class DataAnggaranController extends Controller
         try {
             $selisihPagu = 0;
 
-            // Hanya update pagu jika level Akun
             if ($data->kode_akun) {
-                $oldPagu = $data->pagu_anggaran;
-                $newPagu = $validated['pagu_anggaran'];
+                $oldPagu     = $data->pagu_anggaran;
+                $newPagu     = $validated['pagu_anggaran'];
                 $selisihPagu = $newPagu - $oldPagu;
-
-                // Update sisa anggaran
                 $validated['sisa'] = $data->sisa + $selisihPagu;
             } else {
-                // Untuk RO dan SubKomponen, hapus pagu dari validated
                 unset($validated['pagu_anggaran']);
             }
 
-            // PERBAIKAN: Ensure kode_subkomponen dan kode_akun tetap ada di validated
-            // Jika tidak ada di request, ambil dari data yang ada
             if ($data->kode_subkomponen && !isset($validated['kode_subkomponen'])) {
                 $validated['kode_subkomponen'] = $data->kode_subkomponen;
             }
-
             if ($data->kode_akun && !isset($validated['kode_akun'])) {
                 $validated['kode_akun'] = $data->kode_akun;
             }
 
-            // Regenerate referensi
             $baseRef = $validated['kegiatan'] . $validated['kro'] . $validated['ro'];
-            $validated['referensi'] = $baseRef;
+            $validated['referensi']  = $baseRef;
             $validated['referensi2'] = $baseRef;
             $validated['ref_output'] = $baseRef;
-            $validated['len'] = strlen($baseRef);
+            $validated['len']        = strlen($baseRef);
 
             if (!empty($validated['kode_subkomponen'])) {
-                $validated['referensi'] .= $validated['kode_subkomponen'];
-                $validated['referensi2'] = $baseRef . $validated['kode_subkomponen'];
-                $validated['len'] = strlen($validated['referensi2']);
+                $validated['referensi']  .= $validated['kode_subkomponen'];
+                $validated['referensi2']  = $baseRef . $validated['kode_subkomponen'];
+                $validated['len']         = strlen($validated['referensi2']);
             }
-
             if (!empty($validated['kode_akun'])) {
                 $validated['referensi'] .= $validated['kode_akun'];
-                $validated['len'] = strlen($validated['referensi']);
+                $validated['len']        = strlen($validated['referensi']);
             }
 
             $data->update($validated);
 
-            // Update parent totals if pagu changed (hanya untuk level Akun)
             if ($selisihPagu != 0 && $data->kode_akun) {
                 $this->updateParentPaguAfterEdit($data, $selisihPagu);
             }
@@ -264,16 +220,14 @@ class DataAnggaranController extends Controller
             DB::commit();
 
             return redirect()->route('anggaran.data.index')
-                ->with('success', 'Data anggaran berhasil diupdate');
+                ->with('success', 'Data anggaran berhasil diupdate.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error updating anggaran: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'data_id' => $data->id
+            $this->handleException($e, 'Gagal mengupdate data anggaran.', [
+                'action'  => 'update',
+                'data_id' => $data->id,
             ]);
-            return back()
-                ->withInput()
-                ->with('error', 'Gagal mengupdate data anggaran: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Gagal mengupdate data anggaran. Silakan coba lagi.');
         }
     }
 
@@ -281,17 +235,14 @@ class DataAnggaranController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Check if this item has children
             if (!$data->kode_akun) {
                 if (!$data->kode_subkomponen) {
-                    // RO level - check subkomponen
                     $hasChildren = Anggaran::where('kegiatan', $data->kegiatan)
                         ->where('kro', $data->kro)
                         ->where('ro', $data->ro)
                         ->whereNotNull('kode_subkomponen')
                         ->exists();
                 } else {
-                    // Subkomponen level - check akun
                     $hasChildren = Anggaran::where('kegiatan', $data->kegiatan)
                         ->where('kro', $data->kro)
                         ->where('ro', $data->ro)
@@ -301,18 +252,16 @@ class DataAnggaranController extends Controller
                 }
 
                 if ($hasChildren) {
-                    return back()->with('error', 'Tidak dapat menghapus item yang masih memiliki child items');
+                    return back()->with('error', 'Tidak dapat menghapus item yang masih memiliki sub-item.');
                 }
             }
 
-            // Check if has realisasi
             if ($data->total_penyerapan > 0 || $data->tagihan_outstanding > 0) {
-                return back()->with('error', 'Tidak dapat menghapus item yang sudah memiliki realisasi');
+                return back()->with('error', 'Tidak dapat menghapus item yang sudah memiliki realisasi.');
             }
 
             $data->delete();
 
-            // Update parent totals if this was a child item
             if ($data->kode_akun) {
                 $this->updateParentPaguAfterEdit($data, -$data->pagu_anggaran);
             }
@@ -320,115 +269,15 @@ class DataAnggaranController extends Controller
             DB::commit();
 
             return redirect()->route('anggaran.data.index')
-                ->with('success', 'Data anggaran berhasil dihapus');
+                ->with('success', 'Data anggaran berhasil dihapus.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menghapus data anggaran: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal menghapus data anggaran.', [
+                'action'  => 'destroy',
+                'data_id' => $data->id,
+            ]);
+            return back()->with('error', 'Gagal menghapus data anggaran. Silakan coba lagi.');
         }
-    }
-
-    /**
-     * Update parent totals when adding new child
-     */
-    private function updateParentTotals(Anggaran $anggaran)
-    {
-        // Update subkomponen level
-        $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)
-            ->where('kro', $anggaran->kro)
-            ->where('ro', $anggaran->ro)
-            ->where('kode_subkomponen', $anggaran->kode_subkomponen)
-            ->whereNull('kode_akun')
-            ->first();
-
-        if ($subkomp) {
-            $totalPagu = Anggaran::where('kegiatan', $anggaran->kegiatan)
-                ->where('kro', $anggaran->kro)
-                ->where('ro', $anggaran->ro)
-                ->where('kode_subkomponen', $anggaran->kode_subkomponen)
-                ->whereNotNull('kode_akun')
-                ->sum('pagu_anggaran');
-
-            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)
-                ->where('kro', $anggaran->kro)
-                ->where('ro', $anggaran->ro)
-                ->where('kode_subkomponen', $anggaran->kode_subkomponen)
-                ->whereNotNull('kode_akun')
-                ->sum('total_penyerapan');
-
-            $subkomp->pagu_anggaran = $totalPagu;
-            $subkomp->total_penyerapan = $totalRealisasi;
-            $subkomp->sisa = $totalPagu - $totalRealisasi;
-            $subkomp->save();
-        }
-
-        // Update RO level
-        $ro = Anggaran::where('kegiatan', $anggaran->kegiatan)
-            ->where('kro', $anggaran->kro)
-            ->where('ro', $anggaran->ro)
-            ->whereNull('kode_subkomponen')
-            ->first();
-
-        if ($ro) {
-            $totalPagu = Anggaran::where('kegiatan', $anggaran->kegiatan)
-                ->where('kro', $anggaran->kro)
-                ->where('ro', $anggaran->ro)
-                ->whereNotNull('kode_subkomponen')
-                ->whereNull('kode_akun')
-                ->sum('pagu_anggaran');
-
-            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)
-                ->where('kro', $anggaran->kro)
-                ->where('ro', $anggaran->ro)
-                ->whereNotNull('kode_subkomponen')
-                ->whereNull('kode_akun')
-                ->sum('total_penyerapan');
-
-            $ro->pagu_anggaran = $totalPagu;
-            $ro->total_penyerapan = $totalRealisasi;
-            $ro->sisa = $totalPagu - $totalRealisasi;
-            $ro->save();
-        }
-    }
-
-    /**
-     * Update parent pagu after edit/delete
-     */
-    private function updateParentPaguAfterEdit(Anggaran $anggaran, $selisih)
-    {
-        // Update subkomponen level
-        $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)
-            ->where('kro', $anggaran->kro)
-            ->where('ro', $anggaran->ro)
-            ->where('kode_subkomponen', $anggaran->kode_subkomponen)
-            ->whereNull('kode_akun')
-            ->first();
-
-        if ($subkomp) {
-            $subkomp->pagu_anggaran += $selisih;
-            $subkomp->sisa += $selisih;
-            $subkomp->save();
-        }
-
-        // Update RO level
-        $ro = Anggaran::where('kegiatan', $anggaran->kegiatan)
-            ->where('kro', $anggaran->kro)
-            ->where('ro', $anggaran->ro)
-            ->whereNull('kode_subkomponen')
-            ->first();
-
-        if ($ro) {
-            $ro->pagu_anggaran += $selisih;
-            $ro->sisa += $selisih;
-            $ro->save();
-        }
-    }
-
-    /**
-     * Import from Excel
-     */
-    public function importForm()
-    {
-        return view('anggaran.data.import');
     }
 
     public function import(Request $request)
@@ -444,83 +293,43 @@ class DataAnggaranController extends Controller
             $message = "Import berhasil! {$import->imported} data baru ditambahkan, {$import->updated} data diperbarui.";
 
             if (!empty($import->errors)) {
-                $errorList = implode('<br>', $import->errors);
+                $errorList = implode('<br>', array_map('e', $import->errors));
                 return back()->with('warning', $message . "<br><strong>Peringatan:</strong><br>{$errorList}");
             }
 
             return back()->with('success', $message);
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $failures = $e->failures();
-            $errors = [];
+            $errors   = [];
             foreach ($failures as $failure) {
                 $errors[] = "Baris {$failure->row()}: " . implode(', ', $failure->errors());
             }
-            return back()->with('error', 'Validasi gagal:<br>' . implode('<br>', $errors));
+            return back()->with('error', 'Validasi gagal:<br>' . implode('<br>', array_map('e', $errors)));
         } catch (\Exception $e) {
-            Log::error('Import anggaran error: ' . $e->getMessage());
-            return back()->with('error', 'Gagal import: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal import data anggaran.', ['action' => 'import']);
+            return back()->with('error', 'Gagal melakukan import. Pastikan format file sesuai template.');
         }
     }
 
-
-    /**
-     * Export to Excel
-     */
     public function export(Request $request)
     {
-        $ro    = $request->get('ro');
-        $level = $request->get('level');
-        $filename = 'data_anggaran_' . date('Ymd_His') . '.xlsx';
+        try {
+            $ro       = $request->get('ro');
+            $level    = $request->get('level');
+            $filename = 'data_anggaran_' . date('Ymd_His') . '.xlsx';
 
-        return Excel::download(new DataAnggaranExport($ro, $level), $filename);
+            return Excel::download(new DataAnggaranExport($ro, $level), $filename);
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal export data anggaran.', ['action' => 'export']);
+            return back()->with('error', 'Gagal melakukan export. Silakan coba lagi.');
+        }
     }
 
-    public function downloadTemplate()
-    {
-        // Buat template Excel dengan contoh data
-        return Excel::download(new class implements
-            \Maatwebsite\Excel\Concerns\FromArray,
-            \Maatwebsite\Excel\Concerns\WithHeadings,
-            \Maatwebsite\Excel\Concerns\WithStyles,
-            \Maatwebsite\Excel\Concerns\WithColumnWidths
-        {
-            public function array(): array
-            {
-                return [
-                    ['4753', 'EBA', '403', 'AA', '521211', 'Belanja Keperluan Perkantoran', 'SJ.7', 5000000],
-                    ['4753', 'EBA', '403', 'AA', '',       'Sub Komponen AA - Uraian',       'SJ.7', 0],
-                    ['4753', 'EBA', '403', '',   '',       'RO 403 - Uraian RO',             'SJ.7', 0],
-                ];
-            }
-
-            public function headings(): array
-            {
-                return ['kegiatan', 'kro', 'ro', 'kode_subkomponen', 'kode_akun', 'program_kegiatan', 'pic', 'pagu_anggaran'];
-            }
-
-            public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
-            {
-                return [1 => ['font' => ['bold' => true]]];
-            }
-
-            public function columnWidths(): array
-            {
-                return ['A' => 12, 'B' => 8, 'C' => 8, 'D' => 18, 'E' => 12, 'F' => 50, 'G' => 12, 'H' => 18];
-            }
-        }, 'template_anggaran.xlsx');
-    }
-
-
-    /**
-     * Get subkomponen list berdasarkan RO (untuk AJAX)
-     */
     public function getSubkomponen(Request $request)
     {
         try {
-            Log::info('DataAnggaran getSubkomponen called', ['ro' => $request->ro]);
-
             if (!$request->ro) {
-                return response()->json(['error' => 'RO harus diisi'], 400);
+                return response()->json(['error' => 'RO harus diisi.'], 400);
             }
 
             $subkomponens = Anggaran::where('ro', $request->ro)
@@ -531,58 +340,143 @@ class DataAnggaranController extends Controller
                 ->orderBy('kode_subkomponen')
                 ->get(['kode_subkomponen', 'program_kegiatan']);
 
-            Log::info('DataAnggaran getSubkomponen result', [
-                'count' => $subkomponens->count(),
-                'data' => $subkomponens->toArray()
-            ]);
-
             return response()->json($subkomponens);
         } catch (\Exception $e) {
-            Log::error('DataAnggaran getSubkomponen error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+            return $this->handleExceptionJson($e, 'Gagal mengambil data subkomponen.', 500, [
+                'action' => 'getSubkomponen',
+                'ro'     => $request->ro,
             ]);
-            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
+    public function importForm()
+    {
+        return view('anggaran.data.import');
+    }
+
+    public function downloadTemplate()
+    {
+        try {
+            return Excel::download(new class implements
+                \Maatwebsite\Excel\Concerns\FromArray,
+                \Maatwebsite\Excel\Concerns\WithHeadings,
+                \Maatwebsite\Excel\Concerns\WithStyles,
+                \Maatwebsite\Excel\Concerns\WithColumnWidths
+            {
+                public function array(): array
+                {
+                    return [
+                        ['4753', 'EBA', '403', 'AA', '521211', 'Belanja Keperluan Perkantoran', 'SJ.7', 5000000],
+                        ['4753', 'EBA', '403', 'AA', '',       'Sub Komponen AA - Uraian',      'SJ.7', 0],
+                        ['4753', 'EBA', '403', '',   '',       'RO 403 - Uraian RO',            'SJ.7', 0],
+                    ];
+                }
+                public function headings(): array
+                {
+                    return ['kegiatan', 'kro', 'ro', 'kode_subkomponen', 'kode_akun', 'program_kegiatan', 'pic', 'pagu_anggaran'];
+                }
+                public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
+                {
+                    return [1 => ['font' => ['bold' => true]]];
+                }
+                public function columnWidths(): array
+                {
+                    return ['A' => 12, 'B' => 8, 'C' => 8, 'D' => 18, 'E' => 12, 'F' => 50, 'G' => 12, 'H' => 18];
+                }
+            }, 'template_anggaran.xlsx');
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal mengunduh template anggaran.');
+            return back()->with('error', 'Gagal mengunduh template. Silakan coba lagi.');
+        }
+    }
 
     public function summary(Request $request)
     {
-        $tahun = $request->get('tahun', date('Y'));
+        try {
+            $tahun = $request->get('tahun', date('Y'));
 
-        // Summary per RO
-        $summaryRO = Anggaran::whereNull('kode_subkomponen')
-            ->whereNull('kode_akun')
-            ->orderBy('ro')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'ro'              => $item->ro,
-                    'nama'            => get_ro_name($item->ro),
-                    'pagu'            => $item->pagu_anggaran,
-                    'realisasi'       => $item->total_penyerapan,
-                    'outstanding'     => $item->tagihan_outstanding,
-                    'sisa'            => $item->sisa,
-                    'persen_serap'    => $item->persentase_penyerapan,
-                    'status'          => $item->status_anggaran,
-                ];
-            });
+            $summaryRO = Anggaran::whereNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->orderBy('ro')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'ro'           => $item->ro,
+                        'nama'         => get_ro_name($item->ro),
+                        'pagu'         => $item->pagu_anggaran,
+                        'realisasi'    => $item->total_penyerapan,
+                        'outstanding'  => $item->tagihan_outstanding,
+                        'sisa'         => $item->sisa,
+                        'persen_serap' => $item->persentase_penyerapan,
+                        'status'       => $item->status_anggaran,
+                    ];
+                });
 
-        // Total keseluruhan
-        $totals = Anggaran::whereNull('kode_subkomponen')
+            $totals = Anggaran::whereNull('kode_subkomponen')
+                ->whereNull('kode_akun')
+                ->selectRaw('SUM(pagu_anggaran) as total_pagu, SUM(total_penyerapan) as total_realisasi, SUM(tagihan_outstanding) as total_outstanding, SUM(sisa) as total_sisa')
+                ->first();
+
+            $bulanFields  = ['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'];
+            $selectFields = implode(', ', array_map(fn($b) => "SUM({$b}) as {$b}", $bulanFields));
+
+            $realisasiPerBulan = Anggaran::whereNotNull('kode_akun')
+                ->selectRaw($selectFields)
+                ->first();
+
+            return view('anggaran.data.summary', compact('summaryRO', 'totals', 'realisasiPerBulan', 'tahun'));
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal memuat halaman summary anggaran.');
+            return back()->with('error', 'Gagal memuat data summary. Silakan coba lagi.');
+        }
+    }
+
+    // ── Private Methods ──────────────────────────────────────────
+
+    private function updateParentTotals(Anggaran $anggaran): void
+    {
+        $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)
+            ->where('kro', $anggaran->kro)
+            ->where('ro', $anggaran->ro)
+            ->where('kode_subkomponen', $anggaran->kode_subkomponen)
             ->whereNull('kode_akun')
-            ->selectRaw('SUM(pagu_anggaran) as total_pagu, SUM(total_penyerapan) as total_realisasi, SUM(tagihan_outstanding) as total_outstanding, SUM(sisa) as total_sisa')
             ->first();
 
-        // Realisasi per bulan (dari akun)
-        $bulanFields = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
-        $selectFields = implode(', ', array_map(fn($b) => "SUM({$b}) as {$b}", $bulanFields));
+        if ($subkomp) {
+            $totalPagu      = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->where('kode_subkomponen', $anggaran->kode_subkomponen)->whereNotNull('kode_akun')->sum('pagu_anggaran');
+            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->where('kode_subkomponen', $anggaran->kode_subkomponen)->whereNotNull('kode_akun')->sum('total_penyerapan');
+            $subkomp->pagu_anggaran    = $totalPagu;
+            $subkomp->total_penyerapan = $totalRealisasi;
+            $subkomp->sisa             = $totalPagu - $totalRealisasi;
+            $subkomp->save();
+        }
 
-        $realisasiPerBulan = Anggaran::whereNotNull('kode_akun')
-            ->selectRaw($selectFields)
-            ->first();
+        $ro = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->whereNull('kode_subkomponen')->first();
 
-        return view('anggaran.data.summary', compact('summaryRO', 'totals', 'realisasiPerBulan', 'tahun'));
+        if ($ro) {
+            $totalPagu      = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->whereNotNull('kode_subkomponen')->whereNull('kode_akun')->sum('pagu_anggaran');
+            $totalRealisasi = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->whereNotNull('kode_subkomponen')->whereNull('kode_akun')->sum('total_penyerapan');
+            $ro->pagu_anggaran    = $totalPagu;
+            $ro->total_penyerapan = $totalRealisasi;
+            $ro->sisa             = $totalPagu - $totalRealisasi;
+            $ro->save();
+        }
+    }
+
+    private function updateParentPaguAfterEdit(Anggaran $anggaran, $selisih): void
+    {
+        $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->where('kode_subkomponen', $anggaran->kode_subkomponen)->whereNull('kode_akun')->first();
+        if ($subkomp) {
+            $subkomp->pagu_anggaran += $selisih;
+            $subkomp->sisa          += $selisih;
+            $subkomp->save();
+        }
+
+        $ro = Anggaran::where('kegiatan', $anggaran->kegiatan)->where('kro', $anggaran->kro)->where('ro', $anggaran->ro)->whereNull('kode_subkomponen')->first();
+        if ($ro) {
+            $ro->pagu_anggaran += $selisih;
+            $ro->sisa          += $selisih;
+            $ro->save();
+        }
     }
 }

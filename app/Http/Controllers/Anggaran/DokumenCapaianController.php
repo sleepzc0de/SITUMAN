@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Anggaran/DokumenCapaianController.php
 
 namespace App\Http\Controllers\Anggaran;
 
@@ -8,7 +7,6 @@ use App\Models\Anggaran;
 use App\Models\DokumenCapaian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class DokumenCapaianController extends Controller
@@ -26,7 +24,6 @@ class DokumenCapaianController extends Controller
 
         $dokumens = $query->paginate(20);
 
-        // Jika request dari Alpine (AJAX), kembalikan JSON
         if ($request->boolean('json')) {
             $rows = $dokumens->getCollection()->map(fn($d) => [
                 'id'               => $d->id,
@@ -51,42 +48,18 @@ class DokumenCapaianController extends Controller
             ]);
         }
 
-        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
+        $roList    = Anggaran::select('ro')->distinct()->pluck('ro');
+        $bulanList = ['januari','februari','maret','april','mei','juni',
+                      'juli','agustus','september','oktober','november','desember'];
 
         return view('anggaran.dokumen.index', compact('dokumens', 'roList', 'bulanList'));
     }
 
     public function create()
     {
-        $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
+        $roList    = Anggaran::select('ro')->distinct()->pluck('ro');
+        $bulanList = ['januari','februari','maret','april','mei','juni',
+                      'juli','agustus','september','oktober','november','desember'];
 
         return view('anggaran.dokumen.create', compact('roList', 'bulanList'));
     }
@@ -122,10 +95,9 @@ class DokumenCapaianController extends Controller
             }
 
             if (empty($uploadedFiles)) {
-                return back()->withInput()->with('error', 'Minimal satu file harus diupload');
+                return back()->withInput()->with('error', 'Minimal satu file harus diupload.');
             }
 
-            // Auto-set anggaran_id dari SubKomponen jika tidak diisi
             if (empty($validated['anggaran_id'])) {
                 $subkomp = Anggaran::where('ro', $validated['ro'])
                     ->where('kode_subkomponen', $validated['sub_komponen'])
@@ -143,10 +115,14 @@ class DokumenCapaianController extends Controller
             DokumenCapaian::create($validated);
 
             return redirect()->route('anggaran.dokumen.index')
-                ->with('success', 'Dokumen capaian output berhasil diupload (' . count($uploadedFiles) . ' file)');
+                ->with('success', 'Dokumen capaian output berhasil diupload (' . count($uploadedFiles) . ' file).');
         } catch (\Exception $e) {
-            Log::error('DokumenCapaian store error: ' . $e->getMessage());
-            return back()->withInput()->with('error', 'Gagal mengupload dokumen: ' . $e->getMessage());
+            // Hapus file yang sudah terupload jika terjadi error
+            foreach ($uploadedFiles ?? [] as $uploaded) {
+                Storage::disk('public')->delete($uploaded['path'] ?? '');
+            }
+            $this->handleException($e, 'Gagal mengupload dokumen capaian.', ['action' => 'store']);
+            return back()->withInput()->with('error', 'Gagal mengupload dokumen. Silakan coba lagi.');
         }
     }
 
@@ -155,43 +131,38 @@ class DokumenCapaianController extends Controller
         try {
             $dokumen = DokumenCapaian::with(['user', 'anggaran'])->findOrFail($id);
 
-            // Ambil info anggaran subkomponen untuk ditampilkan
             $anggaranSubkomp = $dokumen->anggaran ?? Anggaran::where('ro', $dokumen->ro)
                 ->where('kode_subkomponen', $dokumen->sub_komponen)
                 ->whereNull('kode_akun')
                 ->first();
 
             return view('anggaran.dokumen.show', compact('dokumen', 'anggaranSubkomp'));
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()->route('anggaran.dokumen.index')
-                ->with('error', 'Dokumen tidak ditemukan');
+                ->with('error', 'Dokumen tidak ditemukan.');
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal memuat dokumen.', ['action' => 'show', 'id' => $id]);
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Gagal memuat dokumen. Silakan coba lagi.');
         }
     }
 
     public function edit($id)
     {
         try {
-            $dokumen  = DokumenCapaian::findOrFail($id);
-            $roList   = Anggaran::select('ro')->distinct()->pluck('ro');
-            $bulanList = [
-                'januari',
-                'februari',
-                'maret',
-                'april',
-                'mei',
-                'juni',
-                'juli',
-                'agustus',
-                'september',
-                'oktober',
-                'november',
-                'desember'
-            ];
+            $dokumen   = DokumenCapaian::findOrFail($id);
+            $roList    = Anggaran::select('ro')->distinct()->pluck('ro');
+            $bulanList = ['januari','februari','maret','april','mei','juni',
+                          'juli','agustus','september','oktober','november','desember'];
 
             return view('anggaran.dokumen.edit', compact('dokumen', 'roList', 'bulanList'));
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()->route('anggaran.dokumen.index')
-                ->with('error', 'Dokumen tidak ditemukan');
+                ->with('error', 'Dokumen tidak ditemukan.');
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal memuat form edit dokumen.', ['action' => 'edit', 'id' => $id]);
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Gagal memuat halaman. Silakan coba lagi.');
         }
     }
 
@@ -211,7 +182,6 @@ class DokumenCapaianController extends Controller
 
             $existingFiles = $dokumen->files ?? [];
 
-            // Hapus file yang dipilih
             if ($request->has('remove_files') && is_array($request->remove_files)) {
                 foreach ($request->remove_files as $fileIndex) {
                     if (isset($existingFiles[$fileIndex])) {
@@ -225,7 +195,6 @@ class DokumenCapaianController extends Controller
                 $existingFiles = array_values($existingFiles);
             }
 
-            // Upload file baru
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $file) {
                     $filename = time() . '_' . uniqid() . '_' .
@@ -241,7 +210,6 @@ class DokumenCapaianController extends Controller
                 }
             }
 
-            // Update anggaran_id jika RO/subkomponen berubah
             $subkomp = Anggaran::where('ro', $validated['ro'])
                 ->where('kode_subkomponen', $validated['sub_komponen'])
                 ->whereNull('kode_akun')
@@ -253,10 +221,13 @@ class DokumenCapaianController extends Controller
             $dokumen->update($validated);
 
             return redirect()->route('anggaran.dokumen.index')
-                ->with('success', 'Dokumen capaian output berhasil diupdate');
+                ->with('success', 'Dokumen capaian output berhasil diupdate.');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Dokumen tidak ditemukan.');
         } catch (\Exception $e) {
-            Log::error('DokumenCapaian update error: ' . $e->getMessage());
-            return back()->withInput()->with('error', 'Gagal mengupdate dokumen: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal mengupdate dokumen capaian.', ['action' => 'update', 'id' => $id]);
+            return back()->withInput()->with('error', 'Gagal mengupdate dokumen. Silakan coba lagi.');
         }
     }
 
@@ -274,11 +245,14 @@ class DokumenCapaianController extends Controller
             $dokumen->delete();
 
             return redirect()->route('anggaran.dokumen.index')
-                ->with('success', 'Dokumen capaian output berhasil dihapus');
-        } catch (\Exception $e) {
-            Log::error('DokumenCapaian destroy error: ' . $e->getMessage());
+                ->with('success', 'Dokumen capaian output berhasil dihapus.');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()->route('anggaran.dokumen.index')
-                ->with('error', 'Gagal menghapus dokumen: ' . $e->getMessage());
+                ->with('error', 'Dokumen tidak ditemukan.');
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal menghapus dokumen capaian.', ['action' => 'destroy', 'id' => $id]);
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Gagal menghapus dokumen. Silakan coba lagi.');
         }
     }
 
@@ -289,7 +263,8 @@ class DokumenCapaianController extends Controller
             $allFiles = $dokumen->getAllFiles();
 
             if (empty($allFiles)) {
-                throw new \Exception('Tidak ada file untuk didownload');
+                return redirect()->route('anggaran.dokumen.index')
+                    ->with('error', 'Tidak ada file untuk didownload.');
             }
 
             if (count($allFiles) === 1) {
@@ -297,22 +272,25 @@ class DokumenCapaianController extends Controller
                 $fullPath = storage_path('app/public/' . $file['path']);
 
                 if (!file_exists($fullPath)) {
-                    throw new \Exception('File tidak ditemukan');
+                    return redirect()->route('anggaran.dokumen.index')
+                        ->with('error', 'File tidak ditemukan.');
                 }
 
                 return response()->download($fullPath, $file['name']);
             }
 
-            // Multiple files: buat ZIP
-            $tempDir     = storage_path('app/temp');
-            if (!file_exists($tempDir)) mkdir($tempDir, 0755, true);
+            $tempDir = storage_path('app/temp');
+            if (!file_exists($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
 
             $zipFileName = 'dokumen_' . $dokumen->id . '_' . time() . '.zip';
             $zipPath     = $tempDir . '/' . $zipFileName;
 
             $zip = new \ZipArchive();
             if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-                throw new \Exception('Gagal membuat file ZIP');
+                return redirect()->route('anggaran.dokumen.index')
+                    ->with('error', 'Gagal membuat file ZIP. Silakan coba lagi.');
             }
 
             foreach ($allFiles as $file) {
@@ -325,10 +303,13 @@ class DokumenCapaianController extends Controller
             $zip->close();
 
             return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
-        } catch (\Exception $e) {
-            Log::error('DokumenCapaian download error: ' . $e->getMessage());
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return redirect()->route('anggaran.dokumen.index')
-                ->with('error', 'Gagal mendownload file: ' . $e->getMessage());
+                ->with('error', 'Dokumen tidak ditemukan.');
+        } catch (\Exception $e) {
+            $this->handleException($e, 'Gagal mendownload dokumen.', ['action' => 'download', 'id' => $id]);
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Gagal mendownload file. Silakan coba lagi.');
         }
     }
 
@@ -339,21 +320,26 @@ class DokumenCapaianController extends Controller
             $allFiles = $dokumen->getAllFiles();
 
             if (!isset($allFiles[$fileIndex])) {
-                throw new \Exception('File tidak ditemukan');
+                return redirect()->route('anggaran.dokumen.show', $id)
+                    ->with('error', 'File tidak ditemukan.');
             }
 
             $file     = $allFiles[$fileIndex];
             $fullPath = storage_path('app/public/' . $file['path']);
 
             if (!file_exists($fullPath)) {
-                throw new \Exception('File tidak ditemukan di server');
+                return redirect()->route('anggaran.dokumen.show', $id)
+                    ->with('error', 'File tidak ditemukan di server.');
             }
 
             return response()->download($fullPath, $file['name']);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return redirect()->route('anggaran.dokumen.index')
+                ->with('error', 'Dokumen tidak ditemukan.');
         } catch (\Exception $e) {
-            Log::error('DokumenCapaian downloadSingle error: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal mendownload file.', ['action' => 'downloadSingle', 'id' => $id]);
             return redirect()->route('anggaran.dokumen.show', $id)
-                ->with('error', 'Gagal mendownload file: ' . $e->getMessage());
+                ->with('error', 'Gagal mendownload file. Silakan coba lagi.');
         }
     }
 
@@ -361,10 +347,9 @@ class DokumenCapaianController extends Controller
     {
         try {
             if (!$request->ro) {
-                return response()->json(['error' => 'RO harus diisi'], 400);
+                return response()->json(['error' => 'RO harus diisi.'], 400);
             }
 
-            // Sertakan info sisa anggaran untuk referensi
             $subkomponens = Anggaran::where('ro', $request->ro)
                 ->whereNotNull('kode_subkomponen')
                 ->whereNull('kode_akun')
@@ -374,8 +359,9 @@ class DokumenCapaianController extends Controller
 
             return response()->json($subkomponens);
         } catch (\Exception $e) {
-            Log::error('DokumenCapaian getSubkomponen error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            return $this->handleExceptionJson($e, 'Gagal mengambil data subkomponen.', 500, [
+                'action' => 'getSubkomponen',
+            ]);
         }
     }
 }

@@ -6,9 +6,9 @@ class HttpMessages
 {
     public static function safe(int $statusCode): string
     {
-        return match($statusCode) {
+        return match ($statusCode) {
             400 => 'Permintaan tidak valid.',
-            401 => 'Autentikasi diperlukan.',
+            401 => 'Autentikasi diperlukan. Silakan login kembali.',
             403 => 'Anda tidak memiliki izin untuk melakukan tindakan ini.',
             404 => 'Halaman atau data yang diminta tidak ditemukan.',
             405 => 'Metode request tidak diizinkan.',
@@ -17,7 +17,7 @@ class HttpMessages
             429 => 'Terlalu banyak permintaan. Silakan coba beberapa saat lagi.',
             500 => 'Terjadi kesalahan pada sistem. Silakan coba beberapa saat lagi.',
             503 => 'Sistem sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.',
-            default => 'Terjadi kesalahan yang tidak diketahui.',
+            default => 'Terjadi kesalahan. Silakan coba beberapa saat lagi.',
         };
     }
 }

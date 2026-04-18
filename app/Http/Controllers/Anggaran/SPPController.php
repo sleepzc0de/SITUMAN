@@ -8,7 +8,6 @@ use App\Models\SPP;
 use App\Services\AnggaranService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class SPPController extends Controller
 {
@@ -36,25 +35,11 @@ class SPPController extends Controller
             });
         }
 
-        $spps = $query->orderBy('tgl_spp', 'desc')->paginate(20)->withQueryString();
+        $spps      = $query->orderBy('tgl_spp', 'desc')->paginate(20)->withQueryString();
+        $bulanList = ['januari','februari','maret','april','mei','juni',
+                      'juli','agustus','september','oktober','november','desember'];
+        $roList    = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
 
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
-        $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
-
-        // Statistik tetap ikut filter RO & bulan
         $statsQuery = SPP::query();
         if ($request->filled('bulan') && $request->bulan !== 'all') {
             $statsQuery->where('bulan', $request->bulan);
@@ -68,11 +53,10 @@ class SPPController extends Controller
         $totalSP2D      = (clone $statsQuery)->where('status', 'Tagihan Telah SP2D')->sum('netto');
         $totalBelumSP2D = (clone $statsQuery)->where('status', 'Tagihan Belum SP2D')->sum('netto');
 
-        // Jika AJAX request, return partial view
         if ($request->ajax()) {
             return response()->json([
-                'table' => view('anggaran.spp._table_content', compact('spps'))->render(),
-                'stats' => [
+                'table'  => view('anggaran.spp._table_content', compact('spps'))->render(),
+                'stats'  => [
                     'totalBruto'     => (float) $totalBruto,
                     'totalNetto'     => (float) $totalNetto,
                     'totalSP2D'      => (float) $totalSP2D,
@@ -87,35 +71,16 @@ class SPPController extends Controller
         }
 
         return view('anggaran.spp.index', compact(
-            'spps',
-            'bulanList',
-            'roList',
-            'totalBruto',
-            'totalNetto',
-            'totalSP2D',
-            'totalBelumSP2D'
+            'spps', 'bulanList', 'roList',
+            'totalBruto', 'totalNetto', 'totalSP2D', 'totalBelumSP2D'
         ));
     }
 
     public function create()
     {
-        $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
-
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
-
+        $roList       = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
+        $bulanList    = ['januari','februari','maret','april','mei','juni',
+                         'juli','agustus','september','oktober','november','desember'];
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
         $lsBendahara  = ['LS', 'Bendahara'];
 
@@ -128,29 +93,29 @@ class SPPController extends Controller
 
         DB::beginTransaction();
         try {
-            // Validasi sisa anggaran sebelum simpan
             $coa = $validated['kode_kegiatan'] . $validated['kro'] . $validated['ro'] . $validated['mak'];
             $this->validateSisaAnggaran($coa, (float) $validated['netto']);
 
             $spp = SPP::create($validated);
-
-            // Sync anggaran via service
             $this->anggaranService->syncFromSPP($spp->coa);
 
             DB::commit();
 
             return redirect()->route('anggaran.spp.index')
-                ->with('success', 'Data SPP berhasil ditambahkan');
+                ->with('success', 'Data SPP berhasil ditambahkan.');
+        } catch (\InvalidArgumentException $e) {
+            // Validasi bisnis (sisa anggaran tidak cukup) — pesan aman untuk ditampilkan
+            DB::rollBack();
+            return back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('SPP store error: ' . $e->getMessage());
-            return back()->withInput()->with('error', 'Gagal menambahkan data SPP: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal menambahkan data SPP.', ['action' => 'store']);
+            return back()->withInput()->with('error', 'Gagal menambahkan data SPP. Silakan coba lagi.');
         }
     }
 
     public function show(SPP $spp)
     {
-        // Load anggaran terkait untuk info sisa
         $anggaran = Anggaran::whereNotNull('kode_akun')
             ->whereRaw("CONCAT(kegiatan, kro, ro, kode_akun) = ?", [$spp->coa])
             ->first();
@@ -160,23 +125,9 @@ class SPPController extends Controller
 
     public function edit(SPP $spp)
     {
-        $roList = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
-
-        $bulanList = [
-            'januari',
-            'februari',
-            'maret',
-            'april',
-            'mei',
-            'juni',
-            'juli',
-            'agustus',
-            'september',
-            'oktober',
-            'november',
-            'desember'
-        ];
-
+        $roList      = Anggaran::select('ro')->distinct()->orderBy('ro')->pluck('ro');
+        $bulanList   = ['januari','februari','maret','april','mei','juni',
+                        'juli','agustus','september','oktober','november','desember'];
         $jenisBelanja = ['Kontraktual', 'Non Kontraktual', 'GUP', 'TUP'];
         $lsBendahara  = ['LS', 'Bendahara'];
 
@@ -192,13 +143,8 @@ class SPPController extends Controller
             ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan', 'pagu_anggaran', 'sisa']);
 
         return view('anggaran.spp.edit', compact(
-            'spp',
-            'roList',
-            'bulanList',
-            'jenisBelanja',
-            'lsBendahara',
-            'subkomponenList',
-            'akunList'
+            'spp', 'roList', 'bulanList', 'jenisBelanja',
+            'lsBendahara', 'subkomponenList', 'akunList'
         ));
     }
 
@@ -211,17 +157,14 @@ class SPPController extends Controller
             $oldCoa = $spp->coa;
             $newCoa = $validated['kode_kegiatan'] . $validated['kro'] . $validated['ro'] . $validated['mak'];
 
-            // Validasi sisa anggaran (exclude SPP ini dari perhitungan outstanding)
             $this->validateSisaAnggaran($newCoa, (float) $validated['netto'], $spp->id);
 
             $spp->update($validated);
 
-            // Pastikan COA terupdate
             if ($spp->coa !== $newCoa) {
                 $spp->update(['coa' => $newCoa]);
             }
 
-            // Sync anggaran: jika COA berubah, sync keduanya
             if ($oldCoa !== $newCoa) {
                 $this->anggaranService->syncFromSPP($oldCoa);
             }
@@ -230,11 +173,14 @@ class SPPController extends Controller
             DB::commit();
 
             return redirect()->route('anggaran.spp.index')
-                ->with('success', 'Data SPP berhasil diupdate');
+                ->with('success', 'Data SPP berhasil diupdate.');
+        } catch (\InvalidArgumentException $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', $e->getMessage());
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('SPP update error: ' . $e->getMessage());
-            return back()->withInput()->with('error', 'Gagal mengupdate data SPP: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal mengupdate data SPP.', ['action' => 'update', 'spp_id' => $spp->id]);
+            return back()->withInput()->with('error', 'Gagal mengupdate data SPP. Silakan coba lagi.');
         }
     }
 
@@ -243,19 +189,16 @@ class SPPController extends Controller
         DB::beginTransaction();
         try {
             $coa = $spp->coa;
-            $spp->delete(); // soft delete
-
-            // Sync anggaran setelah delete
+            $spp->delete();
             $this->anggaranService->syncFromSPP($coa);
-
             DB::commit();
 
             return redirect()->route('anggaran.spp.index')
-                ->with('success', 'Data SPP berhasil dihapus');
+                ->with('success', 'Data SPP berhasil dihapus.');
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('SPP destroy error: ' . $e->getMessage());
-            return back()->with('error', 'Gagal menghapus data SPP: ' . $e->getMessage());
+            $this->handleException($e, 'Gagal menghapus data SPP.', ['action' => 'destroy', 'spp_id' => $spp->id]);
+            return back()->with('error', 'Gagal menghapus data SPP. Silakan coba lagi.');
         }
     }
 
@@ -263,7 +206,7 @@ class SPPController extends Controller
     {
         try {
             if (!$request->ro) {
-                return response()->json(['error' => 'RO harus diisi'], 400);
+                return response()->json(['error' => 'RO harus diisi.'], 400);
             }
 
             $subkomponens = Anggaran::where('ro', $request->ro)
@@ -275,8 +218,9 @@ class SPPController extends Controller
 
             return response()->json($subkomponens);
         } catch (\Exception $e) {
-            Log::error('getSubkomponen error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            return $this->handleExceptionJson($e, 'Gagal mengambil data subkomponen.', 500, [
+                'action' => 'getSubkomponen',
+            ]);
         }
     }
 
@@ -284,7 +228,7 @@ class SPPController extends Controller
     {
         try {
             if (!$request->ro || !$request->subkomponen) {
-                return response()->json(['error' => 'RO dan Subkomponen harus diisi'], 400);
+                return response()->json(['error' => 'RO dan Subkomponen harus diisi.'], 400);
             }
 
             $akuns = Anggaran::where('ro', $request->ro)
@@ -293,7 +237,6 @@ class SPPController extends Controller
                 ->orderBy('kode_akun')
                 ->get(['kode_akun', 'kegiatan', 'kro', 'program_kegiatan', 'pagu_anggaran', 'sisa', 'tagihan_outstanding']);
 
-            // Tambahkan info sisa efektif di response
             $akuns->transform(function ($item) {
                 $item->sisa_efektif = $item->sisa - $item->tagihan_outstanding;
                 return $item;
@@ -301,12 +244,13 @@ class SPPController extends Controller
 
             return response()->json($akuns);
         } catch (\Exception $e) {
-            Log::error('getAkun error: ' . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            return $this->handleExceptionJson($e, 'Gagal mengambil data akun.', 500, [
+                'action' => 'getAkun',
+            ]);
         }
     }
 
-    // ==================== PRIVATE METHODS ====================
+    // ── Private Methods ──────────────────────────────────────────
 
     private function getValidationRules(Request $request, ?string $sppId = null): array
     {
@@ -347,6 +291,10 @@ class SPPController extends Controller
         ]);
     }
 
+    /**
+     * Validasi sisa anggaran — gunakan InvalidArgumentException
+     * agar pesan bisnis bisa ditampilkan ke user (bukan Exception generik).
+     */
     private function validateSisaAnggaran(string $coa, float $netto, ?string $excludeSppId = null): void
     {
         $anggaran = Anggaran::whereNotNull('kode_akun')
@@ -354,7 +302,7 @@ class SPPController extends Controller
             ->first();
 
         if (!$anggaran) {
-            throw new \Exception("COA {$coa} tidak ditemukan dalam data anggaran.");
+            throw new \InvalidArgumentException("COA tidak ditemukan dalam data anggaran. Pastikan data anggaran sudah diinput.");
         }
 
         $query = SPP::where('coa', $coa)
@@ -370,9 +318,9 @@ class SPPController extends Controller
 
         if ($netto > $sisaEfektif) {
             $fmt = fn($v) => 'Rp ' . number_format($v, 0, ',', '.');
-            throw new \Exception(
+            throw new \InvalidArgumentException(
                 "Nilai SPP ({$fmt($netto)}) melebihi sisa anggaran efektif ({$fmt($sisaEfektif)}). " .
-                    "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}"
+                "Sisa: {$fmt($anggaran->sisa)}, Outstanding: {$fmt($totalOutstanding)}."
             );
         }
     }
