@@ -6,9 +6,11 @@
 <nav aria-label="Breadcrumb">
     <ol class="breadcrumb">
         <li><a href="{{ route('anggaran.data.index') }}" class="breadcrumb-item">Kelola Data Anggaran</a></li>
-        <li><svg class="w-3.5 h-3.5 breadcrumb-sep" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></li>
+        <li><svg class="w-3.5 h-3.5 breadcrumb-sep" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></li>
         <li><a href="{{ route('anggaran.data.show', $data) }}" class="breadcrumb-item">Detail Anggaran</a></li>
-        <li><svg class="w-3.5 h-3.5 breadcrumb-sep" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></li>
+        <li><svg class="w-3.5 h-3.5 breadcrumb-sep" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></li>
         <li><span class="breadcrumb-current">Edit Data</span></li>
     </ol>
 </nav>
@@ -50,7 +52,11 @@
 <form action="{{ route('anggaran.data.update', $data) }}" method="POST" id="formEdit" novalidate>
     @csrf @method('PUT')
 
-    {{-- Hidden: kode tidak boleh diubah --}}
+    {{--
+        SECURITY: kode_subkomponen dan kode_akun dikirim sebagai hidden.
+        Controller mengabaikan nilai ini dan selalu mengambil dari model (DB).
+        Hidden ini hanya memenuhi form submission — nilai sebenarnya diabaikan server.
+    --}}
     @if($data->kode_subkomponen)
         <input type="hidden" name="kode_subkomponen" value="{{ $data->kode_subkomponen }}">
     @endif
@@ -63,11 +69,9 @@
         {{-- ===== STATUS BANNER ===== --}}
         <div class="card-flat border-l-4 {{ $levelBorderColor }} p-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                {{-- Level info --}}
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-xl
-                        {{ $isRO ? 'bg-blue-100 dark:bg-blue-900/30' : ($isSubkomponen ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-green-100 dark:bg-green-900/30') }}
-                        flex items-center justify-center flex-shrink-0">
+                    <div class="w-9 h-9 rounded-xl {{ $isRO ? 'bg-blue-100 dark:bg-blue-900/30' : ($isSubkomponen ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-green-100 dark:bg-green-900/30') }}
+                               flex items-center justify-center flex-shrink-0">
                         <svg class="w-4 h-4 {{ $isRO ? 'text-blue-600 dark:text-blue-400' : ($isSubkomponen ? 'text-purple-600 dark:text-purple-400' : 'text-green-600 dark:text-green-400') }}"
                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $levelIcon }}"/>
@@ -89,7 +93,6 @@
                         </p>
                     </div>
                 </div>
-                {{-- Stat mini --}}
                 @if($data->pagu_anggaran > 0)
                 <div class="flex items-center gap-4 text-right">
                     <div>
@@ -154,57 +157,48 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
-                {{-- Kode Kegiatan --}}
                 <div class="input-group">
-                    <label class="input-label" for="kegiatan">
-                        Kode Kegiatan <span class="text-red-500">*</span>
-                    </label>
+                    <label class="input-label" for="kegiatan">Kode Kegiatan <span class="text-red-500">*</span></label>
                     <input type="text" id="kegiatan" name="kegiatan"
                            value="{{ old('kegiatan', $data->kegiatan) }}"
                            class="input-field font-mono @error('kegiatan') input-error @enderror"
-                           placeholder="Contoh: 4753" required>
-                    @error('kegiatan')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
+                           placeholder="Contoh: 4753" maxlength="50" required>
+                    @error('kegiatan')<p class="input-hint-error">{{ $message }}</p>@enderror
                 </div>
 
-                {{-- KRO --}}
                 <div class="input-group">
-                    <label class="input-label" for="kro">
-                        KRO <span class="text-red-500">*</span>
-                    </label>
+                    <label class="input-label" for="kro">KRO <span class="text-red-500">*</span></label>
                     <input type="text" id="kro" name="kro"
                            value="{{ old('kro', $data->kro) }}"
                            class="input-field font-mono @error('kro') input-error @enderror"
-                           placeholder="Contoh: EBA" required>
-                    @error('kro')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
+                           placeholder="Contoh: EBA" maxlength="50" required>
+                    @error('kro')<p class="input-hint-error">{{ $message }}</p>@enderror
                 </div>
 
-                {{-- RO --}}
+                {{-- RO — <select> dengan whitelist dari server, divalidasi Rule::in di controller --}}
                 <div class="input-group">
-                    <label class="input-label" for="ro">
-                        RO <span class="text-red-500">*</span>
-                    </label>
+                    <label class="input-label" for="ro">RO <span class="text-red-500">*</span></label>
                     <select id="ro" name="ro"
-                            class="input-field @error('ro') input-error @enderror" required>
+                            class="input-field @error('ro') input-error @enderror"
+                            required>
                         @foreach($roList as $ro)
                             <option value="{{ $ro }}" {{ old('ro', $data->ro) == $ro ? 'selected' : '' }}>
                                 {{ $ro }} – {{ get_ro_name($ro) }}
                             </option>
                         @endforeach
                     </select>
-                    @error('ro')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
+                    @error('ro')<p class="input-hint-error">{{ $message }}</p>@enderror
                 </div>
 
-                {{-- Sub Komponen (readonly) --}}
+                {{--
+                    Sub Komponen & Kode Akun ditampilkan sebagai readonly div — bukan input.
+                    Tidak ada cara user mengubahnya melalui browser.
+                    Nilai asli dikirim via hidden input di atas.
+                --}}
                 @if($data->kode_subkomponen)
                 <div class="input-group">
                     <label class="input-label">Sub Komponen</label>
-                    <div class="input-field-readonly flex items-center gap-2">
+                    <div class="input-field-readonly flex items-center gap-2" aria-readonly="true">
                         <span class="font-mono font-semibold text-purple-700 dark:text-purple-400">
                             {{ $data->kode_subkomponen }}
                         </span>
@@ -214,11 +208,10 @@
                 </div>
                 @endif
 
-                {{-- Kode Akun (readonly) --}}
                 @if($data->kode_akun)
                 <div class="input-group">
                     <label class="input-label">Kode Akun</label>
-                    <div class="input-field-readonly flex items-center gap-2">
+                    <div class="input-field-readonly flex items-center gap-2" aria-readonly="true">
                         <span class="font-mono font-semibold text-green-700 dark:text-green-400">
                             {{ $data->kode_akun }}
                         </span>
@@ -245,7 +238,6 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-                {{-- Uraian --}}
                 <div class="input-group sm:col-span-2">
                     <label class="input-label" for="program_kegiatan">
                         Uraian Program / Kegiatan <span class="text-red-500">*</span>
@@ -253,35 +245,26 @@
                     <textarea id="program_kegiatan" name="program_kegiatan" rows="3"
                               class="input-field resize-none @error('program_kegiatan') input-error @enderror"
                               placeholder="Tuliskan uraian lengkap..." required>{{ old('program_kegiatan', $data->program_kegiatan) }}</textarea>
-                    @error('program_kegiatan')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
+                    @error('program_kegiatan')<p class="input-hint-error">{{ $message }}</p>@enderror
                 </div>
 
-                {{-- PIC --}}
                 <div class="input-group">
-                    <label class="input-label" for="pic">
-                        PIC <span class="text-red-500">*</span>
-                    </label>
+                    <label class="input-label" for="pic">PIC <span class="text-red-500">*</span></label>
                     <input type="text" id="pic" name="pic"
                            value="{{ old('pic', $data->pic) }}"
                            class="input-field @error('pic') input-error @enderror"
-                           placeholder="Penanggung jawab anggaran" required>
+                           placeholder="Penanggung jawab anggaran"
+                           maxlength="100" required>
                     <p class="input-hint">Kode unit / nama penanggung jawab</p>
-                    @error('pic')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
+                    @error('pic')<p class="input-hint-error">{{ $message }}</p>@enderror
                 </div>
 
-                {{-- Pagu Anggaran --}}
                 <div class="input-group">
                     <label class="input-label" for="pagu_anggaran">
-                        Pagu Anggaran
-                        @if($isAkun)<span class="text-red-500">*</span>@endif
+                        Pagu Anggaran @if($isAkun)<span class="text-red-500">*</span>@endif
                     </label>
 
                     @if($isAkun)
-                        {{-- Editable --}}
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                                 <span class="text-sm font-medium text-gray-400 dark:text-gray-500">Rp</span>
@@ -289,19 +272,17 @@
                             <input type="number" id="pagu_anggaran" name="pagu_anggaran"
                                    value="{{ old('pagu_anggaran', $data->pagu_anggaran) }}"
                                    class="input-field pl-10 @error('pagu_anggaran') input-error @enderror"
-                                   step="1" min="0" required>
+                                   step="1" min="0" max="999999999999" required>
                         </div>
                         <p class="input-hint" id="pagu_preview_hint">
                             <span class="text-green-600 dark:text-green-400">
                                 ✏ Nilai saat ini: {{ format_rupiah($data->pagu_anggaran) }}
                             </span>
                         </p>
-                        @error('pagu_anggaran')
-                            <p class="input-hint-error">{{ $message }}</p>
-                        @enderror
+                        @error('pagu_anggaran')<p class="input-hint-error">{{ $message }}</p>@enderror
                     @else
-                        {{-- Readonly --}}
-                        <div class="input-field-readonly font-mono">
+                        {{-- Readonly div — bukan input, tidak bisa diubah --}}
+                        <div class="input-field-readonly font-mono" aria-readonly="true">
                             {{ format_rupiah($data->pagu_anggaran) }}
                         </div>
                         <p class="input-hint">
@@ -387,43 +368,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const newVal = parseFloat(this.value) || 0;
         const diff   = newVal - oldPagu;
 
-        // Preview hint
-        if (newVal > 0) {
-            hintEl.innerHTML = `<span class="text-navy-600 dark:text-navy-400">≈ ${fmt(newVal)}</span>`;
-        } else {
-            hintEl.innerHTML = `<span class="text-green-600 dark:text-green-400">✏ Nilai saat ini: {{ format_rupiah($data->pagu_anggaran) }}</span>`;
-        }
+        hintEl.innerHTML = newVal > 0
+            ? '<span class="text-navy-600 dark:text-navy-400">≈ ' + fmt(newVal) + '</span>'
+            : '<span class="text-green-600 dark:text-green-400">✏ Nilai saat ini: {{ format_rupiah($data->pagu_anggaran) }}</span>';
 
-        // Preview box
-        if (newVal !== oldPagu && newVal > 0) {
-            preview.style.display = 'block';
+        if (newVal > 0 && newVal !== oldPagu) {
+            preview.style.display   = 'block';
             previewNew.textContent  = fmt(newVal);
-
             if (diff > 0) {
-                previewDiff.textContent  = '+' + fmt(diff);
-                previewDiff.className    = 'font-semibold mt-0.5 text-green-600 dark:text-green-400';
+                previewDiff.textContent = '+' + fmt(diff);
+                previewDiff.className   = 'font-semibold mt-0.5 text-green-600 dark:text-green-400';
             } else if (diff < 0) {
-                previewDiff.textContent  = fmt(diff);
-                previewDiff.className    = 'font-semibold mt-0.5 text-red-500 dark:text-red-400';
+                previewDiff.textContent = fmt(diff);
+                previewDiff.className   = 'font-semibold mt-0.5 text-red-500 dark:text-red-400';
             } else {
-                previewDiff.textContent  = 'Tidak berubah';
-                previewDiff.className    = 'font-semibold mt-0.5 text-gray-500';
+                previewDiff.textContent = 'Tidak berubah';
+                previewDiff.className   = 'font-semibold mt-0.5 text-gray-500';
             }
         } else {
             preview.style.display = 'none';
         }
     });
 
-    // Submit loading state
+    // Cegah double submit
     document.getElementById('formEdit').addEventListener('submit', function () {
-        const btn = document.getElementById('submitBtn');
-        btn.disabled = true;
-        btn.innerHTML = `
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            Menyimpan...`;
+        const btn     = document.getElementById('submitBtn');
+        btn.disabled  = true;
+        btn.innerHTML =
+            '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">'
+            + '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
+            + '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
+            + '</svg> Menyimpan...';
     });
 });
 </script>
