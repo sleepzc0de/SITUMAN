@@ -12,17 +12,21 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ProyeksiMutasiController extends Controller
 {
-    private const CACHE_TTL = 300;
+    private const CACHE_TTL   = 300;
+    // Nilai prioritas yang valid untuk filter
+    private const VALID_PRIORITAS = ['', 'tinggi', 'sedang', 'rendah'];
 
     public function index(Request $request)
     {
-        $tahun     = (int) $request->input('tahun', date('Y'));
+        $tahun     = max(2000, min((int) date('Y') + 5, (int) $request->input('tahun', date('Y'))));
         $bagian    = (string) ($request->input('bagian') ?? '');
-        $prioritas = (string) ($request->input('prioritas') ?? '');
+        $prioritas = in_array($request->input('prioritas'), self::VALID_PRIORITAS, true)
+            ? (string) $request->input('prioritas')
+            : '';
         $search    = (string) ($request->input('search') ?? '');
 
-        // ── Handle Export Excel ────────────────────────────────
-        if ($request->input('export') == '1') {
+        // ── Handle Export Excel ──────────────────────────────
+        if ($request->input('export') === '1') {
             return $this->exportExcel($tahun, $bagian, $prioritas, $search);
         }
 
@@ -55,7 +59,7 @@ class ProyeksiMutasiController extends Controller
         ));
     }
 
-    // ── Export Excel ───────────────────────────────────────────
+    // ── Export Excel ─────────────────────────────────────────
     private function exportExcel(int $tahun, string $bagian, string $prioritas, string $search)
     {
         try {
@@ -102,7 +106,7 @@ class ProyeksiMutasiController extends Controller
                             return [
                                 $i + 1,
                                 $p->nama,
-                                $p->nip,
+                                "'" . $p->nip, // prefix ' agar NIP tidak dikonversi number oleh Excel
                                 $p->jabatan ?? '-',
                                 $p->eselon ?? '-',
                                 $p->bagian ?? '-',
@@ -155,7 +159,13 @@ class ProyeksiMutasiController extends Controller
 
     private function getProyeksi(int $tahun, string $bagian, string $prioritas, string $search)
     {
-        $cacheKey = "proyeksi_mutasi_{$tahun}_{$bagian}_{$prioritas}_{$search}";
+        // SECURITY: sanitasi cache key — jangan langsung masukkan user input mentah
+        // karena bisa digunakan untuk cache poisoning atau DoS (memenuhi cache storage)
+        $safeBagian    = substr(preg_replace('/[^a-zA-Z0-9\s\-]/', '', $bagian), 0, 50);
+        $safePrioritas = in_array($prioritas, self::VALID_PRIORITAS, true) ? $prioritas : '';
+        $safeSearch    = substr(preg_replace('/[^a-zA-Z0-9\s]/', '', $search), 0, 30);
+
+        $cacheKey = "proyeksi_mutasi_{$tahun}_" . md5("{$safeBagian}|{$safePrioritas}|{$safeSearch}");
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($tahun, $bagian, $prioritas, $search) {
             $query = Pegawai::where('status', 'AKTIF');
@@ -191,7 +201,7 @@ class ProyeksiMutasiController extends Controller
                         };
                     });
                 })
-                ->sortByDesc('analisis_mutasi.prioritas')
+                ->sortByDesc(fn($p) => $p->analisis_mutasi['prioritas'])
                 ->values();
         });
     }

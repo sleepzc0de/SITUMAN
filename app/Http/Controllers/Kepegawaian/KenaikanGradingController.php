@@ -31,13 +31,15 @@ class KenaikanGradingController extends Controller
 
     public function index(Request $request)
     {
-        $tahun  = (int) $request->input('tahun', date('Y'));
+        // Sanitasi input — hanya parameter yang dikenal
+        $tahun  = max(2000, min((int) date('Y') + 5, (int) $request->input('tahun', date('Y'))));
         $bagian = (string) ($request->input('bagian') ?? '');
         $search = (string) ($request->input('search') ?? '');
         $isAjax = $request->ajax() || $request->input('ajax');
 
-        // ── Handle Export Excel ────────────────────────────────
-        if ($request->input('export') == '1') {
+        // ── Handle Export Excel ──────────────────────────────
+        // Export dilakukan via GET ?export=1, dikembalikan sebagai file download
+        if ($request->input('export') === '1') {
             return $this->exportExcel($tahun, $bagian, $search);
         }
 
@@ -77,7 +79,8 @@ class KenaikanGradingController extends Controller
         return view('kepegawaian.grading.show', compact('pegawai', 'rekomendasi'));
     }
 
-    // ── Export Excel ───────────────────────────────────────────
+    // ── Export Excel ─────────────────────────────────────────
+    // Mengembalikan BinaryFileResponse (file download), BUKAN redirect
     private function exportExcel(int $tahun, string $bagian, string $search)
     {
         try {
@@ -120,7 +123,7 @@ class KenaikanGradingController extends Controller
                             return [
                                 $i + 1,
                                 $row['nama'],
-                                $row['nip'],
+                                "'" . $row['nip'], // prefix ' agar Excel tidak konversi ke number
                                 $row['jabatan'] ?? '-',
                                 $row['bagian'] ?? '-',
                                 $row['masa_kerja_tahun'],
@@ -154,7 +157,7 @@ class KenaikanGradingController extends Controller
         }
     }
 
-    // ── Private Helpers (sama seperti sebelumnya) ──────────────
+    // ── Private Helpers ───────────────────────────────────────
 
     private function getRekomendasi(int $tahun)
     {
@@ -260,11 +263,11 @@ class KenaikanGradingController extends Controller
         $namaJabatan  = strtolower(trim($pegawai->nama_jabatan ?? $pegawai->jabatan ?? ''));
 
         if ($eselon) {
-            if (preg_match('/^i[ab]?$/i', $eselon) || $eselon === '1')  return ['key' => 'eselon_i',   'label' => 'Eselon I'];
-            if (preg_match('/^ii[ab]?$/i', $eselon) || $eselon === '2') return ['key' => 'eselon_ii',  'label' => 'Eselon II'];
-            if (preg_match('/^iii[ab]?$/i', $eselon) || $eselon === '3')return ['key' => 'eselon_iii', 'label' => 'Eselon III'];
-            if (preg_match('/^iv[ab]?$/i', $eselon) || $eselon === '4') return ['key' => 'eselon_iv',  'label' => 'Eselon IV'];
-            if (preg_match('/^v[ab]?$/i', $eselon) || $eselon === '5')  return ['key' => 'eselon_v',   'label' => 'Eselon V'];
+            if (preg_match('/^i[ab]?$/i', $eselon) || $eselon === '1')   return ['key' => 'eselon_i',   'label' => 'Eselon I'];
+            if (preg_match('/^ii[ab]?$/i', $eselon) || $eselon === '2')  return ['key' => 'eselon_ii',  'label' => 'Eselon II'];
+            if (preg_match('/^iii[ab]?$/i', $eselon) || $eselon === '3') return ['key' => 'eselon_iii', 'label' => 'Eselon III'];
+            if (preg_match('/^iv[ab]?$/i', $eselon) || $eselon === '4')  return ['key' => 'eselon_iv',  'label' => 'Eselon IV'];
+            if (preg_match('/^v[ab]?$/i', $eselon) || $eselon === '5')   return ['key' => 'eselon_v',   'label' => 'Eselon V'];
         }
 
         if (str_contains($jenisJabatan, 'fungsional') || str_contains($namaJabatan, 'fungsional')) {

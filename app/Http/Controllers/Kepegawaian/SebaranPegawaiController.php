@@ -12,7 +12,7 @@ class SebaranPegawaiController extends Controller
 {
     public function index(Request $request)
     {
-        $bagianList = Cache::remember('bagian_list', 3600, function () {
+        $bagianList   = Cache::remember('bagian_list', 3600, function () {
             return Pegawai::select('bagian')
                 ->distinct()
                 ->whereNotNull('bagian')
@@ -27,13 +27,15 @@ class SebaranPegawaiController extends Controller
 
     public function show(Pegawai $pegawai)
     {
-        // Tidak perlu try-catch karena Laravel auto 404 jika model tidak ditemukan
         return view('kepegawaian.sebaran.show', compact('pegawai'));
     }
 
     public function data(Request $request)
     {
-        abort_unless($request->ajax() || $request->wantsJson(), 403);
+        // Wajib AJAX atau JSON request — tolak akses langsung dari browser
+        if (!$request->ajax() && !$request->wantsJson()) {
+            abort(403, 'Akses hanya diizinkan via AJAX.');
+        }
 
         $query = Pegawai::query();
 
@@ -47,7 +49,7 @@ class SebaranPegawaiController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                    ->orWhere('nip', 'like', "%{$search}%");
+                  ->orWhere('nip', 'like', "%{$search}%");
             });
         }
 
@@ -79,7 +81,7 @@ class SebaranPegawaiController extends Controller
 
         $rows = $pegawai->getCollection()->map(function ($p, $i) use ($pegawai) {
             return [
-                'no'         => $pegawai->firstItem() + $i,
+                'no'         => ($pegawai->firstItem() ?? 0) + $i,
                 'id'         => $p->id,
                 'nama'       => $p->nama,
                 'nama_gelar' => $p->nama_gelar,
