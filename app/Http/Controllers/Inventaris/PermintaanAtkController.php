@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Inventaris/PermintaanAtkController.php
 
 namespace App\Http\Controllers\Inventaris;
 
@@ -16,13 +17,14 @@ class PermintaanAtkController extends Controller
     {
         $query = PermintaanAtk::with(['user', 'pegawai', 'details.atk']);
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && in_array($request->status, ['pending', 'disetujui', 'ditolak', 'selesai'])) {
             $query->where('status', $request->status);
         }
         if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('nomor_permintaan', 'like', '%' . $request->search . '%')
-                    ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $request->search . '%'));
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nomor_permintaan', 'like', '%' . $search . '%')
+                    ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $search . '%'));
             });
         }
         if ($request->filled('tanggal_dari')) {
@@ -32,13 +34,13 @@ class PermintaanAtkController extends Controller
             $query->whereDate('tanggal_permintaan', '<=', $request->tanggal_sampai);
         }
 
-        $permintaan = $query->latest()->paginate(15);
+        $permintaan = $query->latest()->paginate(15)->withQueryString();
         $stats = [
-            'total'    => PermintaanAtk::count(),
-            'pending'  => PermintaanAtk::where('status', 'pending')->count(),
-            'disetujui'=> PermintaanAtk::where('status', 'disetujui')->count(),
-            'ditolak'  => PermintaanAtk::where('status', 'ditolak')->count(),
-            'selesai'  => PermintaanAtk::where('status', 'selesai')->count(),
+            'total'     => PermintaanAtk::count(),
+            'pending'   => PermintaanAtk::where('status', 'pending')->count(),
+            'disetujui' => PermintaanAtk::where('status', 'disetujui')->count(),
+            'ditolak'   => PermintaanAtk::where('status', 'ditolak')->count(),
+            'selesai'   => PermintaanAtk::where('status', 'selesai')->count(),
         ];
 
         return view('inventaris.permintaan-atk.index', compact('permintaan', 'stats'));
@@ -48,7 +50,6 @@ class PermintaanAtkController extends Controller
     {
         $pegawai = Pegawai::orderBy('nama')->get();
         $atk     = Atk::where('status', '!=', 'kosong')->orderBy('nama')->get();
-
         return view('inventaris.permintaan-atk.create', compact('pegawai', 'atk'));
     }
 
@@ -56,15 +57,21 @@ class PermintaanAtkController extends Controller
     {
         $validated = $request->validate([
             'pegawai_id'          => 'required|exists:pegawai,id',
-            'tanggal_permintaan'  => 'required|date',
-            'keterangan'          => 'nullable|string',
-            'atk_id'              => 'required|array|min:1',
+            'tanggal_permintaan'  => 'required|date|before_or_equal:today',
+            'keterangan'          => 'nullable|string|max:1000',
+            'atk_id'              => 'required|array|min:1|max:50',
             'atk_id.*'            => 'required|exists:atk,id',
             'jumlah'              => 'required|array|min:1',
-            'jumlah.*'            => 'required|integer|min:1',
+            'jumlah.*'            => 'required|integer|min:1|max:9999',
             'keterangan_item'     => 'nullable|array',
-            'keterangan_item.*'   => 'nullable|string',
+            'keterangan_item.*'   => 'nullable|string|max:500',
         ]);
+
+        // Pastikan tidak ada duplikasi ATK dalam satu permintaan
+        $atkIds = $validated['atk_id'];
+        if (count($atkIds) !== count(array_unique($atkIds))) {
+            return back()->withInput()->with('error', 'Terdapat item ATK yang duplikat dalam permintaan.');
+        }
 
         DB::beginTransaction();
         try {
@@ -72,7 +79,7 @@ class PermintaanAtkController extends Controller
                 'user_id'            => auth()->id(),
                 'pegawai_id'         => $validated['pegawai_id'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'keterangan'         => $validated['keterangan'],
+                'keterangan'         => $validated['keterangan'] ?? null,
                 'status'             => 'pending',
             ]);
 
@@ -91,7 +98,7 @@ class PermintaanAtkController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             $this->handleException($e, 'Gagal membuat permintaan ATK.', ['action' => 'store']);
-            return back()->with('error', 'Gagal membuat permintaan ATK. Silakan coba lagi.');
+            return back()->withInput()->with('error', 'Gagal membuat permintaan ATK. Silakan coba lagi.');
         }
     }
 
@@ -122,22 +129,27 @@ class PermintaanAtkController extends Controller
 
         $validated = $request->validate([
             'pegawai_id'          => 'required|exists:pegawai,id',
-            'tanggal_permintaan'  => 'required|date',
-            'keterangan'          => 'nullable|string',
-            'atk_id'              => 'required|array|min:1',
+            'tanggal_permintaan'  => 'required|date|before_or_equal:today',
+            'keterangan'          => 'nullable|string|max:1000',
+            'atk_id'              => 'required|array|min:1|max:50',
             'atk_id.*'            => 'required|exists:atk,id',
             'jumlah'              => 'required|array|min:1',
-            'jumlah.*'            => 'required|integer|min:1',
+            'jumlah.*'            => 'required|integer|min:1|max:9999',
             'keterangan_item'     => 'nullable|array',
-            'keterangan_item.*'   => 'nullable|string',
+            'keterangan_item.*'   => 'nullable|string|max:500',
         ]);
+
+        $atkIds = $validated['atk_id'];
+        if (count($atkIds) !== count(array_unique($atkIds))) {
+            return back()->withInput()->with('error', 'Terdapat item ATK yang duplikat dalam permintaan.');
+        }
 
         DB::beginTransaction();
         try {
             $permintaanAtk->update([
                 'pegawai_id'         => $validated['pegawai_id'],
                 'tanggal_permintaan' => $validated['tanggal_permintaan'],
-                'keterangan'         => $validated['keterangan'],
+                'keterangan'         => $validated['keterangan'] ?? null,
             ]);
 
             $permintaanAtk->details()->delete();
@@ -157,10 +169,10 @@ class PermintaanAtkController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             $this->handleException($e, 'Gagal memperbarui permintaan ATK.', [
-                'action'          => 'update',
-                'permintaan_id'   => $permintaanAtk->id,
+                'action'        => 'update',
+                'permintaan_id' => $permintaanAtk->id,
             ]);
-            return back()->with('error', 'Gagal memperbarui permintaan ATK. Silakan coba lagi.');
+            return back()->withInput()->with('error', 'Gagal memperbarui permintaan ATK. Silakan coba lagi.');
         }
     }
 
@@ -172,7 +184,6 @@ class PermintaanAtkController extends Controller
 
         try {
             $permintaanAtk->delete();
-
             return redirect()->route('inventaris.permintaan-atk.index')
                 ->with('success', 'Permintaan ATK berhasil dihapus.');
         } catch (\Exception $e) {
@@ -192,13 +203,30 @@ class PermintaanAtkController extends Controller
 
         DB::beginTransaction();
         try {
-            foreach ($permintaanAtk->details as $detail) {
-                if ($detail->atk->stok_tersedia < $detail->jumlah) {
+            // Load details dengan lock untuk hindari race condition
+            $details = $permintaanAtk->details()->with('atk')->get();
+
+            // Validasi stok SEMUA item dulu sebelum ada yang dikurangi
+            foreach ($details as $detail) {
+                $atk = Atk::lockForUpdate()->find($detail->atk_id);
+                if (!$atk || $atk->stok_tersedia < $detail->jumlah) {
+                    DB::rollBack();
+                    $nama  = $atk->nama ?? 'ATK tidak ditemukan';
+                    $stok  = $atk->stok_tersedia ?? 0;
+                    $sat   = $atk->satuan ?? '';
                     return back()->with(
                         'error',
-                        "Stok {$detail->atk->nama} tidak mencukupi. Tersedia: {$detail->atk->stok_tersedia} {$detail->atk->satuan}."
+                        "Stok {$nama} tidak mencukupi. Tersedia: {$stok} {$sat}, dibutuhkan: {$detail->jumlah} {$sat}."
                     );
                 }
+            }
+
+            // Kurangi stok setelah semua validasi passed
+            foreach ($details as $detail) {
+                $atk = Atk::lockForUpdate()->find($detail->atk_id);
+                $atk->stok_tersedia -= $detail->jumlah;
+                $atk->save();
+                $atk->updateStatus();
             }
 
             $permintaanAtk->update([
@@ -206,13 +234,6 @@ class PermintaanAtkController extends Controller
                 'disetujui_oleh'    => auth()->id(),
                 'tanggal_disetujui' => now(),
             ]);
-
-            foreach ($permintaanAtk->details as $detail) {
-                $atk = $detail->atk;
-                $atk->stok_tersedia -= $detail->jumlah;
-                $atk->save();
-                $atk->updateStatus();
-            }
 
             DB::commit();
             return back()->with('success', 'Permintaan ATK berhasil disetujui.');
@@ -277,13 +298,14 @@ class PermintaanAtkController extends Controller
         try {
             $query = PermintaanAtk::with(['user', 'pegawai', 'details']);
 
-            if ($request->filled('status')) {
+            if ($request->filled('status') && in_array($request->status, ['pending', 'disetujui', 'ditolak', 'selesai'])) {
                 $query->where('status', $request->status);
             }
             if ($request->filled('search')) {
-                $query->where(function ($q) use ($request) {
-                    $q->where('nomor_permintaan', 'like', '%' . $request->search . '%')
-                        ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $request->search . '%'));
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('nomor_permintaan', 'like', '%' . $search . '%')
+                        ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $search . '%'));
                 });
             }
             if ($request->filled('tanggal_dari')) {
@@ -293,9 +315,21 @@ class PermintaanAtkController extends Controller
                 $query->whereDate('tanggal_permintaan', '<=', $request->tanggal_sampai);
             }
 
-            $paginator  = $query->latest()->paginate(15);
-            $badgeMap   = ['pending' => 'badge-warning', 'disetujui' => 'badge-success', 'ditolak' => 'badge-danger', 'selesai' => 'badge-info'];
-            $labelMap   = ['pending' => 'Pending', 'disetujui' => 'Disetujui', 'ditolak' => 'Ditolak', 'selesai' => 'Selesai'];
+            $page = max(1, (int) $request->get('page', 1));
+            $paginator = $query->latest()->paginate(15, ['*'], 'page', $page);
+
+            $badgeMap = [
+                'pending'   => 'badge-warning',
+                'disetujui' => 'badge-success',
+                'ditolak'   => 'badge-danger',
+                'selesai'   => 'badge-info',
+            ];
+            $labelMap = [
+                'pending'   => 'Pending',
+                'disetujui' => 'Disetujui',
+                'ditolak'   => 'Ditolak',
+                'selesai'   => 'Selesai',
+            ];
 
             $data = $paginator->getCollection()->map(function ($item) use ($badgeMap, $labelMap) {
                 $nama    = $item->pegawai->nama ?? '?';
@@ -303,30 +337,30 @@ class PermintaanAtkController extends Controller
                 $initial = implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_slice($words, 0, 2)));
 
                 return [
-                    'id'                 => $item->id,
-                    'nomor_permintaan'   => $item->nomor_permintaan,
-                    'tanggal_formatted'  => \Carbon\Carbon::parse($item->tanggal_permintaan)->translatedFormat('d M Y'),
-                    'pegawai_nama'       => $nama,
-                    'pegawai_initial'    => $initial,
-                    'user_nama'          => $item->user->nama ?? '-',
-                    'jumlah_item'        => $item->details->count(),
-                    'status'             => $item->status,
-                    'status_badge'       => $badgeMap[$item->status] ?? 'badge-gray',
-                    'status_label'       => $labelMap[$item->status] ?? $item->status,
-                    'url_show'           => route('inventaris.permintaan-atk.show', $item->id),
-                    'url_edit'           => route('inventaris.permintaan-atk.edit', $item->id),
-                    'url_destroy'        => route('inventaris.permintaan-atk.destroy', $item->id),
+                    'id'                => $item->id,
+                    'nomor_permintaan'  => $item->nomor_permintaan,
+                    'tanggal_formatted' => \Carbon\Carbon::parse($item->tanggal_permintaan)->translatedFormat('d M Y'),
+                    'pegawai_nama'      => $nama,
+                    'pegawai_initial'   => $initial,
+                    'user_nama'         => $item->user->nama ?? '-',
+                    'jumlah_item'       => $item->details->count(),
+                    'status'            => $item->status,
+                    'status_badge'      => $badgeMap[$item->status] ?? 'badge-gray',
+                    'status_label'      => $labelMap[$item->status] ?? $item->status,
+                    'url_show'          => route('inventaris.permintaan-atk.show', $item->id),
+                    'url_edit'          => route('inventaris.permintaan-atk.edit', $item->id),
+                    'url_destroy'       => route('inventaris.permintaan-atk.destroy', $item->id),
                 ];
             });
 
             return response()->json([
                 'data'  => $data,
                 'stats' => [
-                    'total'    => PermintaanAtk::count(),
-                    'pending'  => PermintaanAtk::where('status', 'pending')->count(),
-                    'disetujui'=> PermintaanAtk::where('status', 'disetujui')->count(),
-                    'ditolak'  => PermintaanAtk::where('status', 'ditolak')->count(),
-                    'selesai'  => PermintaanAtk::where('status', 'selesai')->count(),
+                    'total'     => PermintaanAtk::count(),
+                    'pending'   => PermintaanAtk::where('status', 'pending')->count(),
+                    'disetujui' => PermintaanAtk::where('status', 'disetujui')->count(),
+                    'ditolak'   => PermintaanAtk::where('status', 'ditolak')->count(),
+                    'selesai'   => PermintaanAtk::where('status', 'selesai')->count(),
                 ],
                 'meta' => [
                     'current_page' => $paginator->currentPage(),

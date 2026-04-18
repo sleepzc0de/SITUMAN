@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Inventaris/AsetEndUserController.php
 
 namespace App\Http\Controllers\Inventaris;
 
@@ -16,6 +17,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class AsetEndUserController extends Controller
 {
+    // Nilai enum yang valid — satu sumber kebenaran
+    private const KONDISI_VALID = ['baik', 'rusak ringan', 'rusak berat', 'hilang'];
+    private const STATUS_VALID  = ['tersedia', 'dipinjam', 'diperbaiki', 'tidak aktif'];
+
     public function index(Request $request)
     {
         $query = AsetEndUser::with(['kategori', 'pegawai']);
@@ -23,29 +28,30 @@ class AsetEndUserController extends Controller
         if ($request->filled('kategori')) {
             $query->where('kategori_id', $request->kategori);
         }
-        if ($request->filled('status')) {
+        if ($request->filled('status') && in_array($request->status, self::STATUS_VALID)) {
             $query->where('status', $request->status);
         }
-        if ($request->filled('kondisi')) {
+        if ($request->filled('kondisi') && in_array($request->kondisi, self::KONDISI_VALID)) {
             $query->where('kondisi', $request->kondisi);
         }
         if ($request->filled('search')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('nama_aset', 'like', '%' . $request->search . '%')
-                    ->orWhere('kode_aset', 'like', '%' . $request->search . '%')
-                    ->orWhere('nomor_seri', 'like', '%' . $request->search . '%')
-                    ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $request->search . '%'));
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nama_aset', 'like', '%' . $search . '%')
+                    ->orWhere('kode_aset', 'like', '%' . $search . '%')
+                    ->orWhere('nomor_seri', 'like', '%' . $search . '%')
+                    ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $search . '%'));
             });
         }
 
-        $aset      = $query->latest()->paginate(15);
+        $aset      = $query->latest()->paginate(15)->withQueryString();
         $kategoris = KategoriAset::orderBy('nama')->get();
         $stats = [
             'total_aset'  => AsetEndUser::count(),
             'tersedia'    => AsetEndUser::where('status', 'tersedia')->count(),
             'dipinjam'    => AsetEndUser::where('status', 'dipinjam')->count(),
             'diperbaiki'  => AsetEndUser::where('status', 'diperbaiki')->count(),
-            'total_nilai' => AsetEndUser::sum('nilai_perolehan'),
+            'total_nilai' => AsetEndUser::sum('nilai_perolehan') ?? 0,
         ];
 
         return view('inventaris.aset-end-user.index', compact('aset', 'kategoris', 'stats'));
@@ -62,15 +68,18 @@ class AsetEndUserController extends Controller
         $validated = $request->validate([
             'kategori_id'       => 'required|exists:kategori_aset,id',
             'nama_aset'         => 'required|string|max:255',
-            'deskripsi'         => 'nullable|string',
+            'deskripsi'         => 'nullable|string|max:2000',
             'merek'             => 'nullable|string|max:100',
             'tipe'              => 'nullable|string|max:100',
             'nomor_seri'        => 'nullable|string|max:100',
-            'tanggal_perolehan' => 'nullable|date',
-            'nilai_perolehan'   => 'required|numeric|min:0',
-            'kondisi'           => 'required|in:baik,rusak ringan,rusak berat,hilang',
-            'catatan'           => 'nullable|string',
+            'tanggal_perolehan' => 'nullable|date|before_or_equal:today',
+            'nilai_perolehan'   => 'required|numeric|min:0|max:99999999999',
+            'kondisi'           => 'required|in:' . implode(',', self::KONDISI_VALID),
+            'catatan'           => 'nullable|string|max:2000',
         ]);
+
+        // Status default selalu 'tersedia' saat aset baru dibuat
+        $validated['status'] = 'tersedia';
 
         try {
             AsetEndUser::create($validated);
@@ -85,7 +94,13 @@ class AsetEndUserController extends Controller
 
     public function show(AsetEndUser $asetEndUser)
     {
-        $asetEndUser->load(['kategori', 'pegawai', 'riwayat.pegawai', 'riwayat.user']);
+        // Perbaikan: eager load dengan query yang benar, hindari N+1
+        $asetEndUser->load([
+            'kategori',
+            'pegawai',
+            'riwayat' => fn($q) => $q->latest()->with(['pegawai', 'user']),
+        ]);
+
         return view('inventaris.aset-end-user.show', compact('asetEndUser'));
     }
 
@@ -100,15 +115,18 @@ class AsetEndUserController extends Controller
         $validated = $request->validate([
             'kategori_id'       => 'required|exists:kategori_aset,id',
             'nama_aset'         => 'required|string|max:255',
-            'deskripsi'         => 'nullable|string',
+            'deskripsi'         => 'nullable|string|max:2000',
             'merek'             => 'nullable|string|max:100',
             'tipe'              => 'nullable|string|max:100',
             'nomor_seri'        => 'nullable|string|max:100',
-            'tanggal_perolehan' => 'nullable|date',
-            'nilai_perolehan'   => 'required|numeric|min:0',
-            'kondisi'           => 'required|in:baik,rusak ringan,rusak berat,hilang',
-            'catatan'           => 'nullable|string',
+            'tanggal_perolehan' => 'nullable|date|before_or_equal:today',
+            'nilai_perolehan'   => 'required|numeric|min:0|max:99999999999',
+            'kondisi'           => 'required|in:' . implode(',', self::KONDISI_VALID),
+            'catatan'           => 'nullable|string|max:2000',
         ]);
+
+        // Jangan izinkan update status lewat form edit biasa
+        // Status hanya bisa berubah lewat pinjam/kembalikan
 
         try {
             $asetEndUser->update($validated);
@@ -146,8 +164,8 @@ class AsetEndUserController extends Controller
 
         $validated = $request->validate([
             'pegawai_id'         => 'required|exists:pegawai,id',
-            'tanggal_peminjaman' => 'required|date',
-            'catatan'            => 'nullable|string',
+            'tanggal_peminjaman' => 'required|date|before_or_equal:today',
+            'catatan'            => 'nullable|string|max:2000',
         ]);
 
         DB::beginTransaction();
@@ -156,7 +174,7 @@ class AsetEndUserController extends Controller
                 'pegawai_id'         => $validated['pegawai_id'],
                 'tanggal_peminjaman' => $validated['tanggal_peminjaman'],
                 'status'             => 'dipinjam',
-                'catatan'            => $validated['catatan'],
+                'catatan'            => $validated['catatan'] ?? null,
             ]);
 
             RiwayatAset::create([
@@ -165,7 +183,7 @@ class AsetEndUserController extends Controller
                 'user_id'         => auth()->id(),
                 'jenis_aktivitas' => 'peminjaman',
                 'tanggal'         => $validated['tanggal_peminjaman'],
-                'keterangan'      => $validated['catatan'],
+                'keterangan'      => $validated['catatan'] ?? null,
             ]);
 
             DB::commit();
@@ -184,8 +202,8 @@ class AsetEndUserController extends Controller
         }
 
         $validated = $request->validate([
-            'kondisi' => 'required|in:baik,rusak ringan,rusak berat,hilang',
-            'catatan' => 'nullable|string',
+            'kondisi' => 'required|in:' . implode(',', self::KONDISI_VALID),
+            'catatan' => 'nullable|string|max:2000',
         ]);
 
         DB::beginTransaction();
@@ -197,7 +215,7 @@ class AsetEndUserController extends Controller
                 'tanggal_peminjaman' => null,
                 'status'             => 'tersedia',
                 'kondisi'            => $validated['kondisi'],
-                'catatan'            => $validated['catatan'],
+                'catatan'            => $validated['catatan'] ?? null,
             ]);
 
             RiwayatAset::create([
@@ -205,8 +223,8 @@ class AsetEndUserController extends Controller
                 'pegawai_id'      => $pegawaiId,
                 'user_id'         => auth()->id(),
                 'jenis_aktivitas' => 'pengembalian',
-                'tanggal'         => now(),
-                'keterangan'      => $validated['catatan'],
+                'tanggal'         => now()->toDateString(),
+                'keterangan'      => $validated['catatan'] ?? null,
             ]);
 
             DB::commit();
@@ -218,23 +236,35 @@ class AsetEndUserController extends Controller
         }
     }
 
+    /**
+     * Export — PERBAIKAN: jangan pakai back() untuk file download.
+     * Jika gagal, redirect ke index dengan error (bukan back+download).
+     */
     public function export()
     {
         try {
-            return Excel::download(new AsetEndUserExport, 'data-aset-end-user-' . date('Y-m-d') . '.xlsx');
+            return Excel::download(
+                new AsetEndUserExport,
+                'data-aset-end-user-' . date('Y-m-d') . '.xlsx'
+            );
         } catch (\Exception $e) {
             $this->handleException($e, 'Gagal export data aset.');
-            return back()->with('error', 'Gagal melakukan export. Silakan coba lagi.');
+            return redirect()->route('inventaris.aset-end-user.index')
+                ->with('error', 'Gagal melakukan export. Silakan coba lagi.');
         }
     }
 
     public function downloadTemplate()
     {
         try {
-            return Excel::download(new AsetEndUserTemplateExport, 'template-import-aset-end-user.xlsx');
+            return Excel::download(
+                new AsetEndUserTemplateExport,
+                'template-import-aset-end-user.xlsx'
+            );
         } catch (\Exception $e) {
             $this->handleException($e, 'Gagal mengunduh template aset.');
-            return back()->with('error', 'Gagal mengunduh template. Silakan coba lagi.');
+            return redirect()->route('inventaris.aset-end-user.index')
+                ->with('error', 'Gagal mengunduh template. Silakan coba lagi.');
         }
     }
 
@@ -247,7 +277,7 @@ class AsetEndUserController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv|max:2048',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:2048',
         ]);
 
         try {
@@ -263,12 +293,14 @@ class AsetEndUserController extends Controller
                     $errorMessages[] = "Baris {$failure->row()}: " . implode(', ', $failure->errors());
                 }
                 foreach ($errors as $error) {
-                    // Log detail error, tampilkan pesan generik
                     $this->handleException($error, 'Error pada baris import aset.');
                     $errorMessages[] = 'Terdapat baris yang tidak dapat diproses.';
                 }
 
-                return back()->with('warning', 'Import selesai dengan beberapa peringatan: ' . implode(' | ', $errorMessages));
+                return back()->with(
+                    'warning',
+                    'Import selesai dengan beberapa peringatan: ' . implode(' | ', array_slice($errorMessages, 0, 10))
+                );
             }
 
             return redirect()->route('inventaris.aset-end-user.index')

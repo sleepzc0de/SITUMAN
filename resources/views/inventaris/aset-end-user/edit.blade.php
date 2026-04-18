@@ -11,6 +11,21 @@
     ]" />
 @endsection
 
+@push('head')
+<style>
+    /* Pastikan select tidak bisa diubah menjadi input text */
+    select.input-field {
+        -webkit-appearance: auto;
+        appearance: auto;
+        pointer-events: auto;
+    }
+    /* Nonaktifkan contenteditable pada semua field form */
+    form [contenteditable] {
+        -webkit-user-modify: read-only;
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="max-w-4xl mx-auto">
     <div class="card">

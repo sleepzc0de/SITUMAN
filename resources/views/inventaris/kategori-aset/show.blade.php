@@ -13,7 +13,6 @@
 
 @section('content')
 <div class="space-y-6">
-    <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $kategoriAset->nama }}</h2>
@@ -31,13 +30,20 @@
         </div>
     </div>
 
-    <!-- Statistics -->
+    {{-- Statistics — hitung langsung dari DB, bukan dari collection yang mungkin partial --}}
+    @php
+        $totalAset   = $kategoriAset->aset()->count();
+        $tersedia    = $kategoriAset->aset()->where('status', 'tersedia')->count();
+        $dipinjam    = $kategoriAset->aset()->where('status', 'dipinjam')->count();
+        $totalNilai  = $kategoriAset->aset()->sum('nilai_perolehan') ?? 0;
+    @endphp
+
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400">Total Aset</p>
-                    <p class="text-2xl font-bold text-navy-700 dark:text-white mt-1">{{ $kategoriAset->aset->count() }}</p>
+                    <p class="text-2xl font-bold text-navy-700 dark:text-white mt-1">{{ $totalAset }}</p>
                 </div>
                 <div class="p-3 bg-navy-100 dark:bg-navy-700 rounded-xl">
                     <svg class="w-8 h-8 text-navy-600 dark:text-navy-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,9 +57,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400">Tersedia</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                        {{ $kategoriAset->aset->where('status', 'tersedia')->count() }}
-                    </p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{{ $tersedia }}</p>
                 </div>
                 <div class="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl">
                     <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,9 +71,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400">Dipinjam</p>
-                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-                        {{ $kategoriAset->aset->where('status', 'dipinjam')->count() }}
-                    </p>
+                    <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{{ $dipinjam }}</p>
                 </div>
                 <div class="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl">
                     <svg class="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,7 +86,7 @@
                 <div>
                     <p class="text-sm text-gray-600 dark:text-gray-400">Total Nilai</p>
                     <p class="text-lg font-bold text-gold-600 dark:text-gold-400 mt-1">
-                        {{ format_rupiah($kategoriAset->aset->sum('nilai_perolehan')) }}
+                        {{ format_rupiah($totalNilai) }}
                     </p>
                 </div>
                 <div class="p-3 bg-gold-100 dark:bg-gold-900/30 rounded-xl">
@@ -96,13 +98,16 @@
         </div>
     </div>
 
-    <!-- Aset List -->
     <div class="card">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Daftar Aset</h3>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Daftar Aset</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $aset->total() }} aset</p>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead class="bg-gray-50 dark:bg-navy-800">
                     <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">No</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nama Aset</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Merek</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Kondisi</th>
@@ -112,50 +117,51 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-navy-700">
-                    @forelse($kategoriAset->aset as $aset)
+                    @forelse($aset as $index => $item)
                         <tr class="hover:bg-gray-50 dark:hover:bg-navy-800">
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ $aset->firstItem() + $index }}</td>
                             <td class="px-6 py-4">
-                                <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $aset->nama_aset }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $aset->kode_aset }}</div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $item->nama_aset }}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $item->kode_aset }}</div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                {{ $aset->merek ?? '-' }}
+                                {{ $item->merek ?? '-' }}
                             </td>
                             <td class="px-6 py-4">
-                                @if($aset->kondisi == 'baik')
+                                @if($item->kondisi == 'baik')
                                     <span class="badge-success">Baik</span>
-                                @elseif($aset->kondisi == 'rusak ringan')
+                                @elseif($item->kondisi == 'rusak ringan')
                                     <span class="badge-warning">Rusak Ringan</span>
-                                @elseif($aset->kondisi == 'rusak berat')
+                                @elseif($item->kondisi == 'rusak berat')
                                     <span class="badge-danger">Rusak Berat</span>
                                 @else
-                                    <span class="badge">Hilang</span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">Hilang</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                @if($aset->status == 'tersedia')
+                                @if($item->status == 'tersedia')
                                     <span class="badge-success">Tersedia</span>
-                                @elseif($aset->status == 'dipinjam')
+                                @elseif($item->status == 'dipinjam')
                                     <span class="badge-warning">Dipinjam</span>
-                                @elseif($aset->status == 'diperbaiki')
+                                @elseif($item->status == 'diperbaiki')
                                     <span class="badge-info">Diperbaiki</span>
                                 @else
-                                    <span class="badge">Tidak Aktif</span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">Tidak Aktif</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                                {{ $aset->pegawai->nama ?? '-' }}
+                                {{ $item->pegawai->nama ?? '-' }}
                             </td>
                             <td class="px-6 py-4">
-                                <a href="{{ route('inventaris.aset-end-user.show', $aset) }}"
-                                    class="text-navy-600 dark:text-navy-400 hover:text-navy-900">
+                                <a href="{{ route('inventaris.aset-end-user.show', $item) }}"
+                                    class="text-navy-600 dark:text-navy-400 hover:text-navy-900 text-sm font-medium">
                                     Lihat Detail →
                                 </a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                 Belum ada aset dalam kategori ini
                             </td>
                         </tr>
@@ -163,6 +169,12 @@
                 </tbody>
             </table>
         </div>
+
+        @if($aset->hasPages())
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-navy-700">
+                {{ $aset->links() }}
+            </div>
+        @endif
     </div>
 </div>
 @endsection
