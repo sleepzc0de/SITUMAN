@@ -16,10 +16,16 @@ use Illuminate\Support\Facades\Route;
 // ═══════════════════════════════════════════════════════
 Route::middleware('guest')->group(function () {
     Route::get('login',  [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('login', [LoginController::class, 'login']);
+
+    // ✅ Throttle: 10 attempt per menit per IP
+    Route::post('login', [LoginController::class, 'login'])
+        ->middleware('throttle:10,1');
+
     Route::get('captcha', [\App\Http\Controllers\Auth\CaptchaController::class, 'generate'])
-        ->name('captcha');
+        ->name('captcha')
+        ->middleware('throttle:30,1'); // ← cegah captcha harvesting
 });
+
 
 // ═══════════════════════════════════════════════════════
 // AUTHENTICATED

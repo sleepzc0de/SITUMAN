@@ -22,14 +22,18 @@ class AppServiceProvider extends ServiceProvider
     {
 
         $this->app->singleton(AnggaranService::class);
-
     }
 
     public function boot(): void
     {
+
+        if (app()->environment('production')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
         Gate::policy(User::class, UserPolicy::class);
 
-        // ✅ BLADE DIRECTIVE: @hasrole - support pipe & array
+
         Blade::if('hasrole', function ($roles) {
             if (!auth()->check()) return false;
             $userRole = auth()->user()->role;
