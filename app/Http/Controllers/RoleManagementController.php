@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Permission;
@@ -9,49 +8,102 @@ use Illuminate\Http\Request;
 
 class RoleManagementController extends Controller
 {
-    // ✅ HAPUS __construct() - tidak perlu karena sudah ada middleware di routes/web.php
-    // Route sudah dilindungi oleh: middleware('role:superadmin,admin')
+    /**
+     * Role yang HANYA boleh dikelola oleh superadmin.
+     * Admin tidak boleh menyentuh role ini sama sekali.
+     */
+    private const SUPERADMIN_ONLY_ROLES = ['superadmin', 'admin'];
 
     // =========================================================
-    // ROLES CRUD
+    // HELPER — pastikan hanya superadmin yg bisa akses
     // =========================================================
-
-    public function rolesIndex()
+    private function requireSuperadmin(): void
     {
-        // Double check auth (opsional, karena route middleware sudah handle)
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
-            abort(403, 'Akses ditolak.');
+        if (!auth()->user()?->isSuperadmin()) {
+            abort(403, 'Hanya Super Administrator yang dapat mengakses fitur ini.');
         }
-
-        $roles = Role::withCount('users')
-            ->with('permissions')
-            ->orderBy('created_at')
-            ->get();
-
-        $permissionsGrouped = Permission::orderBy('module')->orderBy('name')->get()->groupBy('module');
-
-        return view('roles.index', compact('roles', 'permissionsGrouped'));
     }
 
-    public function rolesStore(Request $request)
+    /**
+     * Cek apakah admin (non-superadmin) boleh mengedit role tertentu.
+     * Admin hanya boleh edit role custom (bukan sistem).
+     */
+    private function checkRoleEditPermission(Role $role): void
     {
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
+        if (auth()->user()?->isSuperadmin()) {
+            return; // superadmin bebas
+        }
+
+        // Admin tidak boleh menyentuh role sistem (superadmin & admin)
+        if ($role->isProtected()) {
+            abort(403, 'Administrator tidak dapat mengubah role sistem yang dilindungi.');
+        }
+
+        // Admin tidak boleh menyentuh role custom yang namanya ada di list superadmin-only
+        if (in_array($role->name, self::SUPERADMIN_ONLY_ROLES)) {
+            abort(403, 'Akses ditolak.');
+        }
+    }
+
+    // =========================================================
+    // ROLES INDEX
+    // =========================================================
+    public function rolesIndex()
+    {
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        if (!$auth->isAdminLevel()) {
             abort(403);
         }
 
+        // Superadmin lihat semua role; admin hanya lihat role non-sistem
+        $rolesQuery = Role::withCount('users')->with('permissions')->orderBy('created_at');
+
+        if (!$auth->isSuperadmin()) {
+            $rolesQuery->whereNotIn('name', self::SUPERADMIN_ONLY_ROLES);
+        }
+
+        $roles              = $rolesQuery->get();
+        $permissionsGrouped = Permission::orderBy('module')->orderBy('name')->get()->groupBy('module');
+
+        // Untuk permission matrix, superadmin lihat semua role
+        $allRoles = $auth->isSuperadmin()
+            ? Role::withCount('users')->with('permissions')->orderBy('created_at')->get()
+            : $roles;
+
+        return view('roles.index', compact('roles', 'permissionsGrouped', 'allRoles', 'auth'));
+    }
+
+    // =========================================================
+    // ROLES STORE — hanya superadmin
+    // =========================================================
+    public function rolesStore(Request $request)
+    {
+        // Hanya superadmin yang bisa membuat role baru
+        $this->requireSuperadmin();
+
         $validated = $request->validate([
-            'name'          => 'required|string|max:50|unique:roles,name',
+            'name'          => [
+                'required', 'string', 'max:50',
+                'unique:roles,name',
+                'regex:/^[a-z0-9_]+$/',
+                // Tidak boleh pakai nama yang sudah direservasi
+                function ($attribute, $value, $fail) {
+                    $reserved = ['superadmin', 'admin', 'root', 'system', 'guest'];
+                    if (in_array(strtolower($value), $reserved)) {
+                        $fail('Nama role tersebut sudah direservasi oleh sistem.');
+                    }
+                },
+            ],
             'display_name'  => 'required|string|max:100',
             'description'   => 'nullable|string|max:255',
             'permissions'   => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
         ]);
 
-        // Pastikan name hanya huruf kecil, angka, underscore
-        $validated['name'] = strtolower(preg_replace('/[^a-z0-9_]/', '', $validated['name']));
-
         $role = Role::create([
-            'name'         => $validated['name'],
+            'name'         => strtolower($validated['name']),
             'display_name' => $validated['display_name'],
             'description'  => $validated['description'] ?? null,
             'is_active'    => true,
@@ -62,14 +114,22 @@ class RoleManagementController extends Controller
         }
 
         return redirect()->route('roles.index')
-            ->with('success', "Role '{$role->display_name}' berhasil ditambahkan!");
+            ->with('success', "Role '{$role->display_name}' berhasil ditambahkan.");
     }
 
+    // =========================================================
+    // ROLES UPDATE
+    // =========================================================
     public function rolesUpdate(Request $request, Role $role)
     {
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        if (!$auth->isAdminLevel()) {
             abort(403);
         }
+
+        $this->checkRoleEditPermission($role);
 
         $validated = $request->validate([
             'display_name'  => 'required|string|max:100',
@@ -79,24 +139,36 @@ class RoleManagementController extends Controller
             'permissions.*' => 'exists:permissions,id',
         ]);
 
+        // Admin tidak boleh assign permission 'users.*' atau 'roles.*'
+        if (!$auth->isSuperadmin() && !empty($validated['permissions'])) {
+            $restrictedPermissions = Permission::whereIn('id', $validated['permissions'])
+                ->whereIn('module', ['users', 'roles'])
+                ->exists();
+
+            if ($restrictedPermissions) {
+                return back()->with('error', 'Administrator tidak dapat assign permission modul Users atau Roles.');
+            }
+        }
+
         $role->update([
             'display_name' => $validated['display_name'],
             'description'  => $validated['description'] ?? null,
             'is_active'    => $validated['is_active'] ?? $role->is_active,
         ]);
 
-        // Sync permissions (kosong array jika tidak ada yang dicentang)
         $role->permissions()->sync($validated['permissions'] ?? []);
 
         return redirect()->route('roles.index')
-            ->with('success', "Role '{$role->display_name}' berhasil diperbarui!");
+            ->with('success', "Role '{$role->display_name}' berhasil diperbarui.");
     }
 
+    // =========================================================
+    // ROLES DESTROY — hanya superadmin
+    // =========================================================
     public function rolesDestroy(Role $role)
     {
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
-            abort(403);
-        }
+        // Hanya superadmin yang bisa menghapus role
+        $this->requireSuperadmin();
 
         if ($role->isProtected()) {
             return redirect()->route('roles.index')
@@ -106,64 +178,71 @@ class RoleManagementController extends Controller
         $userCount = $role->users()->count();
         if ($userCount > 0) {
             return redirect()->route('roles.index')
-                ->with('error', "Role '{$role->display_name}' masih digunakan oleh {$userCount} user. Pindahkan user terlebih dahulu.");
+                ->with('error', "Role '{$role->display_name}' masih digunakan oleh {$userCount} user.");
         }
 
-        $name = $role->display_name;
+        $nama = $role->display_name;
         $role->delete();
 
         return redirect()->route('roles.index')
-            ->with('success', "Role '{$name}' berhasil dihapus.");
+            ->with('success', "Role '{$nama}' berhasil dihapus.");
     }
 
     // =========================================================
-    // ASSIGN ROLE TO USER
+    // ASSIGN ROLE TO USER — hanya superadmin
     // =========================================================
-
     public function assignRole(Request $request, User $user)
     {
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
-            abort(403);
-        }
+        // Assign role hanya boleh dilakukan superadmin
+        // (admin melakukan ini lewat UserManagementController)
+        $this->requireSuperadmin();
 
         $validated = $request->validate([
-            'role' => 'required|in:superadmin,admin,user,eksekutif,picpegawai,pickeuangan,picinventaris',
+            'role' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) {
+                    $validRoles = array_keys(UserManagementController::AVAILABLE_ROLES);
+                    if (!in_array($value, $validRoles)) {
+                        $fail('Role tidak valid.');
+                    }
+                },
+            ],
         ]);
 
-        // Proteksi: hanya superadmin yang bisa assign/ubah role superadmin
-        if (
-            ($user->role === 'superadmin' || $validated['role'] === 'superadmin')
-            && !auth()->user()->isSuperadmin()
-        ) {
-            return back()->with('error', 'Hanya Superadmin yang bisa mengatur role Superadmin.');
+        // Tidak bisa ubah diri sendiri
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'Anda tidak dapat mengubah role akun Anda sendiri.');
         }
 
-        $oldRole  = $user->role_label;
+        $oldRole = $user->role_label;
         $user->update(['role' => $validated['role']]);
-        $newRole  = $user->fresh()->role_label;
+        $newRole = $user->fresh()->role_label;
 
         return back()->with('success', "Role '{$user->nama}' berhasil diubah dari {$oldRole} ke {$newRole}.");
     }
 
     // =========================================================
-    // PERMISSIONS (Read Only)
+    // PERMISSIONS INDEX
     // =========================================================
-
     public function permissionsIndex()
     {
-        if (!in_array(auth()->user()?->role, ['superadmin', 'admin'])) {
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        if (!$auth->isAdminLevel()) {
             abort(403);
         }
 
-        $permissions = Permission::orderBy('module')
-            ->orderBy('name')
-            ->get()
-            ->groupBy('module');
+        $permissions = Permission::orderBy('module')->orderBy('name')->get()->groupBy('module');
 
-        $roles = Role::with('permissions')
-            ->orderBy('created_at')
-            ->get();
+        // Admin hanya lihat role non-sistem di matrix
+        $rolesQuery = Role::with('permissions')->withCount('users')->orderBy('created_at');
+        if (!$auth->isSuperadmin()) {
+            $rolesQuery->whereNotIn('name', self::SUPERADMIN_ONLY_ROLES);
+        }
+        $roles = $rolesQuery->get();
 
-        return view('roles.permissions', compact('permissions', 'roles'));
+        return view('roles.permissions', compact('permissions', 'roles', 'auth'));
     }
 }
