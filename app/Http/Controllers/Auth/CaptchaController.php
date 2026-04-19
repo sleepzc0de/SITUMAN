@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Auth/CaptchaController.php
 
 namespace App\Http\Controllers\Auth;
 
@@ -11,24 +12,21 @@ class CaptchaController extends Controller
 {
     public function generate(Request $request)
     {
+        // Buat captcha dengan karakter yang mudah dibaca (tanpa 0/O/1/l/I)
         $phraseBuilder = new PhraseBuilder(5, 'abcdefghjkmnpqrstuvwxyz23456789');
-        $builder = new CaptchaBuilder(null, $phraseBuilder);
 
-        $builder
-            ->setBackgroundColor(10, 22, 40)        // Sesuai warna dark theme login
-            ->setTextColor(212, 175, 55)             // Warna gold SiTUMAN
+        $builder = (new CaptchaBuilder(null, $phraseBuilder))
+            ->setBackgroundColor(10, 22, 40)
+            ->setTextColor(212, 175, 55)
             ->setMaxAngle(25)
             ->setMaxBehindLines(3)
             ->setMaxFrontLines(3)
-            ->build(200, 60);                        // Width x Height
+            ->build(200, 60);
 
-        // Simpan phrase ke session
+        // Simpan phrase ke session (pull saat validasi agar sekali pakai)
         $request->session()->put('captcha_phrase', $builder->getPhrase());
 
-        // Return sebagai base64 image (tidak perlu simpan file)
-        $imageData = $builder->get();
-
-        return response($imageData, 200, [
+        return response($builder->get(), 200, [
             'Content-Type'  => 'image/jpeg',
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
             'Pragma'        => 'no-cache',
