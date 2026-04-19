@@ -27,79 +27,47 @@ class ProfileController extends Controller
             'password.min'              => 'Password minimal 8 karakter.',
             'password.mixed_case'       => 'Password harus mengandung huruf besar dan huruf kecil.',
             'password.numbers'          => 'Password harus mengandung minimal satu angka.',
-            'password.symbols'          => 'Password harus mengandung minimal satu simbol (!, @, #, dll).',
+            'password.symbols'          => 'Password harus mengandung minimal satu simbol.',
         ]);
 
+        /** @var \App\Models\User $user */
         $user = $request->user();
 
-        // =====================================================
         // Verifikasi password lama
-        // Mendukung dua kondisi:
-        // 1. Sistem baru  → verifikasi dengan salt
-        // 2. Sistem lama  → verifikasi bcrypt biasa
-        // =====================================================
         if (!$this->verifyCurrentPassword($user, $request->current_password)) {
             return back()->withErrors([
                 'current_password' => 'Password saat ini tidak sesuai.',
-            ]);
+            ])->withInput();
         }
 
-        // =====================================================
-        // Pastikan password baru tidak sama dengan password lama
-        // =====================================================
+        // Password baru tidak boleh sama dengan lama
         if ($this->isSamePassword($user, $request->password)) {
             return back()->withErrors([
                 'password' => 'Password baru tidak boleh sama dengan password lama.',
-            ]);
+            ])->withInput();
         }
 
-        // =====================================================
-        // Update password dengan salt baru
-        // =====================================================
+        // Simpan password baru dengan salt baru
         $user->setPassword($request->password);
         $user->save();
 
-        return back()->with('success', 'Password berhasil diubah.');
+        return back()->with('password_success', 'Password berhasil diubah.');
     }
 
-    // =========================================================
-    // PRIVATE HELPERS
-    // =========================================================
-
-    /**
-     * Verifikasi password lama dengan mendukung sistem lama dan baru
-     */
-    private function verifyCurrentPassword($user, string $plainPassword): bool
+    private function verifyCurrentPassword($user, string $plain): bool
     {
-        // Sistem baru: punya salt
         if (!empty($user->password_salt)) {
-            return PasswordHashService::verify(
-                $plainPassword,
-                $user->password,
-                $user->password_salt
-            );
+            return PasswordHashService::verify($plain, $user->password, $user->password_salt);
         }
 
-        // Sistem lama: bcrypt biasa (tanpa salt)
-        // Jika cocok, upgrade otomatis ke sistem baru
-        if (password_verify($plainPassword, $user->password)) {
-            return true;
-        }
-
-        return false;
+        // Fallback bcrypt (sistem lama)
+        return password_verify($plain, $user->password);
     }
 
-    /**
-     * Cek apakah password baru sama dengan password lama
-     */
     private function isSamePassword($user, string $newPassword): bool
     {
         if (!empty($user->password_salt)) {
-            return PasswordHashService::verify(
-                $newPassword,
-                $user->password,
-                $user->password_salt
-            );
+            return PasswordHashService::verify($newPassword, $user->password, $user->password_salt);
         }
 
         return password_verify($newPassword, $user->password);
