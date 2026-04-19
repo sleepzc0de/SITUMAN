@@ -28,6 +28,24 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto">
+
+    {{-- Banner info batasan role --}}
+    @if(!auth()->user()->isSuperadmin())
+    <div class="alert-info mb-5 flex items-start gap-3">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <div class="text-sm">
+            <p class="font-semibold">Batasan Wewenang</p>
+            <p class="mt-0.5 opacity-90">
+                Sebagai <strong>Administrator</strong>, Anda hanya dapat membuat user dengan role
+                <strong>Eksekutif, PIC Kepegawaian, PIC Keuangan, PIC Inventaris,</strong> dan <strong>User Biasa</strong>.
+            </p>
+        </div>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('users.store') }}"
           x-data="{ showPass: false, showPassConf: false }">
         @csrf
@@ -86,7 +104,7 @@
                             class="input-field @error('role') input-error @enderror"
                             required>
                         <option value="">— Pilih Role —</option>
-                        @foreach($availableRoles as $value => $label)
+                        @foreach($allowedRoles as $value => $label)
                             <option value="{{ $value }}" {{ old('role') == $value ? 'selected' : '' }}>
                                 {{ $label }}
                             </option>
@@ -94,6 +112,10 @@
                     </select>
                     @error('role')
                         <p class="input-hint-error">{{ $message }}</p>
+                    @else
+                        @if(auth()->user()->isSuperadmin())
+                            <p class="input-hint">Role Super Administrator tidak dapat dibuat lewat form ini</p>
+                        @endif
                     @enderror
                 </div>
 
@@ -169,7 +191,8 @@
                                class="input-field pr-10 @error('password') input-error @enderror"
                                autocomplete="new-password" required>
                         <button type="button" @click="showPass = !showPass"
-                                class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                class="absolute inset-y-0 right-3 flex items-center text-gray-400
+                                       hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                             <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -196,7 +219,8 @@
                                class="input-field pr-10"
                                autocomplete="new-password" required>
                         <button type="button" @click="showPassConf = !showPassConf"
-                                class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                class="absolute inset-y-0 right-3 flex items-center text-gray-400
+                                       hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                             <svg x-show="!showPassConf" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -211,14 +235,9 @@
 
             </div>
 
-            {{-- Password requirement hints --}}
+            {{-- Syarat password --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                @foreach([
-                    'Min. 8 karakter',
-                    'Huruf besar & kecil',
-                    'Mengandung angka',
-                    'Mengandung simbol',
-                ] as $hint)
+                @foreach(['Min. 8 karakter', 'Huruf besar & kecil', 'Mengandung angka', 'Mengandung simbol'] as $hint)
                 <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                     <svg class="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
@@ -231,9 +250,7 @@
 
         {{-- ── Actions ── --}}
         <div class="flex items-center justify-between gap-3 mt-5">
-            <a href="{{ route('users.index') }}" class="btn-ghost">
-                Batal
-            </a>
+            <a href="{{ route('users.index') }}" class="btn-ghost">Batal</a>
             <button type="submit" class="btn-primary">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>

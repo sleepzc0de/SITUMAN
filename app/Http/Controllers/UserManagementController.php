@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -20,16 +19,89 @@ class UserManagementController extends Controller
         'user'          => 'User Biasa',
     ];
 
+    /**
+     * Role yang boleh dibuat/diedit oleh admin (non-superadmin).
+     * Superadmin dan Administrator TIDAK termasuk.
+     */
+    private const ADMIN_MANAGEABLE_ROLES = [
+        'eksekutif', 'picpegawai', 'pickeuangan', 'picinventaris', 'user',
+    ];
+
+    // =========================================================
+    // HELPERS — role list berdasarkan siapa yang login
+    // =========================================================
+
+    /**
+     * Kembalikan daftar role yang boleh di-assign oleh user yang sedang login,
+     * digunakan di form create & edit.
+     */
+    private function getAllowedRolesForForm(): array
+    {
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        if ($auth->isSuperadmin()) {
+            // Superadmin bisa assign semua role KECUALI superadmin itu sendiri
+            // (superadmin tidak boleh membuat superadmin baru lewat form biasa)
+            return array_filter(
+                self::AVAILABLE_ROLES,
+                fn($key) => $key !== 'superadmin',
+                ARRAY_FILTER_USE_KEY
+            );
+        }
+
+        // Admin hanya boleh assign role-role di bawahnya
+        return array_intersect_key(
+            self::AVAILABLE_ROLES,
+            array_flip(self::ADMIN_MANAGEABLE_ROLES)
+        );
+    }
+
+    /**
+     * Cek apakah user yang login boleh mengelola (create/edit/delete) $targetUser.
+     * Return string pesan error jika tidak boleh, null jika boleh.
+     */
+    private function checkManagePermission(User $targetUser): ?string
+    {
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        // Superadmin bisa mengelola siapa saja
+        if ($auth->isSuperadmin()) {
+            return null;
+        }
+
+        // Admin tidak boleh menyentuh superadmin atau sesama admin
+        if (in_array($targetUser->role, ['superadmin', 'admin'])) {
+            return 'Anda tidak memiliki izin untuk mengelola user dengan role ' . self::AVAILABLE_ROLES[$targetUser->role] . '.';
+        }
+
+        return null;
+    }
+
     // =========================================================
     // INDEX
     // =========================================================
-
     public function index(Request $request)
     {
+        /** @var User $auth */
+        $auth  = auth()->user();
         $query = User::query();
 
+        // Admin hanya melihat user yang ada di bawah wewenangnya
+        if (!$auth->isSuperadmin()) {
+            $query->whereIn('role', self::ADMIN_MANAGEABLE_ROLES);
+        }
+
         if ($request->filled('role')) {
-            $query->where('role', $request->role);
+            // Pastikan role filter tidak keluar dari yang boleh dilihat
+            $allowedFilter = $auth->isSuperadmin()
+                ? array_keys(self::AVAILABLE_ROLES)
+                : self::ADMIN_MANAGEABLE_ROLES;
+
+            if (in_array($request->role, $allowedFilter)) {
+                $query->where('role', $request->role);
+            }
         }
 
         if ($request->filled('search')) {
@@ -43,31 +115,36 @@ class UserManagementController extends Controller
 
         $users = $query->orderBy('created_at', 'desc')->paginate(20)->withQueryString();
 
-        $availableRoles = self::AVAILABLE_ROLES;
+        // Role list untuk dropdown filter — sesuai hak akses
+        $filterRoles = $auth->isSuperadmin()
+            ? self::AVAILABLE_ROLES
+            : array_intersect_key(self::AVAILABLE_ROLES, array_flip(self::ADMIN_MANAGEABLE_ROLES));
 
         $roleCounts = User::selectRaw('role, count(*) as total')
             ->groupBy('role')
             ->pluck('total', 'role');
 
-        return view('users.index', compact('users', 'availableRoles', 'roleCounts'));
+        return view('users.index', compact('users', 'filterRoles', 'roleCounts'));
     }
 
     // =========================================================
     // CREATE
     // =========================================================
-
     public function create()
     {
-        $availableRoles = self::AVAILABLE_ROLES;
-        return view('users.create', compact('availableRoles'));
+        $allowedRoles = $this->getAllowedRolesForForm();
+        return view('users.create', compact('allowedRoles'));
     }
 
     // =========================================================
     // STORE
     // =========================================================
-
     public function store(Request $request)
     {
+        /** @var User $auth */
+        $auth         = auth()->user();
+        $allowedRoles = array_keys($this->getAllowedRolesForForm());
+
         $validated = $request->validate([
             'nama'          => 'required|string|max:255',
             'nip'           => 'required|string|unique:users,nip|max:18',
@@ -77,15 +154,11 @@ class UserManagementController extends Controller
             'password'      => [
                 'required',
                 'confirmed',
-                Password::min(8)
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
+                Password::min(8)->mixedCase()->numbers()->symbols(),
             ],
-            'role' => ['required', Rule::in(array_keys(self::AVAILABLE_ROLES))],
+            'role' => ['required', Rule::in($allowedRoles)],
         ], $this->validationMessages());
 
-        // Generate salt & hash password
         $passwordResult = PasswordHashService::make($validated['password']);
 
         $user = User::create([
@@ -104,9 +177,8 @@ class UserManagementController extends Controller
     }
 
     // =========================================================
-    // SHOW (opsional, redirect ke edit)
+    // SHOW
     // =========================================================
-
     public function show(User $user)
     {
         return redirect()->route('users.edit', $user);
@@ -115,19 +187,40 @@ class UserManagementController extends Controller
     // =========================================================
     // EDIT
     // =========================================================
-
     public function edit(User $user)
     {
-        $availableRoles = self::AVAILABLE_ROLES;
-        return view('users.edit', compact('user', 'availableRoles'));
+        // Cek izin sebelum tampilkan form
+        if ($error = $this->checkManagePermission($user)) {
+            return redirect()->route('users.index')->with('error', $error);
+        }
+
+        $allowedRoles = $this->getAllowedRolesForForm();
+
+        // Jika user yang diedit adalah superadmin, role tidak bisa diubah
+        $roleIsLocked = $user->role === 'superadmin';
+
+        return view('users.edit', compact('user', 'allowedRoles', 'roleIsLocked'));
     }
 
     // =========================================================
     // UPDATE
     // =========================================================
-
     public function update(Request $request, User $user)
     {
+        // Cek izin
+        if ($error = $this->checkManagePermission($user)) {
+            return redirect()->route('users.index')->with('error', $error);
+        }
+
+        /** @var User $auth */
+        $auth = auth()->user();
+
+        // Jika target adalah superadmin, role tidak boleh diubah sama sekali
+        $roleIsLocked   = $user->role === 'superadmin';
+        $allowedRoles   = $roleIsLocked
+            ? ['superadmin']                          // hanya boleh tetap superadmin
+            : array_keys($this->getAllowedRolesForForm());
+
         $validated = $request->validate([
             'nama'          => 'required|string|max:255',
             'nip'           => ['required', 'string', 'max:18', Rule::unique('users')->ignore($user->id)],
@@ -137,23 +230,10 @@ class UserManagementController extends Controller
             'password'      => [
                 'nullable',
                 'confirmed',
-                Password::min(8)
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
+                Password::min(8)->mixedCase()->numbers()->symbols(),
             ],
-            'role' => ['required', Rule::in(array_keys(self::AVAILABLE_ROLES))],
+            'role' => ['required', Rule::in($allowedRoles)],
         ], $this->validationMessages());
-
-        // Proteksi: non-superadmin tidak bisa ubah/downgrade akun superadmin
-        if ($user->role === 'superadmin' && !auth()->user()->isSuperadmin()) {
-            return back()->with('error', 'Hanya Superadmin yang bisa mengubah akun Superadmin.');
-        }
-
-        // Proteksi: non-superadmin tidak bisa assign role superadmin
-        if ($validated['role'] === 'superadmin' && !auth()->user()->isSuperadmin()) {
-            return back()->with('error', 'Hanya Superadmin yang bisa menetapkan role Superadmin.');
-        }
 
         $updateData = [
             'nama'          => $validated['nama'],
@@ -161,12 +241,12 @@ class UserManagementController extends Controller
             'email'         => $validated['email'],
             'email_pribadi' => $validated['email_pribadi'] ?? null,
             'no_hp'         => $validated['no_hp'] ?? null,
-            'role'          => $validated['role'],
+            // Jika locked, paksa tetap superadmin
+            'role'          => $roleIsLocked ? 'superadmin' : $validated['role'],
         ];
 
-        // Update password + salt baru hanya jika field password diisi
         if ($request->filled('password')) {
-            $passwordResult          = PasswordHashService::make($validated['password']);
+            $passwordResult              = PasswordHashService::make($validated['password']);
             $updateData['password']      = $passwordResult['hash'];
             $updateData['password_salt'] = $passwordResult['salt'];
         }
@@ -180,13 +260,16 @@ class UserManagementController extends Controller
     // =========================================================
     // DESTROY
     // =========================================================
-
     public function destroy(User $user)
     {
-        // Tidak bisa hapus diri sendiri
         if ($user->id === auth()->id()) {
             return redirect()->route('users.index')
                 ->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
+        }
+
+        // Cek izin
+        if ($error = $this->checkManagePermission($user)) {
+            return redirect()->route('users.index')->with('error', $error);
         }
 
         if (!$user->canBeDeleted()) {
@@ -204,7 +287,6 @@ class UserManagementController extends Controller
     // =========================================================
     // PRIVATE HELPERS
     // =========================================================
-
     private function validationMessages(): array
     {
         return [
@@ -219,9 +301,9 @@ class UserManagementController extends Controller
             'password.min'        => 'Password minimal 8 karakter.',
             'password.mixed_case' => 'Password harus mengandung huruf besar dan huruf kecil.',
             'password.numbers'    => 'Password harus mengandung minimal satu angka.',
-            'password.symbols'    => 'Password harus mengandung minimal satu simbol (!, @, #, dll).',
+            'password.symbols'    => 'Password harus mengandung minimal satu simbol.',
             'role.required'       => 'Role wajib dipilih.',
-            'role.in'             => 'Role yang dipilih tidak valid.',
+            'role.in'             => 'Role yang dipilih tidak valid atau di luar wewenang Anda.',
         ];
     }
 }

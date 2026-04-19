@@ -33,8 +33,26 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto">
+
+    {{-- Banner: Role terkunci (target adalah superadmin) --}}
+    @if($roleIsLocked)
+    <div class="alert-warning mb-5 flex items-start gap-3">
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <div class="text-sm">
+            <p class="font-semibold">Role Terkunci</p>
+            <p class="mt-0.5 opacity-90">
+                Role <strong>Super Administrator</strong> tidak dapat diubah melalui form ini.
+                Anda masih dapat memperbarui informasi profil dan password.
+            </p>
+        </div>
+    </div>
+    @endif
+
     <form method="POST" action="{{ route('users.update', $user) }}"
-          x-data="{ showPass: false, showPassConf: false, changePassword: false }">
+          x-data="{ showPass: false, showPassConf: false, changePassword: {{ $errors->has('password') ? 'true' : 'false' }} }">
         @csrf
         @method('PUT')
 
@@ -102,35 +120,40 @@
                     <label class="input-label" for="role">
                         Role <span class="text-red-500">*</span>
                     </label>
-                    @if($user->role === 'superadmin' && !auth()->user()->isSuperadmin())
-                        {{-- Non-superadmin tidak bisa ubah role superadmin --}}
-                        <input type="hidden" name="role" value="{{ $user->role }}">
-                        <div class="input-field bg-gray-50 dark:bg-navy-700/50 cursor-not-allowed flex items-center gap-2">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $user->role_color }}">
+
+                    @if($roleIsLocked)
+                        {{-- Role superadmin: tampilkan read-only, kirim via hidden --}}
+                        <input type="hidden" name="role" value="superadmin">
+                        <div class="input-field flex items-center gap-2
+                                    bg-gray-50 dark:bg-navy-700/50 cursor-not-allowed select-none">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                         {{ $user->role_color }}">
                                 {{ $user->role_label }}
                             </span>
-                            <span class="text-xs text-gray-400">Tidak dapat diubah</span>
+                            <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-xs text-gray-400 dark:text-gray-500">Terkunci</span>
                         </div>
+                        <p class="input-hint">Role Super Administrator tidak dapat diubah</p>
                     @else
                         <select id="role" name="role"
                                 class="input-field @error('role') input-error @enderror"
                                 required>
                             <option value="">— Pilih Role —</option>
-                            @foreach($availableRoles as $value => $label)
-                                {{-- Sembunyikan opsi superadmin jika bukan superadmin --}}
-                                @if($value === 'superadmin' && !auth()->user()->isSuperadmin())
-                                    @continue
-                                @endif
+                            @foreach($allowedRoles as $value => $label)
                                 <option value="{{ $value }}"
                                         {{ old('role', $user->role) == $value ? 'selected' : '' }}>
                                     {{ $label }}
                                 </option>
                             @endforeach
                         </select>
+                        @error('role')
+                            <p class="input-hint-error">{{ $message }}</p>
+                        @enderror
                     @endif
-                    @error('role')
-                        <p class="input-hint-error">{{ $message }}</p>
-                    @enderror
                 </div>
 
                 {{-- Email Kemenkeu --}}
@@ -176,13 +199,15 @@
 
         {{-- ── Ubah Password ── --}}
         <div class="card mt-5 space-y-4">
-            <div class="section-header !mb-0 cursor-pointer" @click="changePassword = !changePassword">
+            <div class="flex items-center justify-between cursor-pointer"
+                 @click="changePassword = !changePassword">
                 <div>
                     <h2 class="section-title">Ubah Password</h2>
                     <p class="section-desc">Kosongkan jika tidak ingin mengubah password</p>
                 </div>
-                <button type="button" class="btn-ghost btn-sm flex-shrink-0">
-                    <svg class="w-4 h-4 transition-transform duration-200" :class="changePassword ? 'rotate-180' : ''"
+                <button type="button" class="btn-ghost btn-sm flex-shrink-0 pointer-events-none">
+                    <svg class="w-4 h-4 transition-transform duration-200"
+                         :class="changePassword ? 'rotate-180' : ''"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
@@ -197,16 +222,6 @@
                  style="display:none">
                 <div class="divider !mt-0 mb-4"></div>
 
-                @if($errors->has('password'))
-                <div class="alert-warning mb-4">
-                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <p class="text-sm">{{ $errors->first('password') }}</p>
-                </div>
-                @endif
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                     <div class="input-group">
@@ -217,7 +232,8 @@
                                    class="input-field pr-10 @error('password') input-error @enderror"
                                    autocomplete="new-password">
                             <button type="button" @click="showPass = !showPass"
-                                    class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    class="absolute inset-y-0 right-3 flex items-center text-gray-400
+                                           hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                 <svg x-show="!showPass" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -228,7 +244,11 @@
                                 </svg>
                             </button>
                         </div>
-                        <p class="input-hint">Min. 8 karakter, huruf besar/kecil, angka, simbol</p>
+                        @error('password')
+                            <p class="input-hint-error">{{ $message }}</p>
+                        @else
+                            <p class="input-hint">Min. 8 karakter, huruf besar/kecil, angka, simbol</p>
+                        @enderror
                     </div>
 
                     <div class="input-group">
@@ -239,7 +259,8 @@
                                    class="input-field pr-10"
                                    autocomplete="new-password">
                             <button type="button" @click="showPassConf = !showPassConf"
-                                    class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    class="absolute inset-y-0 right-3 flex items-center text-gray-400
+                                           hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                 <svg x-show="!showPassConf" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -256,7 +277,7 @@
             </div>
         </div>
 
-        {{-- ── Danger Zone (hapus) ── --}}
+        {{-- ── Danger Zone ── --}}
         @if($user->canBeDeleted() && $user->id !== auth()->id())
         <div class="card border-red-200 dark:border-red-800/50 mt-5">
             <div class="flex items-start justify-between gap-4">
@@ -282,9 +303,7 @@
 
         {{-- ── Actions ── --}}
         <div class="flex items-center justify-between gap-3 mt-5">
-            <a href="{{ route('users.index') }}" class="btn-ghost">
-                Batal
-            </a>
+            <a href="{{ route('users.index') }}" class="btn-ghost">Batal</a>
             <button type="submit" class="btn-primary">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
