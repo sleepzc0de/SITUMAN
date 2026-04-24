@@ -11,15 +11,19 @@ use App\Http\Controllers\RoleManagementController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
+
+// Blokir path /login lama
+Route::get('login', fn() => abort(404));
+Route::post('login', fn() => abort(404));
+
 // ═══════════════════════════════════════════════════════
 // GUEST
 // ═══════════════════════════════════════════════════════
 Route::middleware('guest')->group(function () {
-    Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
-
-    Route::post('login', [LoginController::class, 'login'])
+    // Ganti 'login' dengan path custom Anda
+    Route::get('qWPgqPi3bk7LEky4zNwdxQfbJIAa9GQ8h3Ue1vlg=', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('qWPgqPi3bk7LEky4zNwdxQfbJIAa9GQ8h3Ue1vlg=', [LoginController::class, 'login'])
         ->middleware('throttle:10,1');
-
     Route::get('captcha', [\App\Http\Controllers\Auth\CaptchaController::class, 'generate'])
         ->name('captcha')
         ->middleware('throttle:30,1');
