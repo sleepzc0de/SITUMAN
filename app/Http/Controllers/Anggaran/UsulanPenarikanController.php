@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Anggaran;
 
 use App\Http\Controllers\Controller;
@@ -12,8 +11,15 @@ use Illuminate\Validation\Rule;
 
 class UsulanPenarikanController extends Controller
 {
-    // ── Whitelist Helpers ──────────────────────────────────────
+    // ── Konstanta Batasan Karakter ─────────────────────────────
+    private const MAX_RO            = 50;
+    private const MAX_SUB_KOMPONEN  = 255;
+    private const MAX_BULAN         = 20;
+    private const MAX_KETERANGAN    = 500;
+    private const MAX_CATATAN       = 500;
+    private const MAX_NILAI_USULAN  = 999999999999; // 12 digit
 
+    // ── Whitelist Helpers ──────────────────────────────────────
     private function getValidRoList(): array
     {
         return Anggaran::select('ro')
@@ -32,10 +38,6 @@ class UsulanPenarikanController extends Controller
         ];
     }
 
-    /**
-     * Ambil daftar sub_komponen yang valid untuk RO tertentu dari DB.
-     * Ini adalah whitelist server-side untuk validasi sub_komponen.
-     */
     private function getValidSubkomponenForRo(string $ro): array
     {
         return Anggaran::where('ro', $ro)
@@ -47,12 +49,17 @@ class UsulanPenarikanController extends Controller
             ->toArray();
     }
 
-    private function sanitizeString(?string $value): ?string
+    private function sanitizeString(?string $value, ?int $maxLength = null): ?string
     {
         if ($value === null) return null;
         $value = strip_tags($value);
         $value = str_replace("\0", '', $value);
-        return trim($value);
+        $value = trim($value);
+        // Hard cut-off jika somehow lolos validation
+        if ($maxLength !== null && mb_strlen($value) > $maxLength) {
+            $value = mb_substr($value, 0, $maxLength);
+        }
+        return $value;
     }
 
     private function validationMessages(): array
@@ -60,29 +67,31 @@ class UsulanPenarikanController extends Controller
         return [
             'ro.required'           => 'RO wajib dipilih.',
             'ro.in'                 => 'Nilai RO tidak valid.',
+            'ro.max'                => 'RO maksimal ' . self::MAX_RO . ' karakter.',
             'sub_komponen.required' => 'Sub komponen wajib dipilih.',
             'sub_komponen.in'       => 'Nilai sub komponen tidak valid untuk RO yang dipilih.',
+            'sub_komponen.max'      => 'Sub komponen maksimal ' . self::MAX_SUB_KOMPONEN . ' karakter.',
             'bulan.required'        => 'Bulan wajib dipilih.',
             'bulan.in'              => 'Nilai bulan tidak valid.',
+            'bulan.max'             => 'Bulan maksimal ' . self::MAX_BULAN . ' karakter.',
             'nilai_usulan.required' => 'Nilai usulan wajib diisi.',
             'nilai_usulan.numeric'  => 'Nilai usulan harus berupa angka.',
             'nilai_usulan.min'      => 'Nilai usulan minimal Rp 1.',
-            'nilai_usulan.max'      => 'Nilai usulan terlalu besar.',
-            'keterangan.max'        => 'Keterangan maksimal 500 karakter.',
+            'nilai_usulan.max'      => 'Nilai usulan terlalu besar (maksimal Rp ' . number_format(self::MAX_NILAI_USULAN, 0, ',', '.') . ').',
+            'keterangan.max'        => 'Keterangan maksimal ' . self::MAX_KETERANGAN . ' karakter.',
+            'catatan.max'           => 'Catatan maksimal ' . self::MAX_CATATAN . ' karakter.',
         ];
     }
 
     /**
      * Validasi rules — sub_komponen dicek dari DB berdasarkan RO yang dikirim.
+     * Setiap field string diberi batasan max karakter.
      */
     private function buildValidationRules(Request $request): array
     {
         $validRoList = $this->getValidRoList();
-
-        // Ambil sub_komponen yang valid dari DB berdasarkan RO input
-        // Jika RO tidak valid, validasi akan gagal di sini dulu
-        $ro                   = $request->input('ro', '');
-        $validSubkomponenList = in_array($ro, $validRoList)
+        $ro          = $request->input('ro', '');
+        $validSubkomponenList = in_array($ro, $validRoList, true)
             ? $this->getValidSubkomponenForRo($ro)
             : [];
 
@@ -90,37 +99,36 @@ class UsulanPenarikanController extends Controller
             'ro' => [
                 'required',
                 'string',
-                'max:50',
+                'max:' . self::MAX_RO,
                 Rule::in($validRoList),
             ],
             'sub_komponen' => [
                 'required',
                 'string',
-                'max:255',
-                // Whitelist dari DB — hanya nilai yang ada di tabel anggaran
+                'max:' . self::MAX_SUB_KOMPONEN,
                 Rule::in($validSubkomponenList),
             ],
             'bulan' => [
                 'required',
                 'string',
+                'max:' . self::MAX_BULAN,
                 Rule::in($this->getValidBulanList()),
             ],
             'nilai_usulan' => [
                 'required',
                 'numeric',
                 'min:1',
-                'max:999999999999',
+                'max:' . self::MAX_NILAI_USULAN,
             ],
             'keterangan' => [
                 'nullable',
                 'string',
-                'max:500',
+                'max:' . self::MAX_KETERANGAN,
             ],
         ];
     }
 
     // ── Index ──────────────────────────────────────────────────
-
     public function index(Request $request)
     {
         $validRoList    = $this->getValidRoList();
@@ -129,15 +137,18 @@ class UsulanPenarikanController extends Controller
         $query = UsulanPenarikan::with(['user', 'anggaran'])->orderBy('created_at', 'desc');
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+            // Validasi status hanya nilai yang dikenal
+            if (in_array($request->status, ['pending', 'approved', 'rejected'], true)) {
+                $query->where('status', $request->status);
+            }
         }
         if ($request->filled('bulan') && $request->bulan !== 'all') {
-            if (in_array($request->bulan, $validBulanList)) {
+            if (in_array($request->bulan, $validBulanList, true)) {
                 $query->where('bulan', $request->bulan);
             }
         }
         if ($request->filled('ro') && $request->ro !== 'all') {
-            if (in_array($request->ro, $validRoList)) {
+            if (in_array($request->ro, $validRoList, true)) {
                 $query->where('ro', $request->ro);
             }
         }
@@ -167,26 +178,24 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Create ─────────────────────────────────────────────────
-
     public function create()
     {
         $roList    = $this->getValidRoList();
         $bulanList = $this->getValidBulanList();
-
         return view('anggaran.usulan.create', compact('roList', 'bulanList'));
     }
 
     // ── Get Subkomponen (AJAX) ─────────────────────────────────
-
     public function getSubkomponen(Request $request)
     {
         try {
-            // Validasi RO dari whitelist sebelum query ke DB
-            if (!$request->ro || !in_array($request->ro, $this->getValidRoList())) {
+            // Validasi panjang dan whitelist RO
+            $ro = $request->input('ro', '');
+            if (!is_string($ro) || mb_strlen($ro) > self::MAX_RO || !in_array($ro, $this->getValidRoList(), true)) {
                 return response()->json(['error' => 'RO tidak valid.'], 400);
             }
 
-            $subkomponens = Anggaran::where('ro', $request->ro)
+            $subkomponens = Anggaran::where('ro', $ro)
                 ->whereNotNull('kode_subkomponen')
                 ->whereNull('kode_akun')
                 ->distinct()
@@ -201,23 +210,21 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Store ──────────────────────────────────────────────────
-
     public function store(Request $request)
     {
-        // Validasi dengan rules yang menyertakan whitelist sub_komponen dari DB
         $validated = $request->validate(
             $this->buildValidationRules($request),
             $this->validationMessages()
         );
 
-        // Sanitasi
-        $validated['ro']           = $this->sanitizeString($validated['ro']);
-        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen']);
-        $validated['bulan']        = $this->sanitizeString($validated['bulan']);
-        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null);
+        // Sanitasi dengan hard cut-off panjang
+        $validated['ro']           = $this->sanitizeString($validated['ro'], self::MAX_RO);
+        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen'], self::MAX_SUB_KOMPONEN);
+        $validated['bulan']        = $this->sanitizeString($validated['bulan'], self::MAX_BULAN);
+        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null, self::MAX_KETERANGAN);
 
-        // Triple-check: pastikan sub_komponen masih valid setelah sanitasi
-        if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']))) {
+        // Triple-check validitas sub_komponen
+        if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']), true)) {
             return back()->withInput()->with('error', 'Nilai sub komponen tidak valid.');
         }
 
@@ -249,7 +256,6 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Show ───────────────────────────────────────────────────
-
     public function show(UsulanPenarikan $usulan)
     {
         $usulan->load(['user', 'anggaran']);
@@ -268,7 +274,6 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Edit ───────────────────────────────────────────────────
-
     public function edit(UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -279,7 +284,6 @@ class UsulanPenarikanController extends Controller
         $roList    = $this->getValidRoList();
         $bulanList = $this->getValidBulanList();
 
-        // Ambil subkomponen untuk RO yang sudah tersimpan (untuk populate select awal)
         $subkomponenList = $usulan->ro
             ? Anggaran::where('ro', $usulan->ro)
                 ->whereNotNull('kode_subkomponen')
@@ -295,7 +299,6 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Update ─────────────────────────────────────────────────
-
     public function update(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -303,24 +306,20 @@ class UsulanPenarikanController extends Controller
                 ->with('error', 'Usulan yang sudah diproses tidak dapat diedit.');
         }
 
-        // Validasi dengan rules yang menyertakan whitelist sub_komponen dari DB
         $validated = $request->validate(
             $this->buildValidationRules($request),
             $this->validationMessages()
         );
 
-        // Sanitasi
-        $validated['ro']           = $this->sanitizeString($validated['ro']);
-        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen']);
-        $validated['bulan']        = $this->sanitizeString($validated['bulan']);
-        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null);
+        $validated['ro']           = $this->sanitizeString($validated['ro'], self::MAX_RO);
+        $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen'], self::MAX_SUB_KOMPONEN);
+        $validated['bulan']        = $this->sanitizeString($validated['bulan'], self::MAX_BULAN);
+        $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null, self::MAX_KETERANGAN);
 
-        // Triple-check: pastikan sub_komponen masih valid setelah sanitasi
-        if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']))) {
+        if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']), true)) {
             return back()->withInput()->with('error', 'Nilai sub komponen tidak valid.');
         }
 
-        // Validasi sisa anggaran
         $subkomp = Anggaran::where('ro', $validated['ro'])
             ->where('kode_subkomponen', $validated['sub_komponen'])
             ->whereNull('kode_akun')
@@ -345,22 +344,18 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Destroy ────────────────────────────────────────────────
-
     public function destroy(UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
             return redirect()->route('anggaran.usulan.index')
                 ->with('error', 'Usulan yang sudah diproses tidak dapat dihapus.');
         }
-
         $usulan->delete();
-
         return redirect()->route('anggaran.usulan.index')
             ->with('success', 'Usulan penarikan dana berhasil dihapus.');
     }
 
     // ── Approve ────────────────────────────────────────────────
-
     public function approve(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -368,12 +363,15 @@ class UsulanPenarikanController extends Controller
         }
 
         $validated = $request->validate([
-            'catatan' => 'nullable|string|max:500',
-        ]);
+            'catatan' => 'nullable|string|max:' . self::MAX_CATATAN,
+        ], $this->validationMessages());
 
         $usulan->update([
             'status'     => 'approved',
-            'keterangan' => $this->sanitizeString($validated['catatan'] ?? $usulan->keterangan),
+            'keterangan' => $this->sanitizeString(
+                $validated['catatan'] ?? $usulan->keterangan,
+                self::MAX_KETERANGAN
+            ),
         ]);
 
         return redirect()->route('anggaran.usulan.index')
@@ -381,7 +379,6 @@ class UsulanPenarikanController extends Controller
     }
 
     // ── Reject ─────────────────────────────────────────────────
-
     public function reject(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -389,20 +386,19 @@ class UsulanPenarikanController extends Controller
         }
 
         $validated = $request->validate([
-            'keterangan' => 'required|string|max:500',
-        ]);
+            'keterangan' => 'required|string|max:' . self::MAX_KETERANGAN,
+        ], $this->validationMessages());
 
         $usulan->update([
             'status'     => 'rejected',
-            'keterangan' => $this->sanitizeString($validated['keterangan']),
+            'keterangan' => $this->sanitizeString($validated['keterangan'], self::MAX_KETERANGAN),
         ]);
 
         return redirect()->route('anggaran.usulan.index')
             ->with('success', 'Usulan penarikan dana berhasil ditolak.');
     }
 
-    // ── Render Table HTML ──────────────────────────────────────
-
+    // ── Render Table HTML (sama seperti aslinya) ───────────────
     private function renderTableHtml($usulans): string
     {
         $badgeMap = [
@@ -414,7 +410,6 @@ class UsulanPenarikanController extends Controller
         $html  = '<div class="table-wrapper">';
         $html .= '<table class="table">';
         $html .= '<thead><tr>';
-
         foreach ([
             'w-10'             => 'No',
             ''                 => 'RO',
@@ -428,7 +423,6 @@ class UsulanPenarikanController extends Controller
         ] as $cls => $label) {
             $html .= '<th' . ($cls ? ' class="' . e($cls) . '"' : '') . '>' . e($label) . '</th>';
         }
-
         $html .= '</tr></thead><tbody>';
 
         if ($usulans->isEmpty()) {
@@ -485,7 +479,6 @@ class UsulanPenarikanController extends Controller
         </svg>
       </a>
 HTML;
-
                 if ($usulan->status === 'pending') {
                     $html .= <<<HTML
       <a href="{$editUrl}" class="table-action-edit" title="Edit">
@@ -494,7 +487,6 @@ HTML;
         </svg>
       </a>
 HTML;
-
                     if (auth()->user() && (auth()->user()->hasRole('superadmin') || auth()->user()->hasRole('admin'))) {
                         $html .= <<<HTML
       <form action="{$approveUrl}" method="POST" class="inline" x-data @submit.prevent="if(confirm('Setujui usulan ini?')) \$el.submit()">
@@ -512,7 +504,6 @@ HTML;
       </button>
 HTML;
                     }
-
                     $html .= <<<HTML
       <form action="{$deleteUrl}" method="POST" class="inline" x-data @submit.prevent="if(confirm('Hapus usulan ini? Tidak dapat dibatalkan.')) \$el.submit()">
         {$csrf}<input type="hidden" name="_method" value="DELETE">
@@ -524,7 +515,6 @@ HTML;
       </form>
 HTML;
                 }
-
                 $html .= '</div></td></tr>';
             }
         }

@@ -27,7 +27,7 @@ class SPPController extends Controller
             $query->where('ro', $request->ro);
         }
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = mb_substr(trim($request->search), 0, self::MAX_SEARCH);
             $query->where(function ($q) use ($search) {
                 $q->where('no_spp', 'like', "%{$search}%")
                     ->orWhere('uraian_spp', 'like', "%{$search}%")
@@ -298,42 +298,66 @@ class SPPController extends Controller
 
     // ── Private Methods ──────────────────────────────────────────
 
+    private const MAX_NO_SPP            = 100;
+    private const MAX_NOMINATIF         = 255;
+    private const MAX_JENIS_KEGIATAN    = 255;
+    private const MAX_JENIS_BELANJA     = 50;
+    private const MAX_NOMOR_KONTRAK     = 255;
+    private const MAX_NO_BAST           = 255;
+    private const MAX_ID_EPERJADIN      = 255;
+    private const MAX_URAIAN_SPP        = 5000;
+    private const MAX_BAGIAN            = 255;
+    private const MAX_NAMA_PIC          = 255;
+    private const MAX_KODE_KEGIATAN     = 50;
+    private const MAX_KRO               = 50;
+    private const MAX_RO                = 50;
+    private const MAX_SUB_KOMPONEN      = 255;
+    private const MAX_MAK               = 50;
+    private const MAX_NOMOR_SURAT_TUGAS = 255;
+    private const MAX_NOMOR_UNDANGAN    = 255;
+    private const MAX_LS_BENDAHARA      = 50;
+    private const MAX_STAFF_PPK         = 255;
+    private const MAX_NO_SP2D           = 255;
+    private const MAX_POSISI_UANG       = 255;
+    private const MAX_NETTO             = 999999999999;
+    private const MAX_SEARCH            = 200;
+
     private function getValidationRules(Request $request, ?string $sppId = null): array
     {
         return $request->validate([
-            'bulan'             => 'required|string|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
-            'no_spp'            => 'required|string|max:100|unique:spp,no_spp' . ($sppId ? ",{$sppId}" : ''),
-            'nominatif'         => 'nullable|string|max:255',
+            'bulan'             => 'required|string|max:20|in:januari,februari,maret,april,mei,juni,juli,agustus,september,oktober,november,desember',
+            'no_spp'            => 'required|string|max:' . self::MAX_NO_SPP . '|unique:spp,no_spp' . ($sppId ? ",{$sppId}" : ''),
+            'nominatif'         => 'nullable|string|max:' . self::MAX_NOMINATIF,
             'tgl_spp'           => 'required|date',
-            'jenis_kegiatan'    => 'required|string|max:255',
-            'jenis_belanja'     => 'required|string|in:Kontraktual,Non Kontraktual,GUP,TUP',
-            'nomor_kontrak'     => 'nullable|string|max:255',
-            'no_bast'           => 'nullable|string|max:255',
-            'id_eperjadin'      => 'nullable|string|max:255',
-            'uraian_spp'        => 'required|string',
-            'bagian'            => 'required|string|max:255',
-            'nama_pic'          => 'required|string|max:255',
-            'kode_kegiatan'     => 'required|string|max:50',
-            'kro'               => 'required|string|max:50',
-            'ro'                => 'required|string|max:50',
-            'sub_komponen'      => 'required|string|max:255',
-            'mak'               => 'required|string|max:50',
-            'nomor_surat_tugas' => 'nullable|string|max:255',
+            'jenis_kegiatan'    => 'required|string|max:' . self::MAX_JENIS_KEGIATAN,
+            'jenis_belanja'     => 'required|string|max:' . self::MAX_JENIS_BELANJA . '|in:Kontraktual,Non Kontraktual,GUP,TUP',
+            'nomor_kontrak'     => 'nullable|string|max:' . self::MAX_NOMOR_KONTRAK,
+            'no_bast'           => 'nullable|string|max:' . self::MAX_NO_BAST,
+            'id_eperjadin'      => 'nullable|string|max:' . self::MAX_ID_EPERJADIN,
+            'uraian_spp'        => 'required|string|max:' . self::MAX_URAIAN_SPP,
+            'bagian'            => 'required|string|max:' . self::MAX_BAGIAN,
+            'nama_pic'          => 'required|string|max:' . self::MAX_NAMA_PIC,
+            'kode_kegiatan'     => 'required|string|max:' . self::MAX_KODE_KEGIATAN,
+            'kro'               => 'required|string|max:' . self::MAX_KRO,
+            'ro'                => 'required|string|max:' . self::MAX_RO,
+            'sub_komponen'      => 'required|string|max:' . self::MAX_SUB_KOMPONEN,
+            'mak'               => 'required|string|max:' . self::MAX_MAK,
+            'nomor_surat_tugas' => 'nullable|string|max:' . self::MAX_NOMOR_SURAT_TUGAS,
             'tanggal_st'        => 'nullable|date',
-            'nomor_undangan'    => 'nullable|string|max:255',
-            'bruto'             => 'required|numeric|min:0',
-            'ppn'               => 'nullable|numeric|min:0',
-            'pph'               => 'nullable|numeric|min:0',
-            'netto'             => 'required|numeric|min:0',
+            'nomor_undangan'    => 'nullable|string|max:' . self::MAX_NOMOR_UNDANGAN,
+            'bruto'             => 'required|numeric|min:0|max:' . self::MAX_NETTO,
+            'ppn'               => 'nullable|numeric|min:0|max:' . self::MAX_NETTO,
+            'pph'               => 'nullable|numeric|min:0|max:' . self::MAX_NETTO,
+            'netto'             => 'required|numeric|min:0|max:' . self::MAX_NETTO,
             'tanggal_mulai'     => 'nullable|date',
             'tanggal_selesai'   => 'nullable|date|after_or_equal:tanggal_mulai',
-            'ls_bendahara'      => 'required|string|in:LS,Bendahara',
-            'staff_ppk'         => 'nullable|string|max:255',
-            'no_sp2d'           => 'nullable|string|max:255',
+            'ls_bendahara'      => 'required|string|max:' . self::MAX_LS_BENDAHARA . '|in:LS,Bendahara',
+            'staff_ppk'         => 'nullable|string|max:' . self::MAX_STAFF_PPK,
+            'no_sp2d'           => 'nullable|string|max:' . self::MAX_NO_SP2D,
             'tgl_selesai_sp2d'  => 'nullable|date',
             'tgl_sp2d'          => 'nullable|date',
-            'status'            => 'required|in:Tagihan Telah SP2D,Tagihan Belum SP2D',
-            'posisi_uang'       => 'nullable|string|max:255',
+            'status'            => 'required|max:50|in:Tagihan Telah SP2D,Tagihan Belum SP2D',
+            'posisi_uang'       => 'nullable|string|max:' . self::MAX_POSISI_UANG,
         ]);
     }
 

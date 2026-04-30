@@ -44,16 +44,16 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="input-group">
                 <label class="input-label">No SPP <span class="text-red-500">*</span></label>
-                <input type="text" name="no_spp" value="{{ old('no_spp') }}"
-                       class="input-field @error('no_spp') input-error @enderror"
-                       placeholder="Contoh: SPP-001/2025" required>
+              <input type="text" name="no_spp" value="{{ old('no_spp') }}"
+       class="input-field @error('no_spp') input-error @enderror"
+       placeholder="Contoh: SPP-001/2025" maxlength="100" required>
                 @error('no_spp')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="input-group">
                 <label class="input-label">Nominatif</label>
-                <input type="text" name="nominatif" value="{{ old('nominatif') }}"
-                       class="input-field" placeholder="Nama nominatif (opsional)">
+               <input type="text" name="nominatif" value="{{ old('nominatif') }}"
+       class="input-field" maxlength="255" placeholder="Nama nominatif (opsional)">
             </div>
 
             <div class="input-group">
@@ -79,8 +79,8 @@
             <div class="input-group">
                 <label class="input-label">Jenis Kegiatan <span class="text-red-500">*</span></label>
                 <input type="text" name="jenis_kegiatan" value="{{ old('jenis_kegiatan') }}"
-                       class="input-field @error('jenis_kegiatan') input-error @enderror"
-                       placeholder="Contoh: Perjalanan Dinas" required>
+       class="input-field @error('jenis_kegiatan') input-error @enderror"
+       placeholder="Contoh: Perjalanan Dinas" maxlength="255" required>
                 @error('jenis_kegiatan')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
@@ -99,43 +99,43 @@
 
             <div class="input-group">
                 <label class="input-label">Nomor Kontrak / SPBy</label>
-                <input type="text" name="nomor_kontrak" value="{{ old('nomor_kontrak') }}"
-                       class="input-field" placeholder="Nomor kontrak jika kontraktual">
+               <input type="text" name="nomor_kontrak" value="{{ old('nomor_kontrak') }}"
+       class="input-field" maxlength="255" placeholder="Nomor kontrak jika kontraktual">
             </div>
 
             <div class="input-group">
                 <label class="input-label">No BAST / Kuitansi</label>
                 <input type="text" name="no_bast" value="{{ old('no_bast') }}"
-                       class="input-field" placeholder="Nomor BAST atau Kuitansi">
+       class="input-field" maxlength="255" placeholder="Nomor BAST atau Kuitansi">
             </div>
 
             <div class="input-group">
                 <label class="input-label">ID e-Perjadin</label>
-                <input type="text" name="id_eperjadin" value="{{ old('id_eperjadin') }}"
-                       class="input-field" placeholder="ID e-Perjadin jika ada">
+               <input type="text" name="id_eperjadin" value="{{ old('id_eperjadin') }}"
+       class="input-field" maxlength="255" placeholder="ID e-Perjadin jika ada">
             </div>
 
             <div class="input-group">
                 <label class="input-label">Bagian <span class="text-red-500">*</span></label>
                 <input type="text" name="bagian" value="{{ old('bagian') }}"
-                       class="input-field @error('bagian') input-error @enderror"
-                       placeholder="Nama bagian" required>
+       class="input-field @error('bagian') input-error @enderror"
+       placeholder="Nama bagian" maxlength="255" required>
                 @error('bagian')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="input-group">
                 <label class="input-label">Nama PIC <span class="text-red-500">*</span></label>
                 <input type="text" name="nama_pic" value="{{ old('nama_pic') }}"
-                       class="input-field @error('nama_pic') input-error @enderror"
-                       placeholder="Nama PIC" required>
+       class="input-field @error('nama_pic') input-error @enderror"
+       placeholder="Nama PIC" maxlength="255" required>
                 @error('nama_pic')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="input-group md:col-span-2">
                 <label class="input-label">Uraian SPP <span class="text-red-500">*</span></label>
-                <textarea name="uraian_spp" rows="3"
-                          class="input-field @error('uraian_spp') input-error @enderror"
-                          placeholder="Uraian lengkap kegiatan SPP" required>{{ old('uraian_spp') }}</textarea>
+                <textarea name="uraian_spp" rows="3" maxlength="5000"
+          class="input-field @error('uraian_spp') input-error @enderror"
+          placeholder="Uraian lengkap kegiatan SPP (maks. 5000 karakter)" required>{{ old('uraian_spp') }}</textarea>
                 @error('uraian_spp')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
         </div>
@@ -167,19 +167,19 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="input-group">
                 <label class="input-label">Kode Kegiatan <span class="text-red-500">*</span></label>
-                <input type="text" name="kode_kegiatan" id="kode_kegiatan"
-                       value="{{ old('kode_kegiatan', '4753') }}"
-                       class="input-field @error('kode_kegiatan') input-error @enderror"
-                       placeholder="Contoh: 4753" required>
+               <input type="text" name="kode_kegiatan" id="kode_kegiatan"
+       value="{{ old('kode_kegiatan', '4753') }}"
+       class="input-field @error('kode_kegiatan') input-error @enderror"
+       placeholder="Contoh: 4753" maxlength="50" required>
                 @error('kode_kegiatan')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="input-group">
                 <label class="input-label">KRO <span class="text-red-500">*</span></label>
-                <input type="text" name="kro" id="kro"
-                       value="{{ old('kro', 'EBA') }}"
-                       class="input-field @error('kro') input-error @enderror"
-                       placeholder="Contoh: EBA" required>
+               <input type="text" name="kro" id="kro"
+       value="{{ old('kro', 'EBA') }}"
+       class="input-field @error('kro') input-error @enderror"
+       placeholder="Contoh: EBA" maxlength="50" required>
                 @error('kro')<p class="input-hint-error">{{ $message }}</p>@enderror
             </div>
 
@@ -238,8 +238,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="input-group">
                 <label class="input-label">Nomor Surat Tugas / BAST / SK</label>
-                <input type="text" name="nomor_surat_tugas" value="{{ old('nomor_surat_tugas') }}"
-                       class="input-field" placeholder="Nomor surat tugas">
+               <input type="text" name="nomor_surat_tugas" value="{{ old('nomor_surat_tugas') }}"
+       class="input-field" maxlength="255" placeholder="Nomor surat tugas">
             </div>
 
             <div class="input-group">
@@ -249,8 +249,8 @@
 
             <div class="input-group">
                 <label class="input-label">Nomor Undangan</label>
-                <input type="text" name="nomor_undangan" value="{{ old('nomor_undangan') }}"
-                       class="input-field" placeholder="Nomor undangan jika ada">
+              <input type="text" name="nomor_undangan" value="{{ old('nomor_undangan') }}"
+       class="input-field" maxlength="255" placeholder="Nomor undangan jika ada">
             </div>
 
             <div class="input-group">{{-- spacer --}}</div>
@@ -354,7 +354,7 @@
             <div class="input-group">
                 <label class="input-label">Staff PPK</label>
                 <input type="text" name="staff_ppk" value="{{ old('staff_ppk') }}"
-                       class="input-field" placeholder="Nama staff PPK">
+       class="input-field" maxlength="255" placeholder="Nama staff PPK">
             </div>
 
             <div class="input-group">
@@ -375,15 +375,15 @@
 
             <div class="input-group">
                 <label class="input-label">Posisi Uang</label>
-                <input type="text" name="posisi_uang" value="{{ old('posisi_uang') }}"
-                       class="input-field" placeholder="Keterangan posisi uang">
+               <input type="text" name="posisi_uang" value="{{ old('posisi_uang') }}"
+       class="input-field" maxlength="255" placeholder="Keterangan posisi uang">
             </div>
 
             {{-- SP2D Fields (conditional) --}}
             <div x-show="showSP2D" x-transition class="input-group">
                 <label class="input-label">No SP2D</label>
-                <input type="text" name="no_sp2d" value="{{ old('no_sp2d') }}"
-                       class="input-field" placeholder="Nomor SP2D">
+               <input type="text" name="no_sp2d" value="{{ old('no_sp2d') }}"
+       class="input-field" maxlength="255" placeholder="Nomor SP2D">
             </div>
 
             <div x-show="showSP2D" x-transition class="input-group">

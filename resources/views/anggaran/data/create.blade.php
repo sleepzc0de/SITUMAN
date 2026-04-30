@@ -142,7 +142,7 @@
                             {{-- Untuk level "subkomponen": ketik kode baru --}}
                             <input type="text" id="kode_subkomponen_input"
                                 class="input-field font-mono @error('kode_subkomponen') input-error @enderror"
-                                placeholder="Contoh: AA, AB" style="display:none;" maxlength="10" autocomplete="off">
+                                placeholder="Contoh: AA, AB" style="display:none;" maxlength="50" autocomplete="off">
 
                             {{-- Hidden field yang dikirim ke server --}}
                             <input type="hidden" name="kode_subkomponen" id="kode_subkomponen_final"
@@ -197,9 +197,9 @@
                             <label class="input-label" for="program_kegiatan">
                                 Uraian Program / Kegiatan <span class="text-red-500">*</span>
                             </label>
-                            <textarea id="program_kegiatan" name="program_kegiatan" rows="3"
+                            <textarea id="program_kegiatan" name="program_kegiatan" rows="3" maxlength="1000"
                                 class="input-field resize-none @error('program_kegiatan') input-error @enderror"
-                                placeholder="Tuliskan uraian lengkap program/kegiatan/output/komponen/akun..." required>{{ old('program_kegiatan') }}</textarea>
+                                placeholder="Tuliskan uraian lengkap... (maks. 1000 karakter)" required>{{ old('program_kegiatan') }}</textarea>
                             @error('program_kegiatan')
                                 <p class="input-hint-error">{{ $message }}</p>
                             @enderror
@@ -531,7 +531,7 @@
                 if (level === 'subkomponen' && !subkompFinal.value.trim()) {
                     e.preventDefault();
                     if (typeof showToast === 'function') showToast('Masukkan Kode Sub Komponen!',
-                    'warning');
+                        'warning');
                     subkompInput.focus();
                     return;
                 }

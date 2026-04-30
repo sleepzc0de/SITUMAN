@@ -110,15 +110,24 @@ class RevisiAnggaranController extends Controller
         return view('anggaran.revisi.create', compact('anggarans', 'jenisRevisi'));
     }
 
+
+    private const MAX_JENIS_REVISI = 100;
+    private const MAX_ALASAN       = 1000;
+    private const MAX_PAGU         = 999999999999;
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'anggaran_id'       => 'required|exists:anggaran,id',
-            'jenis_revisi'      => 'required|string|in:POK,DIPA,Revisi Anggaran,Pergeseran',
-            'pagu_sesudah'      => 'required|numeric|min:0',
-            'alasan_revisi'     => 'required|string|max:1000',
+            'jenis_revisi'      => 'required|string|max:' . self::MAX_JENIS_REVISI . '|in:POK,DIPA,Revisi Anggaran,Pergeseran',
+            'pagu_sesudah'      => 'required|numeric|min:0|max:' . self::MAX_PAGU,
+            'alasan_revisi'     => 'required|string|max:' . self::MAX_ALASAN,
             'tanggal_revisi'    => 'required|date',
             'dokumen_pendukung' => 'nullable|file|mimes:pdf|max:5120',
+        ], [
+            'jenis_revisi.max'   => 'Jenis revisi maksimal ' . self::MAX_JENIS_REVISI . ' karakter.',
+            'alasan_revisi.max'  => 'Alasan revisi maksimal ' . self::MAX_ALASAN . ' karakter.',
+            'pagu_sesudah.max'   => 'Nilai pagu terlalu besar.',
         ]);
 
         $anggaran = Anggaran::findOrFail($validated['anggaran_id']);
