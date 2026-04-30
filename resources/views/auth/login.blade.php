@@ -468,7 +468,7 @@
             <p class="text-xs footer-text">
                 &copy; {{ date('Y') }} Biro Manajemen BMN dan Pengadaan &middot; Hak Cipta Dilindungi
             </p>
-            <p class="text-xs footer-text">Versi 3.0</p>
+            <p class="text-xs footer-text">Versi 4.0</p>
         </div>
 
     </div>

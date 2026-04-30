@@ -9,14 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         // Truncate data yang melebihi batas (jika ada) sebelum alter
-        DB::statement("UPDATE atk SET deskripsi = LEFT(deskripsi, 2000) WHERE LENGTH(deskripsi) > 2000");
-        DB::statement("UPDATE kategori_atk SET deskripsi = LEFT(deskripsi, 1000) WHERE LENGTH(deskripsi) > 1000");
-        DB::statement("UPDATE permintaan_atk SET keterangan = LEFT(keterangan, 1000) WHERE LENGTH(keterangan) > 1000");
-        DB::statement("UPDATE permintaan_atk SET alasan_penolakan = LEFT(alasan_penolakan, 500) WHERE LENGTH(alasan_penolakan) > 500");
-        DB::statement("UPDATE permintaan_atk_detail SET keterangan = LEFT(keterangan, 500) WHERE LENGTH(keterangan) > 500");
+        // SQL Server: gunakan LEN() untuk varchar/nvarchar, DATALENGTH() untuk text/ntext
+        DB::statement("UPDATE atk SET deskripsi = LEFT(deskripsi, 2000) WHERE LEN(deskripsi) > 2000");
+        DB::statement("UPDATE kategori_atk SET deskripsi = LEFT(deskripsi, 1000) WHERE LEN(deskripsi) > 1000");
+        DB::statement("UPDATE permintaan_atk SET keterangan = LEFT(keterangan, 1000) WHERE LEN(keterangan) > 1000");
+        DB::statement("UPDATE permintaan_atk SET alasan_penolakan = LEFT(alasan_penolakan, 500) WHERE LEN(alasan_penolakan) > 500");
+        DB::statement("UPDATE permintaan_atk_detail SET keterangan = LEFT(keterangan, 500) WHERE LEN(keterangan) > 500");
 
         Schema::table('atk', function (Blueprint $table) {
-            $table->string('kode_atk', 50)->unique()->change();
+            $table->string('kode_atk', 50)->change();
             $table->string('nama', 255)->change();
             $table->string('deskripsi', 2000)->nullable()->change();
             $table->string('satuan', 20)->change();
@@ -28,7 +29,7 @@ return new class extends Migration
         });
 
         Schema::table('permintaan_atk', function (Blueprint $table) {
-            $table->string('nomor_permintaan', 50)->unique()->change();
+            $table->string('nomor_permintaan', 50)->change();
             $table->string('keterangan', 1000)->nullable()->change();
             $table->string('alasan_penolakan', 500)->nullable()->change();
         });
