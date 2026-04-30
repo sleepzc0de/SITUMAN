@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/Inventaris/MonitoringAtkController.php
-
 namespace App\Http\Controllers\Inventaris;
 
 use App\Http\Controllers\Controller;
@@ -17,8 +15,57 @@ class MonitoringAtkController extends Controller
 {
     private const SATUAN_VALID = ['pcs', 'rim', 'box', 'lusin', 'pack', 'unit', 'set'];
 
+    /**
+     * Aturan validasi terpusat untuk store & update.
+     */
+    private function validationRules(): array
+    {
+        return [
+            'kategori_id'   => 'required|uuid|exists:kategori_atk,id',
+            'nama'          => 'required|string|min:3|max:255',
+            'deskripsi'     => 'nullable|string|max:2000',
+            'satuan'        => 'required|string|in:' . implode(',', self::SATUAN_VALID),
+            'stok_minimum'  => 'required|integer|min:0|max:999999',
+            'stok_tersedia' => 'required|integer|min:0|max:999999',
+            'harga_satuan'  => 'required|numeric|min:0|max:99999999999',
+        ];
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'kategori_id.required'   => 'Kategori harus dipilih.',
+            'kategori_id.exists'     => 'Kategori tidak valid.',
+            'nama.required'          => 'Nama ATK harus diisi.',
+            'nama.min'               => 'Nama ATK minimal 3 karakter.',
+            'nama.max'               => 'Nama ATK maksimal 255 karakter.',
+            'deskripsi.max'          => 'Deskripsi maksimal 2000 karakter.',
+            'satuan.required'        => 'Satuan harus dipilih.',
+            'satuan.in'              => 'Satuan tidak valid.',
+            'stok_minimum.required'  => 'Stok minimum harus diisi.',
+            'stok_minimum.integer'   => 'Stok minimum harus bilangan bulat.',
+            'stok_minimum.min'       => 'Stok minimum tidak boleh negatif.',
+            'stok_minimum.max'       => 'Stok minimum maksimal 999.999.',
+            'stok_tersedia.required' => 'Stok tersedia harus diisi.',
+            'stok_tersedia.integer'  => 'Stok tersedia harus bilangan bulat.',
+            'stok_tersedia.min'      => 'Stok tersedia tidak boleh negatif.',
+            'stok_tersedia.max'      => 'Stok tersedia maksimal 999.999.',
+            'harga_satuan.required'  => 'Harga satuan harus diisi.',
+            'harga_satuan.numeric'   => 'Harga satuan harus berupa angka.',
+            'harga_satuan.min'       => 'Harga satuan tidak boleh negatif.',
+            'harga_satuan.max'       => 'Harga satuan terlalu besar.',
+        ];
+    }
+
     public function index(Request $request)
     {
+        // Batasi panjang search untuk hindari abuse
+        $request->validate([
+            'search'   => 'nullable|string|max:100',
+            'kategori' => 'nullable|uuid',
+            'status'   => 'nullable|in:tersedia,menipis,kosong',
+        ]);
+
         $query = Atk::with('kategori');
 
         if ($request->filled('kategori')) {
@@ -28,7 +75,7 @@ class MonitoringAtkController extends Controller
             $query->where('status', $request->status);
         }
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = mb_substr($request->search, 0, 100);
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', '%' . $search . '%')
                     ->orWhere('kode_atk', 'like', '%' . $search . '%');
@@ -37,12 +84,12 @@ class MonitoringAtkController extends Controller
 
         $atk       = $query->latest()->paginate(15)->withQueryString();
         $kategoris = KategoriAtk::orderBy('nama')->get();
+
         $stats = [
             'total_item'    => Atk::count(),
             'stok_tersedia' => Atk::where('status', 'tersedia')->count(),
             'stok_menipis'  => Atk::where('status', 'menipis')->count(),
             'stok_kosong'   => Atk::where('status', 'kosong')->count(),
-            // PERBAIKAN: total nilai = stok_tersedia * harga_satuan, bukan hanya sum harga
             'total_nilai'   => Atk::selectRaw('SUM(stok_tersedia * harga_satuan) as total')->value('total') ?? 0,
         ];
 
@@ -57,15 +104,7 @@ class MonitoringAtkController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'kategori_id'   => 'required|exists:kategori_atk,id',
-            'nama'          => 'required|string|max:255',
-            'deskripsi'     => 'nullable|string|max:2000',
-            'satuan'        => 'required|in:' . implode(',', self::SATUAN_VALID),
-            'stok_minimum'  => 'required|integer|min:0|max:999999',
-            'stok_tersedia' => 'required|integer|min:0|max:999999',
-            'harga_satuan'  => 'required|numeric|min:0|max:99999999999',
-        ]);
+        $validated = $request->validate($this->validationRules(), $this->validationMessages());
 
         try {
             $atk = Atk::create($validated);
@@ -87,6 +126,7 @@ class MonitoringAtkController extends Controller
                 ->with(['permintaan.pegawai', 'permintaan.user'])
                 ->limit(20),
         ]);
+
         return view('inventaris.monitoring-atk.show', compact('monitoringAtk'));
     }
 
@@ -98,15 +138,7 @@ class MonitoringAtkController extends Controller
 
     public function update(Request $request, Atk $monitoringAtk)
     {
-        $validated = $request->validate([
-            'kategori_id'   => 'required|exists:kategori_atk,id',
-            'nama'          => 'required|string|max:255',
-            'deskripsi'     => 'nullable|string|max:2000',
-            'satuan'        => 'required|in:' . implode(',', self::SATUAN_VALID),
-            'stok_minimum'  => 'required|integer|min:0|max:999999',
-            'stok_tersedia' => 'required|integer|min:0|max:999999',
-            'harga_satuan'  => 'required|numeric|min:0|max:99999999999',
-        ]);
+        $validated = $request->validate($this->validationRules(), $this->validationMessages());
 
         try {
             $monitoringAtk->update($validated);
@@ -138,11 +170,18 @@ class MonitoringAtkController extends Controller
             'jenis'      => 'required|in:tambah,kurang',
             'jumlah'     => 'required|integer|min:1|max:999999',
             'keterangan' => 'nullable|string|max:500',
+        ], [
+            'jenis.required'      => 'Jenis transaksi harus dipilih.',
+            'jenis.in'            => 'Jenis transaksi tidak valid.',
+            'jumlah.required'     => 'Jumlah harus diisi.',
+            'jumlah.integer'      => 'Jumlah harus bilangan bulat.',
+            'jumlah.min'          => 'Jumlah minimal 1.',
+            'jumlah.max'          => 'Jumlah maksimal 999.999.',
+            'keterangan.max'      => 'Keterangan maksimal 500 karakter.',
         ]);
 
         DB::beginTransaction();
         try {
-            // Re-fetch dengan lock untuk hindari race condition
             $atk = Atk::lockForUpdate()->findOrFail($monitoringAtk->id);
 
             if ($validated['jenis'] === 'tambah') {
@@ -199,6 +238,10 @@ class MonitoringAtkController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:2048',
+        ], [
+            'file.required' => 'File harus diupload.',
+            'file.mimes'    => 'Format file harus xlsx, xls, atau csv.',
+            'file.max'      => 'Ukuran file maksimal 2MB.',
         ]);
 
         try {

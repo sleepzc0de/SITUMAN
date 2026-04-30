@@ -29,8 +29,6 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto space-y-5">
-
-    {{-- ── Info strip ── --}}
     <div class="card-flat flex items-center gap-4">
         <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-navy-100 to-navy-200
                     dark:from-navy-700 dark:to-navy-600 flex items-center justify-center flex-shrink-0">
@@ -47,19 +45,15 @@
         </div>
     </div>
 
-    {{-- ── Form Card ── --}}
     <div class="card">
         <form action="{{ route('inventaris.kategori-atk.update', $kategoriAtk) }}" method="POST"
               x-data="{
-                  nama: '{{ old('nama', addslashes($kategoriAtk->nama)) }}',
-                  deskripsi: '{{ old('deskripsi', addslashes($kategoriAtk->deskripsi ?? '')) }}'
+                  nama: @js(old('nama', $kategoriAtk->nama)),
+                  deskripsi: @js(old('deskripsi', $kategoriAtk->deskripsi ?? ''))
               }">
             @csrf
             @method('PUT')
-
             <div class="space-y-5">
-
-                {{-- Nama Kategori --}}
                 <div class="input-group">
                     <label for="nama" class="input-label">
                         Nama Kategori
@@ -69,38 +63,40 @@
                         x-model="nama"
                         class="input-field @error('nama') input-error @enderror"
                         autocomplete="off"
+                        minlength="3"
+                        maxlength="100"
                         required>
                     @error('nama')
                         <p class="input-hint-error">{{ $message }}</p>
                     @else
-                        <p class="input-hint">Nama kategori harus unik di seluruh sistem</p>
+                        <p class="input-hint">
+                            <span x-text="nama.length"></span>/100 karakter
+                        </p>
                     @enderror
                 </div>
 
-                {{-- Deskripsi --}}
                 <div class="input-group">
                     <label for="deskripsi" class="input-label">Deskripsi</label>
                     <textarea id="deskripsi" name="deskripsi" rows="4"
                         x-model="deskripsi"
+                        maxlength="1000"
                         class="input-field @error('deskripsi') input-error @enderror">{{ old('deskripsi', $kategoriAtk->deskripsi) }}</textarea>
                     @error('deskripsi')
                         <p class="input-hint-error">{{ $message }}</p>
                     @else
-                        <p class="input-hint" x-text="deskripsi.length + ' karakter'"></p>
+                        <p class="input-hint">
+                            <span x-text="deskripsi.length"></span>/1000 karakter
+                        </p>
                     @enderror
                 </div>
-
             </div>
 
-            {{-- Actions --}}
             <div class="flex items-center justify-between gap-3 mt-6 pt-5 border-t border-gray-100 dark:border-navy-700">
                 <a href="{{ route('inventaris.kategori-atk.index') }}" class="btn-ghost btn-sm text-gray-500">
                     ← Kembali ke Daftar
                 </a>
                 <div class="flex items-center gap-3">
-                    <a href="{{ route('inventaris.kategori-atk.show', $kategoriAtk) }}" class="btn-outline">
-                        Batal
-                    </a>
+                    <a href="{{ route('inventaris.kategori-atk.show', $kategoriAtk) }}" class="btn-outline">Batal</a>
                     <button type="submit" class="btn-primary">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -112,7 +108,6 @@
         </form>
     </div>
 
-    {{-- ── Danger Zone ── --}}
     @if(($kategoriAtk->atk_count ?? $kategoriAtk->atk()->count()) === 0)
     <div class="card border-red-200 dark:border-red-800/50">
         <div class="flex items-start justify-between gap-4">
@@ -134,6 +129,5 @@
         </div>
     </div>
     @endif
-
 </div>
 @endsection

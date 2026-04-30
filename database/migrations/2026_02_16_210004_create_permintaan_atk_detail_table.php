@@ -1,5 +1,4 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -12,9 +11,11 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('permintaan_id')->constrained('permintaan_atk')->onDelete('cascade');
             $table->foreignUuid('atk_id')->constrained('atk')->onDelete('cascade');
-            $table->integer('jumlah');
-            $table->text('keterangan')->nullable();
+            $table->unsignedInteger('jumlah');
+            $table->string('keterangan', 500)->nullable();
             $table->timestamps();
+
+            $table->index('permintaan_id');
         });
     }
 

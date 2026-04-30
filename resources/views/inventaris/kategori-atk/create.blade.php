@@ -20,15 +20,11 @@
 
 @section('content')
 <div class="max-w-2xl mx-auto space-y-5">
-
-    {{-- ── Form Card ── --}}
     <div class="card">
         <form action="{{ route('inventaris.kategori-atk.store') }}" method="POST"
               x-data="{ nama: '{{ old('nama') }}', deskripsi: '{{ old('deskripsi') }}' }">
             @csrf
-
             <div class="space-y-5">
-
                 {{-- Nama Kategori --}}
                 <div class="input-group">
                     <label for="nama" class="input-label">
@@ -40,11 +36,15 @@
                         class="input-field @error('nama') input-error @enderror"
                         placeholder="Contoh: Alat Tulis, Kertas, Tinta..."
                         autocomplete="off"
+                        minlength="3"
+                        maxlength="100"
                         required>
                     @error('nama')
                         <p class="input-hint-error">{{ $message }}</p>
                     @else
-                        <p class="input-hint">Nama kategori harus unik dan deskriptif</p>
+                        <p class="input-hint">
+                            <span x-text="nama.length"></span>/100 karakter — Nama kategori harus unik dan deskriptif
+                        </p>
                     @enderror
                 </div>
 
@@ -54,11 +54,14 @@
                     <textarea id="deskripsi" name="deskripsi" rows="4"
                         x-model="deskripsi"
                         class="input-field @error('deskripsi') input-error @enderror"
+                        maxlength="1000"
                         placeholder="Deskripsi singkat tentang jenis ATK dalam kategori ini...">{{ old('deskripsi') }}</textarea>
                     @error('deskripsi')
                         <p class="input-hint-error">{{ $message }}</p>
                     @else
-                        <p class="input-hint" x-text="deskripsi.length + ' karakter'"></p>
+                        <p class="input-hint">
+                            <span x-text="deskripsi.length"></span>/1000 karakter
+                        </p>
                     @enderror
                 </div>
 
@@ -83,14 +86,10 @@
                         </div>
                     </div>
                 </div>
-
             </div>
 
-            {{-- Actions --}}
             <div class="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-100 dark:border-navy-700">
-                <a href="{{ route('inventaris.kategori-atk.index') }}" class="btn-outline">
-                    Batal
-                </a>
+                <a href="{{ route('inventaris.kategori-atk.index') }}" class="btn-outline">Batal</a>
                 <button type="submit" class="btn-primary">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -101,7 +100,6 @@
         </form>
     </div>
 
-    {{-- ── Info Box ── --}}
     <div class="alert-info">
         <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -114,6 +112,5 @@
             </p>
         </div>
     </div>
-
 </div>
 @endsection

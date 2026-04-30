@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Inventaris;
 
 use App\Http\Controllers\Controller;
@@ -16,7 +15,6 @@ class KategoriAtkController extends Controller
             ->latest()
             ->paginate(15);
 
-        // Summary stats
         $totalKategori  = KategoriAtk::count();
         $totalAtk       = \App\Models\Atk::count();
         $totalMenipis   = \App\Models\Atk::where('status', 'menipis')->count();
@@ -35,8 +33,14 @@ class KategoriAtkController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama'      => 'required|string|max:255|unique:kategori_atk,nama',
-            'deskripsi' => 'nullable|string',
+            'nama'      => 'required|string|min:3|max:100|unique:kategori_atk,nama',
+            'deskripsi' => 'nullable|string|max:1000',
+        ], [
+            'nama.required' => 'Nama kategori harus diisi.',
+            'nama.min'      => 'Nama kategori minimal 3 karakter.',
+            'nama.max'      => 'Nama kategori maksimal 100 karakter.',
+            'nama.unique'   => 'Nama kategori sudah digunakan.',
+            'deskripsi.max' => 'Deskripsi maksimal 1000 karakter.',
         ]);
 
         KategoriAtk::create($validated);
@@ -47,7 +51,6 @@ class KategoriAtkController extends Controller
 
     public function show(KategoriAtk $kategoriAtk)
     {
-        // Fix: gunakan paginate terpisah, bukan dalam load()
         $atks = $kategoriAtk->atk()->latest()->paginate(10);
 
         $stats = [
@@ -70,8 +73,14 @@ class KategoriAtkController extends Controller
     public function update(Request $request, KategoriAtk $kategoriAtk)
     {
         $validated = $request->validate([
-            'nama'      => 'required|string|max:255|unique:kategori_atk,nama,' . $kategoriAtk->id,
-            'deskripsi' => 'nullable|string',
+            'nama'      => 'required|string|min:3|max:100|unique:kategori_atk,nama,' . $kategoriAtk->id,
+            'deskripsi' => 'nullable|string|max:1000',
+        ], [
+            'nama.required' => 'Nama kategori harus diisi.',
+            'nama.min'      => 'Nama kategori minimal 3 karakter.',
+            'nama.max'      => 'Nama kategori maksimal 100 karakter.',
+            'nama.unique'   => 'Nama kategori sudah digunakan.',
+            'deskripsi.max' => 'Deskripsi maksimal 1000 karakter.',
         ]);
 
         $kategoriAtk->update($validated);

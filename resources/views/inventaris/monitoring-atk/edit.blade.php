@@ -13,8 +13,11 @@
 @endsection
 
 @section('content')
-<div class="max-w-3xl mx-auto space-y-6">
-
+<div class="max-w-3xl mx-auto space-y-6"
+     x-data="{
+         nama: @js(old('nama', $monitoringAtk->nama)),
+         deskripsi: @js(old('deskripsi', $monitoringAtk->deskripsi ?? ''))
+     }">
     {{-- Header --}}
     <div class="flex items-start gap-4">
         <a href="{{ route('inventaris.monitoring-atk.show', $monitoringAtk) }}"
@@ -55,7 +58,6 @@
             <div class="divider"></div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {{-- Kategori --}}
                 <div class="input-group">
                     <label class="input-label" for="kategori_id">
                         Kategori ATK <span class="text-red-500">*</span>
@@ -75,20 +77,26 @@
                     @enderror
                 </div>
 
-                {{-- Nama --}}
                 <div class="input-group">
                     <label class="input-label" for="nama">
                         Nama ATK <span class="text-red-500">*</span>
                     </label>
                     <input id="nama" type="text" name="nama"
+                        x-model="nama"
                         value="{{ old('nama', $monitoringAtk->nama) }}"
-                        class="input-field @error('nama') input-error @enderror" required>
+                        class="input-field @error('nama') input-error @enderror"
+                        minlength="3"
+                        maxlength="255"
+                        required>
                     @error('nama')
                     <p class="input-hint-error">{{ $message }}</p>
+                    @else
+                    <p class="input-hint">
+                        <span x-text="nama.length"></span>/255 karakter
+                    </p>
                     @enderror
                 </div>
 
-                {{-- Satuan --}}
                 <div class="input-group">
                     <label class="input-label" for="satuan">
                         Satuan <span class="text-red-500">*</span>
@@ -108,7 +116,6 @@
                     @enderror
                 </div>
 
-                {{-- Harga --}}
                 <div class="input-group">
                     <label class="input-label" for="harga_satuan">
                         Harga Satuan <span class="text-red-500">*</span>
@@ -118,7 +125,7 @@
                         <input id="harga_satuan" type="number" name="harga_satuan"
                             value="{{ old('harga_satuan', $monitoringAtk->harga_satuan) }}"
                             class="input-field pl-9 @error('harga_satuan') input-error @enderror"
-                            min="0" step="1" required>
+                            min="0" max="99999999999" step="1" required>
                     </div>
                     @error('harga_satuan')
                     <p class="input-hint-error">{{ $message }}</p>
@@ -126,13 +133,18 @@
                 </div>
             </div>
 
-            {{-- Deskripsi --}}
             <div class="input-group">
                 <label class="input-label" for="deskripsi">Deskripsi</label>
                 <textarea id="deskripsi" name="deskripsi" rows="3"
+                    x-model="deskripsi"
+                    maxlength="2000"
                     class="input-field @error('deskripsi') input-error @enderror">{{ old('deskripsi', $monitoringAtk->deskripsi) }}</textarea>
                 @error('deskripsi')
                 <p class="input-hint-error">{{ $message }}</p>
+                @else
+                <p class="input-hint">
+                    <span x-text="deskripsi.length"></span>/2000 karakter
+                </p>
                 @enderror
             </div>
         </div>
@@ -147,7 +159,6 @@
             </div>
             <div class="divider"></div>
 
-            {{-- Info stok saat ini --}}
             <div class="grid grid-cols-3 gap-3 p-4 bg-gray-50 dark:bg-navy-700/40 rounded-xl">
                 <div class="text-center">
                     <p class="text-xs text-gray-500 dark:text-gray-400">Stok Saat Ini</p>
@@ -175,7 +186,7 @@
                     <input id="stok_tersedia" type="number" name="stok_tersedia"
                         value="{{ old('stok_tersedia', $monitoringAtk->stok_tersedia) }}"
                         class="input-field @error('stok_tersedia') input-error @enderror"
-                        min="0" required>
+                        min="0" max="999999" required>
                     @error('stok_tersedia')
                     <p class="input-hint-error">{{ $message }}</p>
                     @enderror
@@ -188,7 +199,7 @@
                     <input id="stok_minimum" type="number" name="stok_minimum"
                         value="{{ old('stok_minimum', $monitoringAtk->stok_minimum) }}"
                         class="input-field @error('stok_minimum') input-error @enderror"
-                        min="0" required>
+                        min="0" max="999999" required>
                     @error('stok_minimum')
                     <p class="input-hint-error">{{ $message }}</p>
                     @enderror
@@ -196,11 +207,8 @@
             </div>
         </div>
 
-        {{-- Footer --}}
         <div class="flex items-center justify-between gap-3 mt-6">
-            <a href="{{ route('inventaris.monitoring-atk.show', $monitoringAtk) }}" class="btn-ghost">
-                Batal
-            </a>
+            <a href="{{ route('inventaris.monitoring-atk.show', $monitoringAtk) }}" class="btn-ghost">Batal</a>
             <button type="submit" class="btn-primary">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

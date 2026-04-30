@@ -19,11 +19,14 @@
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Lengkapi form di bawah ini untuk menambahkan ATK baru</p>
         </div>
 
-        <form action="{{ route('inventaris.monitoring-atk.store') }}" method="POST">
+        <form action="{{ route('inventaris.monitoring-atk.store') }}" method="POST"
+              x-data="{
+                  nama: @js(old('nama', '')),
+                  deskripsi: @js(old('deskripsi', ''))
+              }">
             @csrf
-
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Kategori -->
+                {{-- Kategori --}}
                 <div class="input-group">
                     <label class="input-label">Kategori ATK <span class="text-red-500">*</span></label>
                     <select name="kategori_id" class="input-field @error('kategori_id') border-red-500 @enderror" required>
@@ -39,84 +42,96 @@
                     @enderror
                 </div>
 
-                <!-- Nama ATK -->
+                {{-- Nama ATK --}}
                 <div class="input-group">
                     <label class="input-label">Nama ATK <span class="text-red-500">*</span></label>
                     <input type="text" name="nama" value="{{ old('nama') }}"
+                        x-model="nama"
                         class="input-field @error('nama') border-red-500 @enderror"
-                        placeholder="Contoh: Kertas HVS A4" required>
+                        placeholder="Contoh: Kertas HVS A4"
+                        minlength="3"
+                        maxlength="255"
+                        required>
                     @error('nama')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="nama.length"></span>/255 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Satuan -->
+                {{-- Satuan --}}
                 <div class="input-group">
                     <label class="input-label">Satuan <span class="text-red-500">*</span></label>
                     <select name="satuan" class="input-field @error('satuan') border-red-500 @enderror" required>
                         <option value="">Pilih Satuan</option>
-                        <option value="pcs" {{ old('satuan') == 'pcs' ? 'selected' : '' }}>Pcs</option>
-                        <option value="rim" {{ old('satuan') == 'rim' ? 'selected' : '' }}>Rim</option>
-                        <option value="box" {{ old('satuan') == 'box' ? 'selected' : '' }}>Box</option>
+                        <option value="pcs"   {{ old('satuan') == 'pcs'   ? 'selected' : '' }}>Pcs</option>
+                        <option value="rim"   {{ old('satuan') == 'rim'   ? 'selected' : '' }}>Rim</option>
+                        <option value="box"   {{ old('satuan') == 'box'   ? 'selected' : '' }}>Box</option>
                         <option value="lusin" {{ old('satuan') == 'lusin' ? 'selected' : '' }}>Lusin</option>
-                        <option value="pack" {{ old('satuan') == 'pack' ? 'selected' : '' }}>Pack</option>
-                        <option value="unit" {{ old('satuan') == 'unit' ? 'selected' : '' }}>Unit</option>
-                        <option value="set" {{ old('satuan') == 'set' ? 'selected' : '' }}>Set</option>
+                        <option value="pack"  {{ old('satuan') == 'pack'  ? 'selected' : '' }}>Pack</option>
+                        <option value="unit"  {{ old('satuan') == 'unit'  ? 'selected' : '' }}>Unit</option>
+                        <option value="set"   {{ old('satuan') == 'set'   ? 'selected' : '' }}>Set</option>
                     </select>
                     @error('satuan')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Stok Minimum -->
+                {{-- Stok Minimum --}}
                 <div class="input-group">
                     <label class="input-label">Stok Minimum <span class="text-red-500">*</span></label>
                     <input type="number" name="stok_minimum" value="{{ old('stok_minimum', 10) }}"
                         class="input-field @error('stok_minimum') border-red-500 @enderror"
-                        min="0" required>
+                        min="0" max="999999" required>
                     @error('stok_minimum')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Stok Tersedia -->
+                {{-- Stok Tersedia --}}
                 <div class="input-group">
                     <label class="input-label">Stok Tersedia <span class="text-red-500">*</span></label>
                     <input type="number" name="stok_tersedia" value="{{ old('stok_tersedia', 0) }}"
                         class="input-field @error('stok_tersedia') border-red-500 @enderror"
-                        min="0" required>
+                        min="0" max="999999" required>
                     @error('stok_tersedia')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Harga Satuan -->
+                {{-- Harga Satuan --}}
                 <div class="input-group">
                     <label class="input-label">Harga Satuan <span class="text-red-500">*</span></label>
                     <input type="number" name="harga_satuan" value="{{ old('harga_satuan', 0) }}"
                         class="input-field @error('harga_satuan') border-red-500 @enderror"
-                        min="0" step="0.01" required>
+                        min="0" max="99999999999" step="0.01" required>
                     @error('harga_satuan')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Deskripsi -->
+                {{-- Deskripsi --}}
                 <div class="input-group md:col-span-2">
                     <label class="input-label">Deskripsi</label>
                     <textarea name="deskripsi" rows="3"
+                        x-model="deskripsi"
+                        maxlength="2000"
                         class="input-field @error('deskripsi') border-red-500 @enderror"
                         placeholder="Deskripsi detail ATK...">{{ old('deskripsi') }}</textarea>
                     @error('deskripsi')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="deskripsi.length"></span>/2000 karakter
+                        </span>
                     @enderror
                 </div>
             </div>
 
             <div class="flex items-center justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-navy-700">
-                <a href="{{ route('inventaris.monitoring-atk.index') }}" class="btn-outline">
-                    Batal
-                </a>
+                <a href="{{ route('inventaris.monitoring-atk.index') }}" class="btn-outline">Batal</a>
                 <button type="submit" class="btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

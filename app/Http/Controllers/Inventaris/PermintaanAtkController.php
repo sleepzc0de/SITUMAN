@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/Inventaris/PermintaanAtkController.php
-
 namespace App\Http\Controllers\Inventaris;
 
 use App\Http\Controllers\Controller;
@@ -13,15 +11,62 @@ use Illuminate\Support\Facades\DB;
 
 class PermintaanAtkController extends Controller
 {
+    /**
+     * Aturan validasi terpusat untuk store & update permintaan.
+     */
+    private function permintaanRules(): array
+    {
+        return [
+            'pegawai_id'          => 'required|uuid|exists:pegawai,id',
+            'tanggal_permintaan'  => 'required|date|before_or_equal:today',
+            'keterangan'          => 'nullable|string|max:1000',
+            'atk_id'              => 'required|array|min:1|max:50',
+            'atk_id.*'            => 'required|uuid|exists:atk,id',
+            'jumlah'              => 'required|array|min:1|max:50',
+            'jumlah.*'            => 'required|integer|min:1|max:9999',
+            'keterangan_item'     => 'nullable|array|max:50',
+            'keterangan_item.*'   => 'nullable|string|max:500',
+        ];
+    }
+
+    private function permintaanMessages(): array
+    {
+        return [
+            'pegawai_id.required'         => 'Pegawai peminta harus dipilih.',
+            'pegawai_id.exists'           => 'Pegawai tidak valid.',
+            'tanggal_permintaan.required' => 'Tanggal permintaan harus diisi.',
+            'tanggal_permintaan.date'     => 'Format tanggal tidak valid.',
+            'tanggal_permintaan.before_or_equal' => 'Tanggal permintaan tidak boleh di masa depan.',
+            'keterangan.max'              => 'Keterangan maksimal 1000 karakter.',
+            'atk_id.required'             => 'Minimal 1 item ATK harus dipilih.',
+            'atk_id.min'                  => 'Minimal 1 item ATK harus dipilih.',
+            'atk_id.max'                  => 'Maksimal 50 item ATK per permintaan.',
+            'atk_id.*.required'           => 'ATK pada item :position harus dipilih.',
+            'atk_id.*.exists'             => 'ATK pada item :position tidak valid.',
+            'jumlah.*.required'           => 'Jumlah pada item :position harus diisi.',
+            'jumlah.*.integer'            => 'Jumlah pada item :position harus bilangan bulat.',
+            'jumlah.*.min'                => 'Jumlah pada item :position minimal 1.',
+            'jumlah.*.max'                => 'Jumlah pada item :position maksimal 9.999.',
+            'keterangan_item.*.max'       => 'Keterangan item :position maksimal 500 karakter.',
+        ];
+    }
+
     public function index(Request $request)
     {
+        $request->validate([
+            'search'         => 'nullable|string|max:100',
+            'status'         => 'nullable|in:pending,disetujui,ditolak,selesai',
+            'tanggal_dari'   => 'nullable|date',
+            'tanggal_sampai' => 'nullable|date|after_or_equal:tanggal_dari',
+        ]);
+
         $query = PermintaanAtk::with(['user', 'pegawai', 'details.atk']);
 
         if ($request->filled('status') && in_array($request->status, ['pending', 'disetujui', 'ditolak', 'selesai'])) {
             $query->where('status', $request->status);
         }
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = mb_substr($request->search, 0, 100);
             $query->where(function ($q) use ($search) {
                 $q->where('nomor_permintaan', 'like', '%' . $search . '%')
                     ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $search . '%'));
@@ -35,6 +80,7 @@ class PermintaanAtkController extends Controller
         }
 
         $permintaan = $query->latest()->paginate(15)->withQueryString();
+
         $stats = [
             'total'     => PermintaanAtk::count(),
             'pending'   => PermintaanAtk::where('status', 'pending')->count(),
@@ -55,19 +101,14 @@ class PermintaanAtkController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'pegawai_id'          => 'required|exists:pegawai,id',
-            'tanggal_permintaan'  => 'required|date|before_or_equal:today',
-            'keterangan'          => 'nullable|string|max:1000',
-            'atk_id'              => 'required|array|min:1|max:50',
-            'atk_id.*'            => 'required|exists:atk,id',
-            'jumlah'              => 'required|array|min:1',
-            'jumlah.*'            => 'required|integer|min:1|max:9999',
-            'keterangan_item'     => 'nullable|array',
-            'keterangan_item.*'   => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validate($this->permintaanRules(), $this->permintaanMessages());
 
-        // Pastikan tidak ada duplikasi ATK dalam satu permintaan
+        // Pastikan jumlah array atk_id == jumlah
+        if (count($validated['atk_id']) !== count($validated['jumlah'])) {
+            return back()->withInput()->with('error', 'Data item tidak konsisten.');
+        }
+
+        // Pastikan tidak ada duplikasi ATK
         $atkIds = $validated['atk_id'];
         if (count($atkIds) !== count(array_unique($atkIds))) {
             return back()->withInput()->with('error', 'Terdapat item ATK yang duplikat dalam permintaan.');
@@ -88,7 +129,9 @@ class PermintaanAtkController extends Controller
                     'permintaan_id' => $permintaan->id,
                     'atk_id'        => $atkId,
                     'jumlah'        => $validated['jumlah'][$index],
-                    'keterangan'    => $validated['keterangan_item'][$index] ?? null,
+                    'keterangan'    => isset($validated['keterangan_item'][$index])
+                        ? mb_substr($validated['keterangan_item'][$index], 0, 500)
+                        : null,
                 ]);
             }
 
@@ -127,17 +170,11 @@ class PermintaanAtkController extends Controller
             return back()->with('error', 'Hanya permintaan dengan status pending yang dapat diedit.');
         }
 
-        $validated = $request->validate([
-            'pegawai_id'          => 'required|exists:pegawai,id',
-            'tanggal_permintaan'  => 'required|date|before_or_equal:today',
-            'keterangan'          => 'nullable|string|max:1000',
-            'atk_id'              => 'required|array|min:1|max:50',
-            'atk_id.*'            => 'required|exists:atk,id',
-            'jumlah'              => 'required|array|min:1',
-            'jumlah.*'            => 'required|integer|min:1|max:9999',
-            'keterangan_item'     => 'nullable|array',
-            'keterangan_item.*'   => 'nullable|string|max:500',
-        ]);
+        $validated = $request->validate($this->permintaanRules(), $this->permintaanMessages());
+
+        if (count($validated['atk_id']) !== count($validated['jumlah'])) {
+            return back()->withInput()->with('error', 'Data item tidak konsisten.');
+        }
 
         $atkIds = $validated['atk_id'];
         if (count($atkIds) !== count(array_unique($atkIds))) {
@@ -159,7 +196,9 @@ class PermintaanAtkController extends Controller
                     'permintaan_id' => $permintaanAtk->id,
                     'atk_id'        => $atkId,
                     'jumlah'        => $validated['jumlah'][$index],
-                    'keterangan'    => $validated['keterangan_item'][$index] ?? null,
+                    'keterangan'    => isset($validated['keterangan_item'][$index])
+                        ? mb_substr($validated['keterangan_item'][$index], 0, 500)
+                        : null,
                 ]);
             }
 
@@ -203,10 +242,8 @@ class PermintaanAtkController extends Controller
 
         DB::beginTransaction();
         try {
-            // Load details dengan lock untuk hindari race condition
             $details = $permintaanAtk->details()->with('atk')->get();
 
-            // Validasi stok SEMUA item dulu sebelum ada yang dikurangi
             foreach ($details as $detail) {
                 $atk = Atk::lockForUpdate()->find($detail->atk_id);
                 if (!$atk || $atk->stok_tersedia < $detail->jumlah) {
@@ -221,7 +258,6 @@ class PermintaanAtkController extends Controller
                 }
             }
 
-            // Kurangi stok setelah semua validasi passed
             foreach ($details as $detail) {
                 $atk = Atk::lockForUpdate()->find($detail->atk_id);
                 $atk->stok_tersedia -= $detail->jumlah;
@@ -254,7 +290,11 @@ class PermintaanAtkController extends Controller
         }
 
         $validated = $request->validate([
-            'alasan_penolakan' => 'required|string|max:500',
+            'alasan_penolakan' => 'required|string|min:10|max:500',
+        ], [
+            'alasan_penolakan.required' => 'Alasan penolakan harus diisi.',
+            'alasan_penolakan.min'      => 'Alasan penolakan minimal 10 karakter.',
+            'alasan_penolakan.max'      => 'Alasan penolakan maksimal 500 karakter.',
         ]);
 
         try {
@@ -264,7 +304,6 @@ class PermintaanAtkController extends Controller
                 'disetujui_oleh'    => auth()->id(),
                 'tanggal_disetujui' => now(),
             ]);
-
             return back()->with('success', 'Permintaan ATK berhasil ditolak.');
         } catch (\Exception $e) {
             $this->handleException($e, 'Gagal menolak permintaan ATK.', [
@@ -296,13 +335,21 @@ class PermintaanAtkController extends Controller
     public function data(Request $request): \Illuminate\Http\JsonResponse
     {
         try {
+            $request->validate([
+                'search'         => 'nullable|string|max:100',
+                'status'         => 'nullable|in:pending,disetujui,ditolak,selesai',
+                'tanggal_dari'   => 'nullable|date',
+                'tanggal_sampai' => 'nullable|date',
+                'page'           => 'nullable|integer|min:1|max:10000',
+            ]);
+
             $query = PermintaanAtk::with(['user', 'pegawai', 'details']);
 
             if ($request->filled('status') && in_array($request->status, ['pending', 'disetujui', 'ditolak', 'selesai'])) {
                 $query->where('status', $request->status);
             }
             if ($request->filled('search')) {
-                $search = $request->search;
+                $search = mb_substr($request->search, 0, 100);
                 $query->where(function ($q) use ($search) {
                     $q->where('nomor_permintaan', 'like', '%' . $search . '%')
                         ->orWhereHas('pegawai', fn($qq) => $qq->where('nama', 'like', '%' . $search . '%'));
@@ -335,7 +382,6 @@ class PermintaanAtkController extends Controller
                 $nama    = $item->pegawai->nama ?? '?';
                 $words   = explode(' ', trim($nama));
                 $initial = implode('', array_map(fn($w) => strtoupper($w[0] ?? ''), array_slice($words, 0, 2)));
-
                 return [
                     'id'                => $item->id,
                     'nomor_permintaan'  => $item->nomor_permintaan,
