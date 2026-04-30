@@ -102,7 +102,8 @@
                         <div class="md:col-span-2">
                             <label class="input-label">Nama Lengkap <span class="text-red-500">*</span></label>
                             <input type="text" name="nama" value="{{ old('nama', $p->nama) }}"
-                                class="input-field @error('nama') input-error @enderror" required>
+                                class="input-field @error('nama') input-error @enderror" required minlength="2"
+                                maxlength="100">
                             @error('nama')
                                 <p class="input-hint-error">{{ $message }}</p>
                             @enderror
@@ -110,12 +111,13 @@
                         <div>
                             <label class="input-label">Nama dengan Gelar</label>
                             <input type="text" name="nama_gelar" value="{{ old('nama_gelar', $p->nama_gelar) }}"
-                                class="input-field">
+                                class="input-field" maxlength="150">
                         </div>
                         <div>
                             <label class="input-label">NIP <span class="text-red-500">*</span></label>
                             <input type="text" name="nip" value="{{ old('nip', $p->nip) }}"
-                                class="input-field font-mono @error('nip') input-error @enderror" required>
+                                class="input-field font-mono @error('nip') input-error @enderror" required minlength="8"
+                                maxlength="25" pattern="[0-9]+" inputmode="numeric">
                             @error('nip')
                                 <p class="input-hint-error">{{ $message }}</p>
                             @enderror
@@ -148,17 +150,19 @@
                         <div>
                             <label class="input-label">Email Kemenkeu</label>
                             <input type="email" name="email_kemenkeu"
-                                value="{{ old('email_kemenkeu', $p->email_kemenkeu) }}" class="input-field">
+                                value="{{ old('email_kemenkeu', $p->email_kemenkeu) }}" class="input-field"
+                                maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Email Pribadi</label>
                             <input type="email" name="email_pribadi"
-                                value="{{ old('email_pribadi', $p->email_pribadi) }}" class="input-field">
+                                value="{{ old('email_pribadi', $p->email_pribadi) }}" class="input-field"
+                                maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">No. HP / WhatsApp</label>
                             <input type="text" name="no_hp" value="{{ old('no_hp', $p->no_hp) }}"
-                                class="input-field">
+                                class="input-field" maxlength="20" pattern="[\d\s\+\-\(\)]*" inputmode="tel">
                         </div>
                     </div>
                 </div>
@@ -169,7 +173,7 @@
                         <div>
                             <label class="input-label">Jabatan</label>
                             <input type="text" name="jabatan" value="{{ old('jabatan', $p->jabatan) }}"
-                                class="input-field">
+                                class="input-field" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Jenis Jabatan</label>
@@ -185,7 +189,7 @@
                         <div class="md:col-span-2">
                             <label class="input-label">Nama Jabatan Lengkap</label>
                             <input type="text" name="nama_jabatan"
-                                value="{{ old('nama_jabatan', $p->nama_jabatan) }}" class="input-field">
+                                value="{{ old('nama_jabatan', $p->nama_jabatan) }}" class="input-field" maxlength="200">
                         </div>
                         <div>
                             <label class="input-label">Eselon</label>
@@ -211,8 +215,8 @@
                         </div>
                         <div>
                             <label class="input-label">Bagian / Unit</label>
-                            <input type="text" name="bagian" value="{{ old('bagian') }}" class="input-field"
-                                placeholder="Nama bagian" list="bagian-list" maxlength="255">
+                            <input type="text" name="bagian" value="{{ old('bagian', $p->bagian) }}"
+                                class="input-field" list="bagian-list" maxlength="150">
                             <datalist id="bagian-list">
                                 @foreach ($bagianList as $b)
                                     <option value="{{ $b }}">
@@ -221,8 +225,8 @@
                         </div>
                         <div>
                             <label class="input-label">Subbagian</label>
-                            <input type="text" name="subbagian" value="{{ old('subbagian') }}" class="input-field"
-                                placeholder="Nama subbagian" list="subbagian-list" maxlength="255">
+                            <input type="text" name="subbagian" value="{{ old('subbagian', $p->subbagian) }}"
+                                class="input-field" list="subbagian-list" maxlength="150">
                             <datalist id="subbagian-list">
                                 @foreach ($subbagianList as $s)
                                     <option value="{{ $s }}">
@@ -232,7 +236,7 @@
                         <div>
                             <label class="input-label">Lokasi / Kantor</label>
                             <input type="text" name="lokasi" value="{{ old('lokasi', $p->lokasi) }}"
-                                class="input-field">
+                                class="input-field" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Status Kepegawaian</label>
@@ -259,7 +263,7 @@
                         <div>
                             <label class="input-label">Pangkat / Golongan</label>
                             <input type="text" name="pangkat" value="{{ old('pangkat', $p->pangkat) }}"
-                                class="input-field">
+                                class="input-field" maxlength="50">
                         </div>
                     </div>
                 </div>
@@ -306,16 +310,20 @@
                         <div>
                             <label class="input-label">Proyeksi KP 1</label>
                             <input type="text" name="proyeksi_kp_1"
-                                value="{{ old('proyeksi_kp_1', $p->proyeksi_kp_1) }}" class="input-field">
+                                value="{{ old('proyeksi_kp_1', $p->proyeksi_kp_1) }}" class="input-field"
+                                maxlength="50">
                         </div>
                         <div>
                             <label class="input-label">Proyeksi KP 2</label>
                             <input type="text" name="proyeksi_kp_2"
-                                value="{{ old('proyeksi_kp_2', $p->proyeksi_kp_2) }}" class="input-field">
+                                value="{{ old('proyeksi_kp_2', $p->proyeksi_kp_2) }}" class="input-field"
+                                maxlength="50">
+
                         </div>
                         <div class="md:col-span-2">
                             <label class="input-label">Keterangan KP</label>
-                            <textarea name="keterangan_kp" rows="3" class="input-field resize-none">{{ old('keterangan_kp', $p->keterangan_kp) }}</textarea>
+                            <textarea name="keterangan_kp" rows="3" class="input-field resize-none" maxlength="2000">{{ old('keterangan_kp', $p->keterangan_kp) }}</textarea>
+
                         </div>
                     </div>
                 </div>
@@ -337,17 +345,18 @@
                         <div>
                             <label class="input-label">Jurusan / Prodi S1</label>
                             <input type="text" name="jurusan_s1" value="{{ old('jurusan_s1', $p->jurusan_s1) }}"
-                                class="input-field">
+                                class="input-field" maxlength="150">
+
                         </div>
                         <div>
                             <label class="input-label">Jurusan / Prodi S2</label>
                             <input type="text" name="jurusan_s2" value="{{ old('jurusan_s2', $p->jurusan_s2) }}"
-                                class="input-field">
+                                class="input-field" maxlength="150">
                         </div>
                         <div>
                             <label class="input-label">Jurusan / Prodi S3</label>
                             <input type="text" name="jurusan_s3" value="{{ old('jurusan_s3', $p->jurusan_s3) }}"
-                                class="input-field">
+                                class="input-field" maxlength="150">
                         </div>
                     </div>
                 </div>

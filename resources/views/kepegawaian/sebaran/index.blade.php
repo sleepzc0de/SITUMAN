@@ -207,14 +207,15 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input
-                        type="text"
-                        x-model="filters.search"
-                        @input="debouncedFetch()"
-                        placeholder="Nama atau NIP..."
-                        class="input-field pl-9 pr-9"
-                        autocomplete="off"
-                    >
+                   <input
+    type="text"
+    x-model="filters.search"
+    @input="debouncedFetch()"
+    placeholder="Nama atau NIP..."
+    maxlength="100"
+    class="input-field pl-9 pr-9"
+    autocomplete="off"
+>
                     <button x-show="filters.search"
                             @click="filters.search = ''; fetchData()"
                             class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400

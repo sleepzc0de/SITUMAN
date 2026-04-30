@@ -26,14 +26,27 @@ class PegawaiController extends Controller
 
     public function index(Request $request)
     {
+
+        $request->validate([
+            'search'        => ['nullable', 'string', 'max:100'],
+            'bagian'        => ['nullable', 'string', 'max:150'],
+            'status'        => ['nullable', 'string', 'max:20'],
+            'jenis_kelamin' => ['nullable', 'string', 'max:15'],
+            'pendidikan'    => ['nullable', 'string', 'max:20'],
+            'eselon'        => ['nullable', 'string', 'max:20'],
+            'per_page'      => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page'          => ['nullable', 'integer', 'min:1'],
+        ]);
+
+
         $query = Pegawai::query();
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('nip', 'like', "%{$search}%")
-                  ->orWhere('jabatan', 'like', "%{$search}%");
+                    ->orWhere('nip', 'like', "%{$search}%")
+                    ->orWhere('jabatan', 'like', "%{$search}%");
             });
         }
 
@@ -60,13 +73,17 @@ class PegawaiController extends Controller
                     'from'       => $pegawai->firstItem() ?? 0,
                     'to'         => $pegawai->lastItem()   ?? 0,
                     'total'      => $pegawai->total(),
-                    'has_filter' => $request->anyFilled(['search','bagian','status','jenis_kelamin','pendidikan','eselon']),
+                    'has_filter' => $request->anyFilled(['search', 'bagian', 'status', 'jenis_kelamin', 'pendidikan', 'eselon']),
                 ],
             ]);
         }
 
         return view('kepegawaian.pegawai.index', compact(
-            'pegawai', 'bagianList', 'eselonList', 'pendidikanList', 'analytics'
+            'pegawai',
+            'bagianList',
+            'eselonList',
+            'pendidikanList',
+            'analytics'
         ));
     }
 
@@ -84,10 +101,12 @@ class PegawaiController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate($this->validationRules());
+        $validated = $request->validate(
+            $this->validationRules(),
+            $this->validationMessages()
+        );
         Pegawai::create($validated);
         $this->clearCache();
-
         return redirect()->route('kepegawaian.pegawai.index')
             ->with('success', 'Data pegawai berhasil ditambahkan.');
     }
@@ -113,10 +132,12 @@ class PegawaiController extends Controller
 
     public function update(Request $request, Pegawai $pegawai)
     {
-        $validated = $request->validate($this->validationRules($pegawai->id));
+        $validated = $request->validate(
+            $this->validationRules($pegawai->id),
+            $this->validationMessages()
+        );
         $pegawai->update($validated);
         $this->clearCache();
-
         return redirect()->route('kepegawaian.pegawai.index')
             ->with('success', 'Data pegawai berhasil diperbarui.');
     }
@@ -158,6 +179,10 @@ class PegawaiController extends Controller
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+        ], [
+            'file.required' => 'Silakan pilih file untuk diimport.',
+            'file.mimes'    => 'Format file harus xlsx, xls, atau csv.',
+            'file.max'      => 'Ukuran file maksimal 10 MB.',
         ]);
 
         try {
@@ -173,20 +198,22 @@ class PegawaiController extends Controller
 
             return redirect()->route('kepegawaian.pegawai.index')
                 ->with('success', $msg);
-
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             $errors = [];
             foreach ($e->failures() as $failure) {
                 $errors[] = "Baris {$failure->row()}: " . implode(', ', $failure->errors());
             }
-            return back()->with('error',
-                'Validasi file gagal. Pastikan format file sesuai template.');
-
+            return back()->with(
+                'error',
+                'Validasi file gagal. Pastikan format file sesuai template.'
+            );
         } catch (\Exception $e) {
             // JANGAN tampilkan $e->getMessage() ke user — bisa mengekspos info internal
             $this->handleException($e, 'Import pegawai gagal.', ['action' => 'import']);
-            return back()->with('error',
-                'Import gagal. Pastikan format file sesuai template dan coba lagi.');
+            return back()->with(
+                'error',
+                'Import gagal. Pastikan format file sesuai template dan coba lagi.'
+            );
         }
     }
 
@@ -240,10 +267,10 @@ class PegawaiController extends Controller
     {
         $ranges = ['< 30' => 0, '30-39' => 0, '40-49' => 0, '50-59' => 0, '≥ 60' => 0];
         Pegawai::where('status', 'AKTIF')->whereNotNull('usia')->pluck('usia')->each(function ($usia) use (&$ranges) {
-            if      ($usia < 30) $ranges['< 30']++;
-            elseif  ($usia < 40) $ranges['30-39']++;
-            elseif  ($usia < 50) $ranges['40-49']++;
-            elseif  ($usia < 60) $ranges['50-59']++;
+            if ($usia < 30) $ranges['< 30']++;
+            elseif ($usia < 40) $ranges['30-39']++;
+            elseif ($usia < 50) $ranges['40-49']++;
+            elseif ($usia < 60) $ranges['50-59']++;
             else                 $ranges['≥ 60']++;
         });
         return $ranges;
@@ -253,10 +280,10 @@ class PegawaiController extends Controller
     {
         $ranges = ['< 5 th' => 0, '5-10 th' => 0, '11-20 th' => 0, '21-30 th' => 0, '> 30 th' => 0];
         Pegawai::where('status', 'AKTIF')->whereNotNull('masa_kerja_tahun')->pluck('masa_kerja_tahun')->each(function ($mk) use (&$ranges) {
-            if      ($mk < 5)   $ranges['< 5 th']++;
-            elseif  ($mk <= 10) $ranges['5-10 th']++;
-            elseif  ($mk <= 20) $ranges['11-20 th']++;
-            elseif  ($mk <= 30) $ranges['21-30 th']++;
+            if ($mk < 5)   $ranges['< 5 th']++;
+            elseif ($mk <= 10) $ranges['5-10 th']++;
+            elseif ($mk <= 20) $ranges['11-20 th']++;
+            elseif ($mk <= 30) $ranges['21-30 th']++;
             else                $ranges['> 30 th']++;
         });
         return $ranges;
@@ -265,9 +292,13 @@ class PegawaiController extends Controller
     private function clearCache(): void
     {
         $keys = [
-            'bagian_list', 'eselon_list', 'pendidikan_list',
-            'pegawai_analytics_summary', 'sebaran_stats_global',
-            'pegawai_bagian_list', 'dashboard_base_stats',
+            'bagian_list',
+            'eselon_list',
+            'pendidikan_list',
+            'pegawai_analytics_summary',
+            'sebaran_stats_global',
+            'pegawai_bagian_list',
+            'dashboard_base_stats',
         ];
         foreach ($keys as $key) {
             Cache::forget($key);
@@ -286,36 +317,35 @@ class PegawaiController extends Controller
     private function validationRules(?string $ignoreId = null): array
     {
         return [
-            'nama'             => ['required', 'string', 'max:255'],
-            'nama_gelar'       => ['nullable', 'string', 'max:255'],
-            // unique:table,column,except_id,id_column — format yang benar
-            'nip'              => ['required', 'string', 'max:50',
-                                   Rule::unique('pegawai', 'nip')->ignore($ignoreId)],
-            'pangkat'          => ['nullable', 'string', 'max:100'],
-            // Dropdown — gunakan Rule::in untuk whitelist server-side
-            'pendidikan'       => ['nullable', Rule::in(self::VALID_PENDIDIKAN)],
-            'email_kemenkeu'   => ['nullable', 'email', 'max:255'],
-            'email_pribadi'    => ['nullable', 'email', 'max:255'],
+            'nama'             => ['required', 'string', 'min:2', 'max:100'],
+            'nama_gelar'       => ['nullable', 'string', 'max:150'],
+            'nip'              => [
+                'required',
+                'string',
+                'min:8',
+                'max:25',
+                'regex:/^[0-9]+$/',
+                Rule::unique('pegawai', 'nip')->ignore($ignoreId)
+            ],
+            'pangkat'          => ['nullable', 'string', 'max:50'],
+            'pendidikan'       => ['nullable', 'string', 'max:20', Rule::in(self::VALID_PENDIDIKAN)],
+            'email_kemenkeu'   => ['nullable', 'email:rfc', 'max:100'],
+            'email_pribadi'    => ['nullable', 'email:rfc', 'max:100'],
             'no_hp'            => ['nullable', 'string', 'max:20', 'regex:/^[\d\s\+\-\(\)]*$/'],
-            'grading'          => ['nullable', 'integer', 'min:1', 'max:27'], // maks grade Eselon I
-            'jabatan'          => ['nullable', 'string', 'max:255'],
-            // Dropdown
-            'jenis_jabatan'    => ['nullable', Rule::in(self::VALID_JENIS_JABATAN)],
-            'nama_jabatan'     => ['nullable', 'string', 'max:255'],
-            // Dropdown
-            'eselon'           => ['nullable', Rule::in(self::VALID_ESELON)],
-            // Dropdown
-            'jenis_pegawai'    => ['nullable', Rule::in(self::VALID_JENIS_PEGAWAI)],
-            // Dropdown
-            'status'           => ['nullable', Rule::in(self::VALID_STATUS)],
-            'lokasi'           => ['nullable', 'string', 'max:255'],
-            // bagian & subbagian adalah free-text (bisa unit baru), tapi dibatasi panjangnya
-            'bagian'           => ['nullable', 'string', 'max:255'],
-            'subbagian'        => ['nullable', 'string', 'max:255'],
-            'jurusan_s1'       => ['nullable', 'string', 'max:255'],
-            'jurusan_s2'       => ['nullable', 'string', 'max:255'],
-            'jurusan_s3'       => ['nullable', 'string', 'max:255'],
-            'tmt_cpns'         => ['nullable', 'date'],
+            'grading'          => ['nullable', 'integer', 'min:1', 'max:27'],
+            'jabatan'          => ['nullable', 'string', 'max:100'],
+            'jenis_jabatan'    => ['nullable', 'string', 'max:30', Rule::in(self::VALID_JENIS_JABATAN)],
+            'nama_jabatan'     => ['nullable', 'string', 'max:200'],
+            'eselon'           => ['nullable', 'string', 'max:20', Rule::in(self::VALID_ESELON)],
+            'jenis_pegawai'    => ['nullable', 'string', 'max:20', Rule::in(self::VALID_JENIS_PEGAWAI)],
+            'status'           => ['nullable', 'string', 'max:20', Rule::in(self::VALID_STATUS)],
+            'lokasi'           => ['nullable', 'string', 'max:100'],
+            'bagian'           => ['nullable', 'string', 'max:150'],
+            'subbagian'        => ['nullable', 'string', 'max:150'],
+            'jurusan_s1'       => ['nullable', 'string', 'max:150'],
+            'jurusan_s2'       => ['nullable', 'string', 'max:150'],
+            'jurusan_s3'       => ['nullable', 'string', 'max:150'],
+            'tmt_cpns'         => ['nullable', 'date', 'before_or_equal:today'],
             'masa_kerja_tahun' => ['nullable', 'integer', 'min:0', 'max:50'],
             'masa_kerja_bulan' => ['nullable', 'integer', 'min:0', 'max:11'],
             'tanggal_lahir'    => ['nullable', 'date', 'before:today'],
@@ -323,13 +353,46 @@ class PegawaiController extends Controller
             'tahun_lahir'      => ['nullable', 'integer', 'min:1940', 'max:' . date('Y')],
             'usia'             => ['nullable', 'integer', 'min:15', 'max:100'],
             'tanggal_pensiun'  => ['nullable', 'date'],
-            'tahun_pensiun'    => ['nullable', 'integer', 'min:' . date('Y'), 'max:' . (date('Y') + 50)],
-            'proyeksi_kp_1'    => ['nullable', 'string', 'max:255'],
-            'proyeksi_kp_2'    => ['nullable', 'string', 'max:255'],
+            'tahun_pensiun'    => ['nullable', 'integer', 'min:' . (date('Y') - 5), 'max:' . (date('Y') + 50)],
+            'proyeksi_kp_1'    => ['nullable', 'string', 'max:50'],
+            'proyeksi_kp_2'    => ['nullable', 'string', 'max:50'],
             'keterangan_kp'    => ['nullable', 'string', 'max:2000'],
-            // Dropdown
-            'jenis_kelamin'    => ['nullable', Rule::in(self::VALID_JENIS_KELAMIN)],
+            'jenis_kelamin'    => ['nullable', 'string', 'max:15', Rule::in(self::VALID_JENIS_KELAMIN)],
             'tmt_jabatan'      => ['nullable', 'date'],
+        ];
+    }
+
+    /**
+     * Custom error messages — agar pesan ke user lebih jelas.
+     */
+    private function validationMessages(): array
+    {
+        return [
+            'nama.max'             => 'Nama maksimal 100 karakter.',
+            'nama.min'             => 'Nama minimal 2 karakter.',
+            'nama_gelar.max'       => 'Nama dengan gelar maksimal 150 karakter.',
+            'nip.max'              => 'NIP maksimal 25 karakter.',
+            'nip.min'              => 'NIP minimal 8 karakter.',
+            'nip.regex'            => 'NIP hanya boleh berisi angka.',
+            'nip.unique'           => 'NIP sudah terdaftar untuk pegawai lain.',
+            'pangkat.max'          => 'Pangkat maksimal 50 karakter.',
+            'email_kemenkeu.max'   => 'Email Kemenkeu maksimal 100 karakter.',
+            'email_kemenkeu.email' => 'Format email Kemenkeu tidak valid.',
+            'email_pribadi.max'    => 'Email pribadi maksimal 100 karakter.',
+            'email_pribadi.email'  => 'Format email pribadi tidak valid.',
+            'no_hp.max'            => 'No HP maksimal 20 karakter.',
+            'no_hp.regex'          => 'No HP hanya boleh berisi angka, spasi, dan tanda +-().',
+            'jabatan.max'          => 'Jabatan maksimal 100 karakter.',
+            'nama_jabatan.max'     => 'Nama jabatan lengkap maksimal 200 karakter.',
+            'lokasi.max'           => 'Lokasi maksimal 100 karakter.',
+            'bagian.max'           => 'Bagian maksimal 150 karakter.',
+            'subbagian.max'        => 'Subbagian maksimal 150 karakter.',
+            'jurusan_s1.max'       => 'Jurusan S1 maksimal 150 karakter.',
+            'jurusan_s2.max'       => 'Jurusan S2 maksimal 150 karakter.',
+            'jurusan_s3.max'       => 'Jurusan S3 maksimal 150 karakter.',
+            'keterangan_kp.max'    => 'Keterangan KP maksimal 2000 karakter.',
+            'proyeksi_kp_1.max'    => 'Proyeksi KP 1 maksimal 50 karakter.',
+            'proyeksi_kp_2.max'    => 'Proyeksi KP 2 maksimal 50 karakter.',
         ];
     }
 }

@@ -55,7 +55,8 @@
                                     d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                             </svg>
                             <input type="text" id="filter-search" value="{{ $search ?? '' }}"
-                                placeholder="Nama atau NIP…" class="input-field pl-10 pr-10 w-full" autocomplete="off">
+                                placeholder="Nama atau NIP…" maxlength="100" class="input-field pl-10 pr-10 w-full"
+                                autocomplete="off">
                             <button id="btn-clear-search"
                                 class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300
                                        hover:text-gray-500 dark:hover:text-gray-300 transition-colors

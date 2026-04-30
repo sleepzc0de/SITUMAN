@@ -37,6 +37,15 @@ class SebaranPegawaiController extends Controller
             abort(403, 'Akses hanya diizinkan via AJAX.');
         }
 
+
+        $request->validate([
+            'search'   => ['nullable', 'string', 'max:100'],
+            'bagian'   => ['nullable', 'string', 'max:150'],
+            'status'   => ['nullable', 'string', 'max:20'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page'     => ['nullable', 'integer', 'min:1'],
+        ]);
+
         $query = Pegawai::query();
 
         if ($request->filled('bagian')) {
@@ -49,7 +58,7 @@ class SebaranPegawaiController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('nip', 'like', "%{$search}%");
+                    ->orWhere('nip', 'like', "%{$search}%");
             });
         }
 

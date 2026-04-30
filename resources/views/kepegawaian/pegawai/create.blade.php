@@ -97,7 +97,7 @@
                             <label class="input-label">Nama Lengkap <span class="text-red-500">*</span></label>
                             <input type="text" name="nama" value="{{ old('nama') }}"
                                 class="input-field @error('nama') input-error @enderror"
-                                placeholder="Masukkan nama lengkap tanpa gelar" required>
+                                placeholder="Masukkan nama lengkap tanpa gelar" required minlength="2" maxlength="100">
                             @error('nama')
                                 <p class="input-hint-error">{{ $message }}</p>
                             @enderror
@@ -105,13 +105,13 @@
                         <div>
                             <label class="input-label">Nama dengan Gelar</label>
                             <input type="text" name="nama_gelar" value="{{ old('nama_gelar') }}" class="input-field"
-                                placeholder="Dr. Budi Santoso, S.E., M.M.">
+                                placeholder="Dr. Budi Santoso, S.E., M.M." maxlength="150">
                         </div>
                         <div>
                             <label class="input-label">NIP <span class="text-red-500">*</span></label>
                             <input type="text" name="nip" value="{{ old('nip') }}"
                                 class="input-field font-mono @error('nip') input-error @enderror" placeholder="18 digit NIP"
-                                required>
+                                required minlength="8" maxlength="25" pattern="[0-9]+" inputmode="numeric">
                             @error('nip')
                                 <p class="input-hint-error">{{ $message }}</p>
                             @enderror
@@ -143,17 +143,17 @@
                         <div>
                             <label class="input-label">Email Kemenkeu</label>
                             <input type="email" name="email_kemenkeu" value="{{ old('email_kemenkeu') }}"
-                                class="input-field" placeholder="nama@kemenkeu.go.id">
+                                class="input-field" placeholder="nama@kemenkeu.go.id" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Email Pribadi</label>
                             <input type="email" name="email_pribadi" value="{{ old('email_pribadi') }}"
-                                class="input-field" placeholder="nama@gmail.com">
+                                class="input-field" placeholder="nama@gmail.com" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">No. HP / WhatsApp</label>
                             <input type="text" name="no_hp" value="{{ old('no_hp') }}" class="input-field"
-                                placeholder="08xx-xxxx-xxxx">
+                                placeholder="08xx-xxxx-xxxx" maxlength="20" pattern="[\d\s\+\-\(\)]*" inputmode="tel">
                         </div>
                     </div>
                 </div>
@@ -164,7 +164,7 @@
                         <div>
                             <label class="input-label">Jabatan</label>
                             <input type="text" name="jabatan" value="{{ old('jabatan') }}" class="input-field"
-                                placeholder="Analis Kepegawaian">
+                                placeholder="Analis Kepegawaian" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Jenis Jabatan</label>
@@ -179,7 +179,7 @@
                         <div class="md:col-span-2">
                             <label class="input-label">Nama Jabatan Lengkap</label>
                             <input type="text" name="nama_jabatan" value="{{ old('nama_jabatan') }}"
-                                class="input-field" placeholder="Nama jabatan resmi sesuai SK">
+                                class="input-field" placeholder="Nama jabatan resmi sesuai SK" maxlength="200">
                         </div>
                         <div>
                             <label class="input-label">Eselon</label>
@@ -204,7 +204,7 @@
                         <div>
                             <label class="input-label">Bagian / Unit</label>
                             <input type="text" name="bagian" value="{{ old('bagian') }}" class="input-field"
-                                placeholder="Nama bagian" list="bagian-list" maxlength="255">
+                                placeholder="Nama bagian" list="bagian-list" maxlength="150">
                             <datalist id="bagian-list">
                                 @foreach ($bagianList as $b)
                                     <option value="{{ $b }}">
@@ -214,7 +214,7 @@
                         <div>
                             <label class="input-label">Subbagian</label>
                             <input type="text" name="subbagian" value="{{ old('subbagian') }}" class="input-field"
-                                placeholder="Nama subbagian" list="subbagian-list" maxlength="255">
+                                placeholder="Nama subbagian" list="subbagian-list" maxlength="150">
                             <datalist id="subbagian-list">
                                 @foreach ($subbagianList as $s)
                                     <option value="{{ $s }}">
@@ -224,7 +224,7 @@
                         <div>
                             <label class="input-label">Lokasi / Kantor</label>
                             <input type="text" name="lokasi" value="{{ old('lokasi') }}" class="input-field"
-                                placeholder="Kantor Pusat Jakarta">
+                                placeholder="Kantor Pusat Jakarta" maxlength="100">
                         </div>
                         <div>
                             <label class="input-label">Status Kepegawaian</label>
@@ -250,7 +250,7 @@
                         <div>
                             <label class="input-label">Pangkat / Golongan</label>
                             <input type="text" name="pangkat" value="{{ old('pangkat') }}" class="input-field"
-                                placeholder="III/c">
+                                placeholder="III/c" maxlength="50">
                         </div>
                     </div>
                 </div>
@@ -293,17 +293,17 @@
                         <div>
                             <label class="input-label">Proyeksi KP 1</label>
                             <input type="text" name="proyeksi_kp_1" value="{{ old('proyeksi_kp_1') }}"
-                                class="input-field" placeholder="1 April 2025">
+                                class="input-field" placeholder="1 April 2025" maxlength="50">
                         </div>
                         <div>
                             <label class="input-label">Proyeksi KP 2</label>
                             <input type="text" name="proyeksi_kp_2" value="{{ old('proyeksi_kp_2') }}"
-                                class="input-field" placeholder="1 Oktober 2027">
+                                class="input-field" placeholder="1 Oktober 2027" maxlength="50">
                         </div>
                         <div class="md:col-span-2">
                             <label class="input-label">Keterangan KP</label>
-                            <textarea name="keterangan_kp" rows="3" class="input-field resize-none"
-                                placeholder="Catatan terkait kenaikan pangkat...">{{ old('keterangan_kp') }}</textarea>
+                            <textarea name="keterangan_kp" rows="3" class="input-field resize-none" maxlength="2000"
+                                placeholder="Catatan terkait kenaikan pangkat (maks 2000 karakter)...">{{ old('keterangan_kp') }}</textarea>
                         </div>
                     </div>
                 </div>
@@ -324,17 +324,17 @@
                         <div>
                             <label class="input-label">Jurusan / Prodi S1</label>
                             <input type="text" name="jurusan_s1" value="{{ old('jurusan_s1') }}" class="input-field"
-                                placeholder="Akuntansi">
+                                placeholder="Akuntansi" maxlength="150">
                         </div>
                         <div>
                             <label class="input-label">Jurusan / Prodi S2</label>
                             <input type="text" name="jurusan_s2" value="{{ old('jurusan_s2') }}" class="input-field"
-                                placeholder="Manajemen Keuangan">
+                                placeholder="Manajemen Keuangan" maxlength="150">
                         </div>
                         <div>
                             <label class="input-label">Jurusan / Prodi S3</label>
                             <input type="text" name="jurusan_s3" value="{{ old('jurusan_s3') }}" class="input-field"
-                                placeholder="Ilmu Administrasi">
+                                placeholder="Ilmu Administrasi" maxlength="150">
                         </div>
                     </div>
                 </div>
