@@ -19,36 +19,49 @@
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ $kategoriAset->nama }}</p>
         </div>
 
-        <form action="{{ route('inventaris.kategori-aset.update', $kategoriAset) }}" method="POST">
+        <form action="{{ route('inventaris.kategori-aset.update', $kategoriAset) }}" method="POST"
+              x-data="{
+                  nama: @js(old('nama', $kategoriAset->nama)),
+                  deskripsi: @js(old('deskripsi', $kategoriAset->deskripsi ?? ''))
+              }">
             @csrf
             @method('PUT')
-
             <div class="space-y-6">
-                <!-- Nama Kategori -->
                 <div class="input-group">
                     <label class="input-label">Nama Kategori <span class="text-red-500">*</span></label>
                     <input type="text" name="nama" value="{{ old('nama', $kategoriAset->nama) }}"
-                        class="input-field @error('nama') border-red-500 @enderror" required>
+                        x-model="nama"
+                        class="input-field @error('nama') border-red-500 @enderror"
+                        minlength="3"
+                        maxlength="100"
+                        required>
                     @error('nama')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="nama.length"></span>/100 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Deskripsi -->
                 <div class="input-group">
                     <label class="input-label">Deskripsi</label>
                     <textarea name="deskripsi" rows="4"
+                        x-model="deskripsi"
+                        maxlength="2000"
                         class="input-field @error('deskripsi') border-red-500 @enderror">{{ old('deskripsi', $kategoriAset->deskripsi) }}</textarea>
                     @error('deskripsi')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="deskripsi.length"></span>/2000 karakter
+                        </span>
                     @enderror
                 </div>
             </div>
 
             <div class="flex items-center justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-navy-700">
-                <a href="{{ route('inventaris.kategori-aset.index') }}" class="btn-outline">
-                    Batal
-                </a>
+                <a href="{{ route('inventaris.kategori-aset.index') }}" class="btn-outline">Batal</a>
                 <button type="submit" class="btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>

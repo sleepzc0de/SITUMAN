@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/Inventaris/AsetEndUserController.php
-
 namespace App\Http\Controllers\Inventaris;
 
 use App\Http\Controllers\Controller;
@@ -17,12 +15,61 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class AsetEndUserController extends Controller
 {
-    // Nilai enum yang valid — satu sumber kebenaran
     private const KONDISI_VALID = ['baik', 'rusak ringan', 'rusak berat', 'hilang'];
     private const STATUS_VALID  = ['tersedia', 'dipinjam', 'diperbaiki', 'tidak aktif'];
 
+    /**
+     * Aturan validasi terpusat untuk store & update aset.
+     */
+    private function asetRules(): array
+    {
+        return [
+            'kategori_id'       => 'required|uuid|exists:kategori_aset,id',
+            'nama_aset'         => 'required|string|min:3|max:255',
+            'deskripsi'         => 'nullable|string|max:2000',
+            'merek'             => 'nullable|string|max:100',
+            'tipe'              => 'nullable|string|max:100',
+            'nomor_seri'        => 'nullable|string|max:100',
+            'tanggal_perolehan' => 'nullable|date|before_or_equal:today',
+            'nilai_perolehan'   => 'required|numeric|min:0|max:99999999999',
+            'kondisi'           => 'required|in:' . implode(',', self::KONDISI_VALID),
+            'catatan'           => 'nullable|string|max:2000',
+        ];
+    }
+
+    private function asetMessages(): array
+    {
+        return [
+            'kategori_id.required'   => 'Kategori harus dipilih.',
+            'kategori_id.exists'     => 'Kategori tidak valid.',
+            'nama_aset.required'     => 'Nama aset harus diisi.',
+            'nama_aset.min'          => 'Nama aset minimal 3 karakter.',
+            'nama_aset.max'          => 'Nama aset maksimal 255 karakter.',
+            'deskripsi.max'          => 'Deskripsi maksimal 2000 karakter.',
+            'merek.max'              => 'Merek maksimal 100 karakter.',
+            'tipe.max'               => 'Tipe/Model maksimal 100 karakter.',
+            'nomor_seri.max'         => 'Nomor seri maksimal 100 karakter.',
+            'tanggal_perolehan.date' => 'Format tanggal tidak valid.',
+            'tanggal_perolehan.before_or_equal' => 'Tanggal perolehan tidak boleh di masa depan.',
+            'nilai_perolehan.required' => 'Nilai perolehan harus diisi.',
+            'nilai_perolehan.numeric'  => 'Nilai perolehan harus berupa angka.',
+            'nilai_perolehan.min'      => 'Nilai perolehan tidak boleh negatif.',
+            'nilai_perolehan.max'      => 'Nilai perolehan terlalu besar.',
+            'kondisi.required'       => 'Kondisi harus dipilih.',
+            'kondisi.in'             => 'Kondisi tidak valid.',
+            'catatan.max'            => 'Catatan maksimal 2000 karakter.',
+        ];
+    }
+
     public function index(Request $request)
     {
+        $request->validate([
+            'search'   => 'nullable|string|max:100',
+            'kategori' => 'nullable|uuid',
+            'status'   => 'nullable|in:tersedia,dipinjam,diperbaiki,tidak aktif',
+            'kondisi'  => 'nullable|in:baik,rusak ringan,rusak berat,hilang',
+        ]);
+
         $query = AsetEndUser::with(['kategori', 'pegawai']);
 
         if ($request->filled('kategori')) {
@@ -35,7 +82,7 @@ class AsetEndUserController extends Controller
             $query->where('kondisi', $request->kondisi);
         }
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = mb_substr($request->search, 0, 100);
             $query->where(function ($q) use ($search) {
                 $q->where('nama_aset', 'like', '%' . $search . '%')
                     ->orWhere('kode_aset', 'like', '%' . $search . '%')
@@ -46,6 +93,7 @@ class AsetEndUserController extends Controller
 
         $aset      = $query->latest()->paginate(15)->withQueryString();
         $kategoris = KategoriAset::orderBy('nama')->get();
+
         $stats = [
             'total_aset'  => AsetEndUser::count(),
             'tersedia'    => AsetEndUser::where('status', 'tersedia')->count(),
@@ -65,25 +113,11 @@ class AsetEndUserController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'kategori_id'       => 'required|exists:kategori_aset,id',
-            'nama_aset'         => 'required|string|max:255',
-            'deskripsi'         => 'nullable|string|max:2000',
-            'merek'             => 'nullable|string|max:100',
-            'tipe'              => 'nullable|string|max:100',
-            'nomor_seri'        => 'nullable|string|max:100',
-            'tanggal_perolehan' => 'nullable|date|before_or_equal:today',
-            'nilai_perolehan'   => 'required|numeric|min:0|max:99999999999',
-            'kondisi'           => 'required|in:' . implode(',', self::KONDISI_VALID),
-            'catatan'           => 'nullable|string|max:2000',
-        ]);
-
-        // Status default selalu 'tersedia' saat aset baru dibuat
+        $validated = $request->validate($this->asetRules(), $this->asetMessages());
         $validated['status'] = 'tersedia';
 
         try {
             AsetEndUser::create($validated);
-
             return redirect()->route('inventaris.aset-end-user.index')
                 ->with('success', 'Aset berhasil ditambahkan.');
         } catch (\Exception $e) {
@@ -94,7 +128,6 @@ class AsetEndUserController extends Controller
 
     public function show(AsetEndUser $asetEndUser)
     {
-        // Perbaikan: eager load dengan query yang benar, hindari N+1
         $asetEndUser->load([
             'kategori',
             'pegawai',
@@ -112,25 +145,10 @@ class AsetEndUserController extends Controller
 
     public function update(Request $request, AsetEndUser $asetEndUser)
     {
-        $validated = $request->validate([
-            'kategori_id'       => 'required|exists:kategori_aset,id',
-            'nama_aset'         => 'required|string|max:255',
-            'deskripsi'         => 'nullable|string|max:2000',
-            'merek'             => 'nullable|string|max:100',
-            'tipe'              => 'nullable|string|max:100',
-            'nomor_seri'        => 'nullable|string|max:100',
-            'tanggal_perolehan' => 'nullable|date|before_or_equal:today',
-            'nilai_perolehan'   => 'required|numeric|min:0|max:99999999999',
-            'kondisi'           => 'required|in:' . implode(',', self::KONDISI_VALID),
-            'catatan'           => 'nullable|string|max:2000',
-        ]);
-
-        // Jangan izinkan update status lewat form edit biasa
-        // Status hanya bisa berubah lewat pinjam/kembalikan
+        $validated = $request->validate($this->asetRules(), $this->asetMessages());
 
         try {
             $asetEndUser->update($validated);
-
             return redirect()->route('inventaris.aset-end-user.index')
                 ->with('success', 'Aset berhasil diperbarui.');
         } catch (\Exception $e) {
@@ -147,7 +165,6 @@ class AsetEndUserController extends Controller
 
         try {
             $asetEndUser->delete();
-
             return redirect()->route('inventaris.aset-end-user.index')
                 ->with('success', 'Aset berhasil dihapus.');
         } catch (\Exception $e) {
@@ -163,9 +180,16 @@ class AsetEndUserController extends Controller
         }
 
         $validated = $request->validate([
-            'pegawai_id'         => 'required|exists:pegawai,id',
+            'pegawai_id'         => 'required|uuid|exists:pegawai,id',
             'tanggal_peminjaman' => 'required|date|before_or_equal:today',
-            'catatan'            => 'nullable|string|max:2000',
+            'catatan'            => 'nullable|string|max:1000',
+        ], [
+            'pegawai_id.required'         => 'Pegawai harus dipilih.',
+            'pegawai_id.exists'           => 'Pegawai tidak valid.',
+            'tanggal_peminjaman.required' => 'Tanggal peminjaman harus diisi.',
+            'tanggal_peminjaman.date'     => 'Format tanggal tidak valid.',
+            'tanggal_peminjaman.before_or_equal' => 'Tanggal peminjaman tidak boleh di masa depan.',
+            'catatan.max'                 => 'Catatan maksimal 1000 karakter.',
         ]);
 
         DB::beginTransaction();
@@ -183,7 +207,9 @@ class AsetEndUserController extends Controller
                 'user_id'         => auth()->id(),
                 'jenis_aktivitas' => 'peminjaman',
                 'tanggal'         => $validated['tanggal_peminjaman'],
-                'keterangan'      => $validated['catatan'] ?? null,
+                'keterangan'      => isset($validated['catatan'])
+                    ? mb_substr($validated['catatan'], 0, 1000)
+                    : null,
             ]);
 
             DB::commit();
@@ -203,7 +229,11 @@ class AsetEndUserController extends Controller
 
         $validated = $request->validate([
             'kondisi' => 'required|in:' . implode(',', self::KONDISI_VALID),
-            'catatan' => 'nullable|string|max:2000',
+            'catatan' => 'nullable|string|max:1000',
+        ], [
+            'kondisi.required' => 'Kondisi harus dipilih.',
+            'kondisi.in'       => 'Kondisi tidak valid.',
+            'catatan.max'      => 'Catatan maksimal 1000 karakter.',
         ]);
 
         DB::beginTransaction();
@@ -224,7 +254,9 @@ class AsetEndUserController extends Controller
                 'user_id'         => auth()->id(),
                 'jenis_aktivitas' => 'pengembalian',
                 'tanggal'         => now()->toDateString(),
-                'keterangan'      => $validated['catatan'] ?? null,
+                'keterangan'      => isset($validated['catatan'])
+                    ? mb_substr($validated['catatan'], 0, 1000)
+                    : null,
             ]);
 
             DB::commit();
@@ -236,10 +268,6 @@ class AsetEndUserController extends Controller
         }
     }
 
-    /**
-     * Export — PERBAIKAN: jangan pakai back() untuk file download.
-     * Jika gagal, redirect ke index dengan error (bukan back+download).
-     */
     public function export()
     {
         try {
@@ -278,6 +306,10 @@ class AsetEndUserController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:2048',
+        ], [
+            'file.required' => 'File harus diupload.',
+            'file.mimes'    => 'Format file harus xlsx, xls, atau csv.',
+            'file.max'      => 'Ukuran file maksimal 2MB.',
         ]);
 
         try {
@@ -296,7 +328,6 @@ class AsetEndUserController extends Controller
                     $this->handleException($error, 'Error pada baris import aset.');
                     $errorMessages[] = 'Terdapat baris yang tidak dapat diproses.';
                 }
-
                 return back()->with(
                     'warning',
                     'Import selesai dengan beberapa peringatan: ' . implode(' | ', array_slice($errorMessages, 0, 10))

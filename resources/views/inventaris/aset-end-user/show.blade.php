@@ -274,12 +274,11 @@
 
 <!-- Modal Pinjam -->
 <div id="pinjamModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-6">
+    <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-6"
+         x-data="{ catatan: '' }">
         <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Pinjamkan Aset</h3>
-
         <form action="{{ route('inventaris.aset-end-user.pinjam', $asetEndUser) }}" method="POST">
             @csrf
-
             <div class="space-y-4">
                 <div class="input-group">
                     <label class="input-label">Pegawai <span class="text-red-500">*</span></label>
@@ -290,28 +289,30 @@
                         @endforeach
                     </select>
                 </div>
-
                 <div class="input-group">
                     <label class="input-label">Tanggal Peminjaman <span class="text-red-500">*</span></label>
                     <input type="date" name="tanggal_peminjaman" value="{{ date('Y-m-d') }}"
+                        max="{{ date('Y-m-d') }}"
                         class="input-field" required>
                 </div>
-
                 <div class="input-group">
                     <label class="input-label">Catatan</label>
-                    <textarea name="catatan" rows="3" class="input-field" placeholder="Catatan peminjaman..."></textarea>
+                    <textarea name="catatan" rows="3" class="input-field"
+                        x-model="catatan"
+                        maxlength="1000"
+                        placeholder="Catatan peminjaman (max 1000 karakter)..."></textarea>
+                    <span class="text-xs text-gray-500 mt-1">
+                        <span x-text="catatan.length"></span>/1000 karakter
+                    </span>
                 </div>
             </div>
-
             <div class="flex items-center justify-end space-x-3 mt-6">
                 <button type="button"
                     onclick="document.getElementById('pinjamModal').classList.add('hidden')"
                     class="btn-outline">
                     Batal
                 </button>
-                <button type="submit" class="btn-primary">
-                    Pinjamkan
-                </button>
+                <button type="submit" class="btn-primary">Pinjamkan</button>
             </div>
         </form>
     </div>
@@ -319,12 +320,11 @@
 
 <!-- Modal Kembalikan -->
 <div id="kembalikanModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-6">
+    <div class="bg-white dark:bg-navy-800 rounded-2xl max-w-md w-full p-6"
+         x-data="{ catatan: '' }">
         <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Kembalikan Aset</h3>
-
         <form action="{{ route('inventaris.aset-end-user.kembalikan', $asetEndUser) }}" method="POST">
             @csrf
-
             <div class="space-y-4">
                 <div class="input-group">
                     <label class="input-label">Kondisi Saat Dikembalikan <span class="text-red-500">*</span></label>
@@ -335,22 +335,24 @@
                         <option value="hilang">Hilang</option>
                     </select>
                 </div>
-
                 <div class="input-group">
                     <label class="input-label">Catatan</label>
-                    <textarea name="catatan" rows="3" class="input-field" placeholder="Catatan pengembalian..."></textarea>
+                    <textarea name="catatan" rows="3" class="input-field"
+                        x-model="catatan"
+                        maxlength="1000"
+                        placeholder="Catatan pengembalian (max 1000 karakter)..."></textarea>
+                    <span class="text-xs text-gray-500 mt-1">
+                        <span x-text="catatan.length"></span>/1000 karakter
+                    </span>
                 </div>
             </div>
-
             <div class="flex items-center justify-end space-x-3 mt-6">
                 <button type="button"
                     onclick="document.getElementById('kembalikanModal').classList.add('hidden')"
                     class="btn-outline">
                     Batal
                 </button>
-                <button type="submit" class="btn-primary">
-                    Kembalikan
-                </button>
+                <button type="submit" class="btn-primary">Kembalikan</button>
             </div>
         </form>
     </div>

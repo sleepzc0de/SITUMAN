@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/Inventaris/KategoriAsetController.php
-
 namespace App\Http\Controllers\Inventaris;
 
 use App\Http\Controllers\Controller;
@@ -23,8 +21,14 @@ class KategoriAsetController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'nama'      => 'required|string|max:255|unique:kategori_aset,nama',
+            'nama'      => 'required|string|min:3|max:100|unique:kategori_aset,nama',
             'deskripsi' => 'nullable|string|max:2000',
+        ], [
+            'nama.required' => 'Nama kategori harus diisi.',
+            'nama.min'      => 'Nama kategori minimal 3 karakter.',
+            'nama.max'      => 'Nama kategori maksimal 100 karakter.',
+            'nama.unique'   => 'Nama kategori sudah digunakan.',
+            'deskripsi.max' => 'Deskripsi maksimal 2000 karakter.',
         ]);
 
         try {
@@ -39,7 +43,6 @@ class KategoriAsetController extends Controller
 
     public function show(KategoriAset $kategoriAset)
     {
-        // PERBAIKAN: paginate() tidak bisa di dalam load(). Gunakan query terpisah.
         $aset = $kategoriAset->aset()
             ->with('pegawai')
             ->latest()
@@ -56,8 +59,14 @@ class KategoriAsetController extends Controller
     public function update(Request $request, KategoriAset $kategoriAset)
     {
         $validated = $request->validate([
-            'nama'      => 'required|string|max:255|unique:kategori_aset,nama,' . $kategoriAset->id,
+            'nama'      => 'required|string|min:3|max:100|unique:kategori_aset,nama,' . $kategoriAset->id,
             'deskripsi' => 'nullable|string|max:2000',
+        ], [
+            'nama.required' => 'Nama kategori harus diisi.',
+            'nama.min'      => 'Nama kategori minimal 3 karakter.',
+            'nama.max'      => 'Nama kategori maksimal 100 karakter.',
+            'nama.unique'   => 'Nama kategori sudah digunakan.',
+            'deskripsi.max' => 'Deskripsi maksimal 2000 karakter.',
         ]);
 
         try {

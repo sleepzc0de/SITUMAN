@@ -96,7 +96,8 @@
                 <div class="flex-1">
                     <form method="GET" class="flex flex-col md:flex-row gap-3">
                         <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Cari nama aset, kode, nomor seri, atau pegawai..." class="input-field flex-1">
+                            placeholder="Cari nama aset, kode, nomor seri, atau pegawai..." maxlength="100"
+                            class="input-field flex-1">
 
                         <select name="kategori" class="input-field">
                             <option value="">Semua Kategori</option>

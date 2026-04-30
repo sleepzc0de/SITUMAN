@@ -13,13 +13,11 @@
 
 @push('head')
 <style>
-    /* Pastikan select tidak bisa diubah menjadi input text */
     select.input-field {
         -webkit-appearance: auto;
         appearance: auto;
         pointer-events: auto;
     }
-    /* Nonaktifkan contenteditable pada semua field form */
     form [contenteditable] {
         -webkit-user-modify: read-only;
     }
@@ -34,12 +32,19 @@
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ $asetEndUser->nama_aset }}</p>
         </div>
 
-        <form action="{{ route('inventaris.aset-end-user.update', $asetEndUser) }}" method="POST">
+        <form action="{{ route('inventaris.aset-end-user.update', $asetEndUser) }}" method="POST"
+              x-data="{
+                  nama_aset: @js(old('nama_aset', $asetEndUser->nama_aset)),
+                  merek: @js(old('merek', $asetEndUser->merek ?? '')),
+                  tipe: @js(old('tipe', $asetEndUser->tipe ?? '')),
+                  nomor_seri: @js(old('nomor_seri', $asetEndUser->nomor_seri ?? '')),
+                  deskripsi: @js(old('deskripsi', $asetEndUser->deskripsi ?? '')),
+                  catatan: @js(old('catatan', $asetEndUser->catatan ?? ''))
+              }">
             @csrf
             @method('PUT')
-
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Kategori -->
+                {{-- Kategori --}}
                 <div class="input-group">
                     <label class="input-label">Kategori Aset <span class="text-red-500">*</span></label>
                     <select name="kategori_id" class="input-field @error('kategori_id') border-red-500 @enderror" required>
@@ -56,70 +61,97 @@
                     @enderror
                 </div>
 
-                <!-- Nama Aset -->
+                {{-- Nama Aset --}}
                 <div class="input-group">
                     <label class="input-label">Nama Aset <span class="text-red-500">*</span></label>
                     <input type="text" name="nama_aset" value="{{ old('nama_aset', $asetEndUser->nama_aset) }}"
-                        class="input-field @error('nama_aset') border-red-500 @enderror" required>
+                        x-model="nama_aset"
+                        class="input-field @error('nama_aset') border-red-500 @enderror"
+                        minlength="3"
+                        maxlength="255"
+                        required>
                     @error('nama_aset')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="nama_aset.length"></span>/255 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Merek -->
+                {{-- Merek --}}
                 <div class="input-group">
                     <label class="input-label">Merek</label>
                     <input type="text" name="merek" value="{{ old('merek', $asetEndUser->merek) }}"
-                        class="input-field @error('merek') border-red-500 @enderror">
+                        x-model="merek"
+                        class="input-field @error('merek') border-red-500 @enderror"
+                        maxlength="100">
                     @error('merek')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="merek.length"></span>/100 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Tipe -->
+                {{-- Tipe --}}
                 <div class="input-group">
                     <label class="input-label">Tipe/Model</label>
                     <input type="text" name="tipe" value="{{ old('tipe', $asetEndUser->tipe) }}"
-                        class="input-field @error('tipe') border-red-500 @enderror">
+                        x-model="tipe"
+                        class="input-field @error('tipe') border-red-500 @enderror"
+                        maxlength="100">
                     @error('tipe')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="tipe.length"></span>/100 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Nomor Seri -->
+                {{-- Nomor Seri --}}
                 <div class="input-group">
                     <label class="input-label">Nomor Seri</label>
                     <input type="text" name="nomor_seri" value="{{ old('nomor_seri', $asetEndUser->nomor_seri) }}"
-                        class="input-field @error('nomor_seri') border-red-500 @enderror">
+                        x-model="nomor_seri"
+                        class="input-field @error('nomor_seri') border-red-500 @enderror"
+                        maxlength="100">
                     @error('nomor_seri')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="nomor_seri.length"></span>/100 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Tanggal Perolehan -->
+                {{-- Tanggal Perolehan --}}
                 <div class="input-group">
                     <label class="input-label">Tanggal Perolehan</label>
                     <input type="date" name="tanggal_perolehan"
                         value="{{ old('tanggal_perolehan', $asetEndUser->tanggal_perolehan?->format('Y-m-d')) }}"
-                        class="input-field @error('tanggal_perolehan') border-red-500 @enderror">
+                        class="input-field @error('tanggal_perolehan') border-red-500 @enderror"
+                        max="{{ date('Y-m-d') }}">
                     @error('tanggal_perolehan')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Nilai Perolehan -->
+                {{-- Nilai Perolehan --}}
                 <div class="input-group">
                     <label class="input-label">Nilai Perolehan <span class="text-red-500">*</span></label>
                     <input type="number" name="nilai_perolehan"
                         value="{{ old('nilai_perolehan', $asetEndUser->nilai_perolehan) }}"
                         class="input-field @error('nilai_perolehan') border-red-500 @enderror"
-                        min="0" step="0.01" required>
+                        min="0" max="99999999999" step="0.01" required>
                     @error('nilai_perolehan')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
                     @enderror
                 </div>
 
-                <!-- Kondisi -->
+                {{-- Kondisi --}}
                 <div class="input-group">
                     <label class="input-label">Kondisi <span class="text-red-500">*</span></label>
                     <select name="kondisi" class="input-field @error('kondisi') border-red-500 @enderror" required>
@@ -133,31 +165,41 @@
                     @enderror
                 </div>
 
-                <!-- Deskripsi -->
+                {{-- Deskripsi --}}
                 <div class="input-group md:col-span-2">
                     <label class="input-label">Deskripsi</label>
                     <textarea name="deskripsi" rows="3"
+                        x-model="deskripsi"
+                        maxlength="2000"
                         class="input-field @error('deskripsi') border-red-500 @enderror">{{ old('deskripsi', $asetEndUser->deskripsi) }}</textarea>
                     @error('deskripsi')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="deskripsi.length"></span>/2000 karakter
+                        </span>
                     @enderror
                 </div>
 
-                <!-- Catatan -->
+                {{-- Catatan --}}
                 <div class="input-group md:col-span-2">
                     <label class="input-label">Catatan</label>
                     <textarea name="catatan" rows="2"
+                        x-model="catatan"
+                        maxlength="2000"
                         class="input-field @error('catatan') border-red-500 @enderror">{{ old('catatan', $asetEndUser->catatan) }}</textarea>
                     @error('catatan')
                         <span class="text-xs text-red-500 mt-1">{{ $message }}</span>
+                    @else
+                        <span class="text-xs text-gray-500 mt-1">
+                            <span x-text="catatan.length"></span>/2000 karakter
+                        </span>
                     @enderror
                 </div>
             </div>
 
             <div class="flex items-center justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-navy-700">
-                <a href="{{ route('inventaris.aset-end-user.index') }}" class="btn-outline">
-                    Batal
-                </a>
+                <a href="{{ route('inventaris.aset-end-user.index') }}" class="btn-outline">Batal</a>
                 <button type="submit" class="btn-primary">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
