@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Anggaran;
 
 use App\Http\Controllers\Controller;
@@ -11,13 +12,17 @@ use Illuminate\Validation\Rule;
 
 class UsulanPenarikanController extends Controller
 {
-    // ── Konstanta Batasan Karakter ─────────────────────────────
-    private const MAX_RO            = 50;
-    private const MAX_SUB_KOMPONEN  = 255;
-    private const MAX_BULAN         = 20;
-    private const MAX_KETERANGAN    = 500;
-    private const MAX_CATATAN       = 500;
-    private const MAX_NILAI_USULAN  = 999999999999; // 12 digit
+    // ══════════════════════════════════════════════════════════════
+    // KONSTANTA BATASAN KARAKTER
+    // Disesuaikan dengan schema migration usulan_penarikan
+    // ══════════════════════════════════════════════════════════════
+    private const MAX_RO              = 50;   // string('ro', 50)
+    private const MAX_SUB_KOMPONEN    = 255;  // string('sub_komponen', 255)
+    private const MAX_BULAN           = 20;   // string('bulan', 20)
+    private const MAX_KETERANGAN      = 500;  // text() — dibatasi business rule
+    private const MAX_CATATAN         = 500;  // alias untuk approval
+    private const MAX_NILAI_USULAN    = 999999999999; // 12 digit, decimal(20,2)
+    private const MIN_NILAI_USULAN    = 1;
 
     // ── Whitelist Helpers ──────────────────────────────────────
     private function getValidRoList(): array
@@ -38,6 +43,10 @@ class UsulanPenarikanController extends Controller
         ];
     }
 
+    /**
+     * Ambil daftar sub_komponen yang valid untuk RO tertentu dari DB.
+     * Whitelist server-side untuk validasi sub_komponen.
+     */
     private function getValidSubkomponenForRo(string $ro): array
     {
         return Anggaran::where('ro', $ro)
@@ -49,16 +58,21 @@ class UsulanPenarikanController extends Controller
             ->toArray();
     }
 
+    /**
+     * Sanitasi string + hard cut-off panjang karakter.
+     * Defense-in-depth: jika somehow lolos validation, panjang tetap dipotong.
+     */
     private function sanitizeString(?string $value, ?int $maxLength = null): ?string
     {
         if ($value === null) return null;
         $value = strip_tags($value);
         $value = str_replace("\0", '', $value);
         $value = trim($value);
-        // Hard cut-off jika somehow lolos validation
+
         if ($maxLength !== null && mb_strlen($value) > $maxLength) {
             $value = mb_substr($value, 0, $maxLength);
         }
+
         return $value;
     }
 
@@ -66,32 +80,45 @@ class UsulanPenarikanController extends Controller
     {
         return [
             'ro.required'           => 'RO wajib dipilih.',
-            'ro.in'                 => 'Nilai RO tidak valid.',
+            'ro.string'             => 'RO harus berupa teks.',
             'ro.max'                => 'RO maksimal ' . self::MAX_RO . ' karakter.',
+            'ro.in'                 => 'Nilai RO tidak valid.',
+
             'sub_komponen.required' => 'Sub komponen wajib dipilih.',
-            'sub_komponen.in'       => 'Nilai sub komponen tidak valid untuk RO yang dipilih.',
+            'sub_komponen.string'   => 'Sub komponen harus berupa teks.',
             'sub_komponen.max'      => 'Sub komponen maksimal ' . self::MAX_SUB_KOMPONEN . ' karakter.',
+            'sub_komponen.in'       => 'Nilai sub komponen tidak valid untuk RO yang dipilih.',
+
             'bulan.required'        => 'Bulan wajib dipilih.',
-            'bulan.in'              => 'Nilai bulan tidak valid.',
+            'bulan.string'          => 'Bulan harus berupa teks.',
             'bulan.max'             => 'Bulan maksimal ' . self::MAX_BULAN . ' karakter.',
+            'bulan.in'              => 'Nilai bulan tidak valid.',
+
             'nilai_usulan.required' => 'Nilai usulan wajib diisi.',
             'nilai_usulan.numeric'  => 'Nilai usulan harus berupa angka.',
-            'nilai_usulan.min'      => 'Nilai usulan minimal Rp 1.',
+            'nilai_usulan.min'      => 'Nilai usulan minimal Rp ' . number_format(self::MIN_NILAI_USULAN, 0, ',', '.') . '.',
             'nilai_usulan.max'      => 'Nilai usulan terlalu besar (maksimal Rp ' . number_format(self::MAX_NILAI_USULAN, 0, ',', '.') . ').',
+
+            'keterangan.string'     => 'Keterangan harus berupa teks.',
             'keterangan.max'        => 'Keterangan maksimal ' . self::MAX_KETERANGAN . ' karakter.',
+
+            'catatan.string'        => 'Catatan harus berupa teks.',
             'catatan.max'           => 'Catatan maksimal ' . self::MAX_CATATAN . ' karakter.',
         ];
     }
 
     /**
-     * Validasi rules — sub_komponen dicek dari DB berdasarkan RO yang dikirim.
-     * Setiap field string diberi batasan max karakter.
+     * Validasi rules untuk store/update.
+     * sub_komponen dicek dari DB berdasarkan RO yang dikirim.
+     * Setiap field string memiliki batasan max:N yang konsisten dengan schema.
      */
     private function buildValidationRules(Request $request): array
     {
         $validRoList = $this->getValidRoList();
-        $ro          = $request->input('ro', '');
-        $validSubkomponenList = in_array($ro, $validRoList, true)
+
+        // Ambil sub_komponen yang valid dari DB berdasarkan RO input
+        $ro = $request->input('ro', '');
+        $validSubkomponenList = (is_string($ro) && in_array($ro, $validRoList, true))
             ? $this->getValidSubkomponenForRo($ro)
             : [];
 
@@ -117,7 +144,7 @@ class UsulanPenarikanController extends Controller
             'nilai_usulan' => [
                 'required',
                 'numeric',
-                'min:1',
+                'min:' . self::MIN_NILAI_USULAN,
                 'max:' . self::MAX_NILAI_USULAN,
             ],
             'keterangan' => [
@@ -128,25 +155,33 @@ class UsulanPenarikanController extends Controller
         ];
     }
 
-    // ── Index ──────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // INDEX
+    // ══════════════════════════════════════════════════════════════
     public function index(Request $request)
     {
         $validRoList    = $this->getValidRoList();
         $validBulanList = $this->getValidBulanList();
+        $validStatusList = ['pending', 'approved', 'rejected'];
 
-        $query = UsulanPenarikan::with(['user', 'anggaran'])->orderBy('created_at', 'desc');
+        $query = UsulanPenarikan::with(['user', 'anggaran'])
+            ->orderBy('created_at', 'desc');
 
+        // Filter status — whitelist
         if ($request->filled('status') && $request->status !== 'all') {
-            // Validasi status hanya nilai yang dikenal
-            if (in_array($request->status, ['pending', 'approved', 'rejected'], true)) {
+            if (in_array($request->status, $validStatusList, true)) {
                 $query->where('status', $request->status);
             }
         }
+
+        // Filter bulan — whitelist
         if ($request->filled('bulan') && $request->bulan !== 'all') {
             if (in_array($request->bulan, $validBulanList, true)) {
                 $query->where('bulan', $request->bulan);
             }
         }
+
+        // Filter RO — whitelist
         if ($request->filled('ro') && $request->ro !== 'all') {
             if (in_array($request->ro, $validRoList, true)) {
                 $query->where('ro', $request->ro);
@@ -177,7 +212,9 @@ class UsulanPenarikanController extends Controller
         ));
     }
 
-    // ── Create ─────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // CREATE
+    // ══════════════════════════════════════════════════════════════
     public function create()
     {
         $roList    = $this->getValidRoList();
@@ -185,13 +222,19 @@ class UsulanPenarikanController extends Controller
         return view('anggaran.usulan.create', compact('roList', 'bulanList'));
     }
 
-    // ── Get Subkomponen (AJAX) ─────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // GET SUBKOMPONEN (AJAX)
+    // ══════════════════════════════════════════════════════════════
     public function getSubkomponen(Request $request)
     {
         try {
-            // Validasi panjang dan whitelist RO
             $ro = $request->input('ro', '');
-            if (!is_string($ro) || mb_strlen($ro) > self::MAX_RO || !in_array($ro, $this->getValidRoList(), true)) {
+
+            // Validasi: harus string, max length, dan ada di whitelist
+            if (!is_string($ro)
+                || mb_strlen($ro) > self::MAX_RO
+                || !in_array($ro, $this->getValidRoList(), true)
+            ) {
                 return response()->json(['error' => 'RO tidak valid.'], 400);
             }
 
@@ -209,21 +252,24 @@ class UsulanPenarikanController extends Controller
         }
     }
 
-    // ── Store ──────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // STORE
+    // ══════════════════════════════════════════════════════════════
     public function store(Request $request)
     {
+        // Validasi dengan rules yang sudah include batasan max karakter
         $validated = $request->validate(
             $this->buildValidationRules($request),
             $this->validationMessages()
         );
 
-        // Sanitasi dengan hard cut-off panjang
+        // Sanitasi + hard cut-off (defense in depth)
         $validated['ro']           = $this->sanitizeString($validated['ro'], self::MAX_RO);
         $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen'], self::MAX_SUB_KOMPONEN);
         $validated['bulan']        = $this->sanitizeString($validated['bulan'], self::MAX_BULAN);
         $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null, self::MAX_KETERANGAN);
 
-        // Triple-check validitas sub_komponen
+        // Triple-check: pastikan sub_komponen masih valid setelah sanitasi
         if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']), true)) {
             return back()->withInput()->with('error', 'Nilai sub komponen tidak valid.');
         }
@@ -255,7 +301,9 @@ class UsulanPenarikanController extends Controller
             ->with('success', 'Usulan penarikan dana berhasil diajukan.');
     }
 
-    // ── Show ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // SHOW
+    // ══════════════════════════════════════════════════════════════
     public function show(UsulanPenarikan $usulan)
     {
         $usulan->load(['user', 'anggaran']);
@@ -273,7 +321,9 @@ class UsulanPenarikanController extends Controller
         return view('anggaran.usulan.show', compact('usulan', 'anggaranSubkomp'));
     }
 
-    // ── Edit ───────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // EDIT
+    // ══════════════════════════════════════════════════════════════
     public function edit(UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -284,6 +334,7 @@ class UsulanPenarikanController extends Controller
         $roList    = $this->getValidRoList();
         $bulanList = $this->getValidBulanList();
 
+        // Ambil subkomponen untuk RO yang sudah tersimpan
         $subkomponenList = $usulan->ro
             ? Anggaran::where('ro', $usulan->ro)
                 ->whereNotNull('kode_subkomponen')
@@ -298,7 +349,9 @@ class UsulanPenarikanController extends Controller
         ));
     }
 
-    // ── Update ─────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // UPDATE
+    // ══════════════════════════════════════════════════════════════
     public function update(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -306,20 +359,24 @@ class UsulanPenarikanController extends Controller
                 ->with('error', 'Usulan yang sudah diproses tidak dapat diedit.');
         }
 
+        // Validasi dengan rules + batasan max karakter
         $validated = $request->validate(
             $this->buildValidationRules($request),
             $this->validationMessages()
         );
 
+        // Sanitasi + hard cut-off
         $validated['ro']           = $this->sanitizeString($validated['ro'], self::MAX_RO);
         $validated['sub_komponen'] = $this->sanitizeString($validated['sub_komponen'], self::MAX_SUB_KOMPONEN);
         $validated['bulan']        = $this->sanitizeString($validated['bulan'], self::MAX_BULAN);
         $validated['keterangan']   = $this->sanitizeString($validated['keterangan'] ?? null, self::MAX_KETERANGAN);
 
+        // Triple-check
         if (!in_array($validated['sub_komponen'], $this->getValidSubkomponenForRo($validated['ro']), true)) {
             return back()->withInput()->with('error', 'Nilai sub komponen tidak valid.');
         }
 
+        // Validasi sisa anggaran
         $subkomp = Anggaran::where('ro', $validated['ro'])
             ->where('kode_subkomponen', $validated['sub_komponen'])
             ->whereNull('kode_akun')
@@ -343,19 +400,25 @@ class UsulanPenarikanController extends Controller
             ->with('success', 'Usulan penarikan dana berhasil diupdate.');
     }
 
-    // ── Destroy ────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // DESTROY
+    // ══════════════════════════════════════════════════════════════
     public function destroy(UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
             return redirect()->route('anggaran.usulan.index')
                 ->with('error', 'Usulan yang sudah diproses tidak dapat dihapus.');
         }
+
         $usulan->delete();
+
         return redirect()->route('anggaran.usulan.index')
             ->with('success', 'Usulan penarikan dana berhasil dihapus.');
     }
 
-    // ── Approve ────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // APPROVE
+    // ══════════════════════════════════════════════════════════════
     public function approve(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -363,7 +426,7 @@ class UsulanPenarikanController extends Controller
         }
 
         $validated = $request->validate([
-            'catatan' => 'nullable|string|max:' . self::MAX_CATATAN,
+            'catatan' => ['nullable', 'string', 'max:' . self::MAX_CATATAN],
         ], $this->validationMessages());
 
         $usulan->update([
@@ -378,7 +441,9 @@ class UsulanPenarikanController extends Controller
             ->with('success', 'Usulan penarikan dana berhasil disetujui.');
     }
 
-    // ── Reject ─────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // REJECT
+    // ══════════════════════════════════════════════════════════════
     public function reject(Request $request, UsulanPenarikan $usulan)
     {
         if ($usulan->status !== 'pending') {
@@ -386,7 +451,7 @@ class UsulanPenarikanController extends Controller
         }
 
         $validated = $request->validate([
-            'keterangan' => 'required|string|max:' . self::MAX_KETERANGAN,
+            'keterangan' => ['required', 'string', 'max:' . self::MAX_KETERANGAN],
         ], $this->validationMessages());
 
         $usulan->update([
@@ -398,7 +463,9 @@ class UsulanPenarikanController extends Controller
             ->with('success', 'Usulan penarikan dana berhasil ditolak.');
     }
 
-    // ── Render Table HTML (sama seperti aslinya) ───────────────
+    // ══════════════════════════════════════════════════════════════
+    // RENDER TABLE HTML (untuk AJAX)
+    // ══════════════════════════════════════════════════════════════
     private function renderTableHtml($usulans): string
     {
         $badgeMap = [
@@ -479,6 +546,7 @@ class UsulanPenarikanController extends Controller
         </svg>
       </a>
 HTML;
+
                 if ($usulan->status === 'pending') {
                     $html .= <<<HTML
       <a href="{$editUrl}" class="table-action-edit" title="Edit">
@@ -487,6 +555,7 @@ HTML;
         </svg>
       </a>
 HTML;
+
                     if (auth()->user() && (auth()->user()->hasRole('superadmin') || auth()->user()->hasRole('admin'))) {
                         $html .= <<<HTML
       <form action="{$approveUrl}" method="POST" class="inline" x-data @submit.prevent="if(confirm('Setujui usulan ini?')) \$el.submit()">
@@ -504,6 +573,7 @@ HTML;
       </button>
 HTML;
                     }
+
                     $html .= <<<HTML
       <form action="{$deleteUrl}" method="POST" class="inline" x-data @submit.prevent="if(confirm('Hapus usulan ini? Tidak dapat dibatalkan.')) \$el.submit()">
         {$csrf}<input type="hidden" name="_method" value="DELETE">
@@ -515,6 +585,7 @@ HTML;
       </form>
 HTML;
                 }
+
                 $html .= '</div></td></tr>';
             }
         }
@@ -537,7 +608,7 @@ HTML;
             if ($cur <= 1) {
                 $html .= '<span class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></span>';
             } else {
-                $prev  = $cur - 1;
+                $prev = $cur - 1;
                 $html .= "<button type=\"button\" x-data @click=\"\$dispatch('change-page',{page:{$prev}})\" class=\"btn btn-ghost btn-sm\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 19l-7-7 7-7\"/></svg></button>";
             }
 
@@ -551,7 +622,7 @@ HTML;
             if (!$usulans->hasMorePages()) {
                 $html .= '<span class="btn btn-ghost btn-sm opacity-40 cursor-not-allowed"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></span>';
             } else {
-                $next  = $cur + 1;
+                $next = $cur + 1;
                 $html .= "<button type=\"button\" x-data @click=\"\$dispatch('change-page',{page:{$next}})\" class=\"btn btn-ghost btn-sm\"><svg class=\"w-4 h-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 5l7 7-7 7\"/></svg></button>";
             }
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Anggaran;
 
 use App\Exports\DataAnggaranExport;
@@ -12,72 +13,109 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class DataAnggaranController extends Controller
 {
+    /**
+     * Whitelist RO yang valid — sumber kebenaran tunggal di server.
+     * Tidak pernah diambil dari user input secara langsung.
+     */
     private const VALID_RO = ['Z06', '403', '405', '994'];
 
-    // ── Konstanta Batasan Karakter ─────────────────────────────
-    private const MAX_KEGIATAN         = 50;
-    private const MAX_KRO              = 50;
-    private const MAX_RO_LEN           = 50;
-    private const MAX_SUBKOMPONEN      = 50;
-    private const MAX_KODE_AKUN        = 50;
-    private const MAX_PROGRAM_KEGIATAN = 1000;
-    private const MAX_PIC              = 100;
-    private const MAX_PAGU             = 999999999999;
-    private const MAX_SEARCH           = 200;
+    /**
+     * Whitelist level yang valid untuk filter index.
+     */
+    private const VALID_LEVELS = ['ro', 'subkomponen', 'akun'];
 
-    // ── Validation messages global ─────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // KONSTANTA BATASAN KARAKTER
+    // Disesuaikan dengan schema migration anggaran
+    // ══════════════════════════════════════════════════════════════
+    private const MAX_KEGIATAN         = 50;   // string('kegiatan', 50)
+    private const MAX_KRO              = 50;   // string('kro', 50)
+    private const MAX_RO_LEN           = 50;   // string('ro', 50)
+    private const MAX_KODE_SUBKOMPONEN = 50;   // string('kode_subkomponen', 50)
+    private const MAX_KODE_AKUN        = 50;   // string('kode_akun', 50)
+    private const MAX_PROGRAM_KEGIATAN = 1000; // text() — dibatasi business rule
+    private const MAX_PIC              = 100;  // string('pic', 100)
+    private const MAX_PAGU             = 999999999999; // 12 digit, decimal(20,2)
+    private const MAX_SEARCH           = 200;  // batasan input search untuk cegah DoS
+
+    // ══════════════════════════════════════════════════════════════
+    // PESAN VALIDASI
+    // ══════════════════════════════════════════════════════════════
     private function validationMessages(): array
     {
         return [
             'kegiatan.required'         => 'Kode kegiatan wajib diisi.',
+            'kegiatan.string'           => 'Kode kegiatan harus berupa teks.',
             'kegiatan.max'              => 'Kode kegiatan maksimal ' . self::MAX_KEGIATAN . ' karakter.',
+
             'kro.required'              => 'KRO wajib diisi.',
+            'kro.string'                => 'KRO harus berupa teks.',
             'kro.max'                   => 'KRO maksimal ' . self::MAX_KRO . ' karakter.',
+
             'ro.required'               => 'RO wajib dipilih.',
-            'ro.in'                     => 'Nilai RO tidak valid.',
+            'ro.string'                 => 'RO harus berupa teks.',
             'ro.max'                    => 'RO maksimal ' . self::MAX_RO_LEN . ' karakter.',
+            'ro.in'                     => 'Nilai RO tidak valid.',
+
             'kode_subkomponen.required' => 'Kode sub komponen wajib diisi.',
-            'kode_subkomponen.max'      => 'Kode sub komponen maksimal ' . self::MAX_SUBKOMPONEN . ' karakter.',
+            'kode_subkomponen.string'   => 'Kode sub komponen harus berupa teks.',
+            'kode_subkomponen.max'      => 'Kode sub komponen maksimal ' . self::MAX_KODE_SUBKOMPONEN . ' karakter.',
             'kode_subkomponen.alpha_num'=> 'Kode sub komponen hanya boleh huruf dan angka.',
+
             'kode_akun.required'        => 'Kode akun wajib diisi.',
+            'kode_akun.string'          => 'Kode akun harus berupa teks.',
             'kode_akun.max'             => 'Kode akun maksimal ' . self::MAX_KODE_AKUN . ' karakter.',
+
             'program_kegiatan.required' => 'Uraian program/kegiatan wajib diisi.',
+            'program_kegiatan.string'   => 'Uraian program/kegiatan harus berupa teks.',
             'program_kegiatan.max'      => 'Uraian program/kegiatan maksimal ' . self::MAX_PROGRAM_KEGIATAN . ' karakter.',
+
             'pic.required'              => 'PIC wajib diisi.',
+            'pic.string'                => 'PIC harus berupa teks.',
             'pic.max'                   => 'PIC maksimal ' . self::MAX_PIC . ' karakter.',
+
             'pagu_anggaran.required'    => 'Pagu anggaran wajib diisi.',
             'pagu_anggaran.numeric'     => 'Pagu anggaran harus berupa angka.',
             'pagu_anggaran.min'         => 'Pagu anggaran minimal 0.',
-            'pagu_anggaran.max'         => 'Pagu anggaran terlalu besar.',
+            'pagu_anggaran.max'         => 'Pagu anggaran terlalu besar (maksimal Rp ' . number_format(self::MAX_PAGU, 0, ',', '.') . ').',
         ];
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // INDEX
+    // ══════════════════════════════════════════════════════════════
     public function index(Request $request)
     {
         $query = Anggaran::query();
 
+        // Filter RO — whitelist
         if ($request->filled('ro') && $request->ro !== 'all') {
-            // Whitelist RO
             if (in_array($request->ro, self::VALID_RO, true)) {
                 $query->where('ro', $request->ro);
             }
         }
+
+        // Filter level — whitelist eksplisit
         if ($request->filled('level')) {
-            match ($request->level) {
-                'ro'          => $query->whereNull('kode_subkomponen')->whereNull('kode_akun'),
-                'subkomponen' => $query->whereNotNull('kode_subkomponen')->whereNull('kode_akun'),
-                'akun'        => $query->whereNotNull('kode_akun'),
-                default       => null,
-            };
+            if (in_array($request->level, self::VALID_LEVELS, true)) {
+                match ($request->level) {
+                    'ro'          => $query->whereNull('kode_subkomponen')->whereNull('kode_akun'),
+                    'subkomponen' => $query->whereNotNull('kode_subkomponen')->whereNull('kode_akun'),
+                    'akun'        => $query->whereNotNull('kode_akun'),
+                };
+            }
         }
+
+        // Filter search — batasi panjang untuk cegah DoS / abuse
         if ($request->filled('search')) {
-            // Batasi panjang search untuk cegah abuse
-            $search = mb_substr(trim($request->search), 0, self::MAX_SEARCH);
-            $query->where(function ($q) use ($search) {
-                $q->where('program_kegiatan', 'like', "%{$search}%")
-                  ->orWhere('kode_akun', 'like', "%{$search}%")
-                  ->orWhere('kode_subkomponen', 'like', "%{$search}%");
-            });
+            $search = mb_substr(trim((string) $request->search), 0, self::MAX_SEARCH);
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('program_kegiatan', 'like', "%{$search}%")
+                      ->orWhere('kode_akun', 'like', "%{$search}%")
+                      ->orWhere('kode_subkomponen', 'like', "%{$search}%");
+                });
+            }
         }
 
         $anggarans = $query
@@ -92,17 +130,25 @@ class DataAnggaranController extends Controller
         return view('anggaran.data.index', compact('anggarans', 'roList'));
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // CREATE
+    // ══════════════════════════════════════════════════════════════
     public function create()
     {
         $roList = self::VALID_RO;
         return view('anggaran.data.create', compact('roList'));
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // STORE
+    // ══════════════════════════════════════════════════════════════
     public function store(Request $request)
     {
+        // Deteksi level dari field yang dikirim
         $hasAkun    = $request->filled('kode_akun');
         $hasSubkomp = $request->filled('kode_subkomponen');
 
+        // Bangun rules berdasarkan level
         $rules = [
             'kegiatan'         => ['required', 'string', 'max:' . self::MAX_KEGIATAN],
             'kro'              => ['required', 'string', 'max:' . self::MAX_KRO],
@@ -112,14 +158,17 @@ class DataAnggaranController extends Controller
         ];
 
         if ($hasAkun) {
-            $rules['kode_subkomponen'] = ['required', 'string', 'max:' . self::MAX_SUBKOMPONEN, 'alpha_num'];
-            $rules['kode_akun']        = ['required', 'string', 'max:' . self::MAX_KODE_AKUN, 'alpha_num'];
+            // Level Akun: subkomponen wajib, akun wajib, pagu wajib
+            $rules['kode_subkomponen'] = ['required', 'string', 'max:' . self::MAX_KODE_SUBKOMPONEN, 'alpha_num'];
+            $rules['kode_akun']        = ['required', 'string', 'max:' . self::MAX_KODE_AKUN];
             $rules['pagu_anggaran']    = ['required', 'numeric', 'min:0', 'max:' . self::MAX_PAGU];
         } elseif ($hasSubkomp) {
-            $rules['kode_subkomponen'] = ['required', 'string', 'max:' . self::MAX_SUBKOMPONEN, 'alpha_num'];
+            // Level SubKomponen: hanya subkomponen
+            $rules['kode_subkomponen'] = ['required', 'string', 'max:' . self::MAX_KODE_SUBKOMPONEN, 'alpha_num'];
             $rules['kode_akun']        = ['nullable'];
             $rules['pagu_anggaran']    = ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PAGU];
         } else {
+            // Level RO: tidak ada subkomponen maupun akun
             $rules['kode_subkomponen'] = ['nullable'];
             $rules['kode_akun']        = ['nullable'];
             $rules['pagu_anggaran']    = ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_PAGU];
@@ -127,10 +176,11 @@ class DataAnggaranController extends Controller
 
         $validated = $request->validate($rules, $this->validationMessages());
 
+        // Bersihkan & normalisasi kode subkomponen (uppercase, strip non-alphanumeric)
         if (!empty($validated['kode_subkomponen'])) {
-            $validated['kode_subkomponen'] = mb_substr(strtoupper(
-                preg_replace('/[^A-Z0-9]/i', '', $validated['kode_subkomponen'])
-            ), 0, self::MAX_SUBKOMPONEN);
+            $cleaned = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $validated['kode_subkomponen']));
+            // Hard cut-off panjang
+            $validated['kode_subkomponen'] = mb_substr($cleaned, 0, self::MAX_KODE_SUBKOMPONEN);
         }
 
         DB::beginTransaction();
@@ -157,6 +207,7 @@ class DataAnggaranController extends Controller
                 $validated['len']       = strlen($validated['referensi']);
             }
 
+            // Pagu untuk RO dan SubKomponen selalu 0 — dihitung otomatis
             if (empty($akun)) {
                 $validated['pagu_anggaran'] = 0;
             }
@@ -188,12 +239,16 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // SHOW
+    // ══════════════════════════════════════════════════════════════
     public function show(Anggaran $data)
     {
         $children = null;
 
         if (!$data->kode_akun) {
             if (!$data->kode_subkomponen) {
+                // Level RO → tampilkan SubKomponen di bawahnya
                 $children = Anggaran::where('kegiatan', $data->kegiatan)
                     ->where('kro', $data->kro)
                     ->where('ro', $data->ro)
@@ -202,6 +257,7 @@ class DataAnggaranController extends Controller
                     ->orderBy('kode_subkomponen')
                     ->get();
             } else {
+                // Level SubKomponen → tampilkan Akun di bawahnya
                 $children = Anggaran::where('kegiatan', $data->kegiatan)
                     ->where('kro', $data->kro)
                     ->where('ro', $data->ro)
@@ -215,12 +271,18 @@ class DataAnggaranController extends Controller
         return view('anggaran.data.show', compact('data', 'children'));
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // EDIT
+    // ══════════════════════════════════════════════════════════════
     public function edit(Anggaran $data)
     {
         $roList = self::VALID_RO;
         return view('anggaran.data.edit', compact('data', 'roList'));
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // UPDATE
+    // ══════════════════════════════════════════════════════════════
     public function update(Request $request, Anggaran $data)
     {
         $rules = [
@@ -237,6 +299,8 @@ class DataAnggaranController extends Controller
 
         $validated = $request->validate($rules, $this->validationMessages());
 
+        // SECURITY: kode_subkomponen & kode_akun TIDAK PERNAH diubah dari request
+        // Selalu ambil dari model yang sudah ada di DB
         unset($validated['kode_subkomponen'], $validated['kode_akun']);
 
         DB::beginTransaction();
@@ -247,17 +311,18 @@ class DataAnggaranController extends Controller
                 $oldPagu     = (float) $data->pagu_anggaran;
                 $newPagu     = (float) $validated['pagu_anggaran'];
                 $selisihPagu = $newPagu - $oldPagu;
-
                 $validated['sisa'] = (float) $data->sisa + $selisihPagu;
             } else {
+                // Jangan izinkan pagu diubah untuk level RO/SubKomponen via form
                 unset($validated['pagu_anggaran']);
             }
 
+            // Rebuild referensi menggunakan kode yang sudah tersimpan di DB
             $kegiatan = $validated['kegiatan'];
             $kro      = $validated['kro'];
             $ro       = $validated['ro'];
-            $subkomp  = $data->kode_subkomponen;
-            $akun     = $data->kode_akun;
+            $subkomp  = $data->kode_subkomponen; // dari DB, bukan request
+            $akun     = $data->kode_akun;         // dari DB, bukan request
 
             $baseRef = $kegiatan . $kro . $ro;
             $validated['referensi']  = $baseRef;
@@ -296,9 +361,11 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // DESTROY
+    // ══════════════════════════════════════════════════════════════
     public function destroy(Anggaran $data)
     {
-        // ... tetap sama seperti aslinya
         DB::beginTransaction();
         try {
             if (!$data->kode_akun) {
@@ -328,6 +395,7 @@ class DataAnggaranController extends Controller
                     'Tidak dapat menghapus item yang sudah memiliki realisasi.');
             }
 
+            // Simpan nilai sebelum dihapus untuk propagate ke parent
             $paguSnapshot = (float) $data->pagu_anggaran;
             $isAkun       = (bool) $data->kode_akun;
 
@@ -351,6 +419,9 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // IMPORT
+    // ══════════════════════════════════════════════════════════════
     public function import(Request $request)
     {
         $request->validate([
@@ -384,6 +455,9 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // EXPORT — mengembalikan file download, BUKAN redirect
+    // ══════════════════════════════════════════════════════════════
     public function export(Request $request)
     {
         try {
@@ -394,12 +468,15 @@ class DataAnggaranController extends Controller
             if ($ro && $ro !== 'all' && !in_array($ro, self::VALID_RO, true)) {
                 $ro = null;
             }
+
             // Validasi level whitelist
-            if ($level && !in_array($level, ['ro', 'subkomponen', 'akun'], true)) {
+            if ($level && !in_array($level, self::VALID_LEVELS, true)) {
                 $level = null;
             }
 
             $filename = 'data_anggaran_' . date('Ymd_His') . '.xlsx';
+
+            // Excel::download() mengembalikan BinaryFileResponse langsung.
             return Excel::download(new DataAnggaranExport($ro, $level), $filename);
         } catch (\Exception $e) {
             $this->handleException($e, 'Gagal export data anggaran.', ['action' => 'export']);
@@ -407,13 +484,19 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // AJAX — GET SUBKOMPONEN
+    // ══════════════════════════════════════════════════════════════
     public function getSubkomponen(Request $request)
     {
         try {
             $ro = trim((string) $request->get('ro', ''));
 
-            // Validasi panjang dan whitelist
-            if (empty($ro) || mb_strlen($ro) > self::MAX_RO_LEN || !in_array($ro, self::VALID_RO, true)) {
+            // Validasi: tidak kosong, tidak melebihi panjang max, dan ada di whitelist
+            if (empty($ro)
+                || mb_strlen($ro) > self::MAX_RO_LEN
+                || !in_array($ro, self::VALID_RO, true)
+            ) {
                 return response()->json(['error' => 'RO tidak valid.'], 400);
             }
 
@@ -434,14 +517,19 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // IMPORT FORM
+    // ══════════════════════════════════════════════════════════════
     public function importForm()
     {
         return view('anggaran.data.import');
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // DOWNLOAD TEMPLATE
+    // ══════════════════════════════════════════════════════════════
     public function downloadTemplate()
     {
-        // ... tetap sama
         try {
             $export = new class implements
                 \Maatwebsite\Excel\Concerns\FromArray,
@@ -457,15 +545,18 @@ class DataAnggaranController extends Controller
                         ['4753', 'EBA', '403', '',   '',       'RO 403 - Uraian RO',            'SJ.7', 0],
                     ];
                 }
+
                 public function headings(): array
                 {
                     return ['kegiatan', 'kro', 'ro', 'kode_subkomponen', 'kode_akun',
                             'program_kegiatan', 'pic', 'pagu_anggaran'];
                 }
+
                 public function styles(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet)
                 {
                     return [1 => ['font' => ['bold' => true]]];
                 }
+
                 public function columnWidths(): array
                 {
                     return ['A' => 12, 'B' => 8, 'C' => 8, 'D' => 18,
@@ -480,12 +571,14 @@ class DataAnggaranController extends Controller
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // SUMMARY
+    // ══════════════════════════════════════════════════════════════
     public function summary(Request $request)
     {
-        // ... tetap sama
         try {
+            // Validasi tahun: harus integer dan dalam range wajar
             $tahun = (int) $request->get('tahun', date('Y'));
-            // Batasi tahun pada range wajar
             if ($tahun < 2000 || $tahun > 2100) {
                 $tahun = (int) date('Y');
             }
@@ -513,9 +606,9 @@ class DataAnggaranController extends Controller
                              SUM(sisa) as total_sisa')
                 ->first();
 
-            $bulanFields       = ['januari','februari','maret','april','mei','juni',
-                                  'juli','agustus','september','oktober','november','desember'];
-            $selectFields      = implode(', ', array_map(fn($b) => "SUM({$b}) as {$b}", $bulanFields));
+            $bulanFields  = ['januari','februari','maret','april','mei','juni',
+                             'juli','agustus','september','oktober','november','desember'];
+            $selectFields = implode(', ', array_map(fn($b) => "SUM({$b}) as {$b}", $bulanFields));
 
             $realisasiPerBulan = Anggaran::whereNotNull('kode_akun')
                 ->selectRaw($selectFields)
@@ -529,9 +622,16 @@ class DataAnggaranController extends Controller
         }
     }
 
-    // Private helpers (updateParentTotals, updateParentPaguAfterEdit) — TETAP SAMA
+    // ══════════════════════════════════════════════════════════════
+    // PRIVATE HELPERS
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Recalculate pagu & realisasi SubKomponen dan RO parent dari akun yang baru dibuat.
+     */
     private function updateParentTotals(Anggaran $anggaran): void
     {
+        // ── SubKomponen parent ────────────────────────────────────
         $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)
             ->where('kro', $anggaran->kro)
             ->where('ro', $anggaran->ro)
@@ -556,6 +656,7 @@ class DataAnggaranController extends Controller
             ]);
         }
 
+        // ── RO parent ─────────────────────────────────────────────
         $ro = Anggaran::where('kegiatan', $anggaran->kegiatan)
             ->where('kro', $anggaran->kro)
             ->where('ro', $anggaran->ro)
@@ -581,9 +682,15 @@ class DataAnggaranController extends Controller
         }
     }
 
+    /**
+     * Tambah/kurangi selisih pagu ke SubKomponen dan RO parent.
+     * Digunakan saat edit pagu akun atau saat akun dihapus.
+     */
     private function updateParentPaguAfterEdit(Anggaran $anggaran, float $selisih): void
     {
-        if ($selisih == 0) return;
+        if ($selisih == 0) {
+            return;
+        }
 
         $subkomp = Anggaran::where('kegiatan', $anggaran->kegiatan)
             ->where('kro', $anggaran->kro)
