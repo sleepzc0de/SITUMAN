@@ -1,5 +1,4 @@
 <?php
-
 use App\Http\Controllers\Anggaran\MonitoringAnggaranController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
@@ -11,16 +10,15 @@ use App\Http\Controllers\RoleManagementController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
-
-// Blokir path /login lama
-Route::get('login', fn() => abort(404));
-Route::post('login', fn() => abort(404));
+// Redirect /login lama ke login page custom (bukan abort 404)
+// Ini mencegah error log spam dari browser/bot yang masih hit /login
+Route::get('login', fn() => redirect()->route('login'))->name('login.redirect');
+Route::post('login', fn() => redirect()->route('login'));
 
 // ═══════════════════════════════════════════════════════
 // GUEST
 // ═══════════════════════════════════════════════════════
 Route::middleware('guest')->group(function () {
-    // Ganti 'login' dengan path custom Anda
     Route::get('qWPgqPi3bk7LEky4zNwdxQfbJIAa9GQ8h3Ue1vlg=', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('qWPgqPi3bk7LEky4zNwdxQfbJIAa9GQ8h3Ue1vlg=', [LoginController::class, 'login'])
         ->middleware('throttle:10,1');
@@ -33,24 +31,19 @@ Route::middleware('guest')->group(function () {
 // AUTHENTICATED
 // ═══════════════════════════════════════════════════════
 Route::middleware(['auth', 'has.role'])->group(function () {
-
-    // ── Dashboard ────────────────────────────────────────
     Route::get('/',          [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    // ── Profile ──────────────────────────────────────────
     Route::get('/profile', fn() => view('profile.index'))->name('profile');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])
         ->name('profile.password.update');
 
-    // ── Logout ───────────────────────────────────────────
     Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 
     // ════════════════════════════════════════════════════
     // KEPEGAWAIAN
     // ════════════════════════════════════════════════════
     Route::prefix('kepegawaian')->name('kepegawaian.')->group(function () {
-
         Route::get('sebaran',           [SebaranPegawaiController::class, 'index'])->name('sebaran');
         Route::get('sebaran/data',      [SebaranPegawaiController::class, 'data'])->name('sebaran.data');
         Route::get('sebaran/{pegawai}', [SebaranPegawaiController::class, 'show'])->name('sebaran.show');
@@ -58,7 +51,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
         Route::get('grading/{pegawai}', [KenaikanGradingController::class, 'show'])->name('grading.show');
         Route::get('mutasi',            [ProyeksiMutasiController::class, 'index'])->name('mutasi');
         Route::get('mutasi/{pegawai}',  [ProyeksiMutasiController::class, 'show'])->name('mutasi.show');
-
         Route::resource('pegawai', \App\Http\Controllers\Kepegawaian\PegawaiController::class);
         Route::get('pegawai-export',
             [\App\Http\Controllers\Kepegawaian\PegawaiController::class, 'export'])
@@ -81,8 +73,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     // ANGGARAN
     // ════════════════════════════════════════════════════
     Route::prefix('anggaran')->name('anggaran.')->group(function () {
-
-        // ── Monitoring ───────────────────────────────────────────────────────
         Route::get('monitoring',
             [MonitoringAnggaranController::class, 'index'])->name('monitoring.index');
         Route::get('monitoring/data',
@@ -94,7 +84,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('monitoring.recalculate')
             ->middleware('role:superadmin,admin');
 
-        // ── SPP — AJAX routes WAJIB sebelum resource() ──────────────────────
         Route::get('spp/ajax/subkomponen',
             [\App\Http\Controllers\Anggaran\SPPController::class, 'getSubkomponen'])
             ->name('spp.ajax.subkomponen');
@@ -103,7 +92,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('spp.ajax.akun');
         Route::resource('spp', \App\Http\Controllers\Anggaran\SPPController::class);
 
-        // ── Usulan Penarikan — AJAX route WAJIB sebelum resource() ──────────
         Route::get('usulan/ajax/subkomponen',
             [\App\Http\Controllers\Anggaran\UsulanPenarikanController::class, 'getSubkomponen'])
             ->name('usulan.ajax.subkomponen');
@@ -117,7 +105,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('usulan.reject')
             ->middleware('role:superadmin,admin');
 
-        // ── Dokumen Capaian — AJAX & download routes WAJIB sebelum resource() ─
         Route::get('dokumen/ajax/subkomponen',
             [\App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'getSubkomponen'])
             ->name('dokumen.ajax.subkomponen');
@@ -129,16 +116,11 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             [\App\Http\Controllers\Anggaran\DokumenCapaianController::class, 'downloadSingle'])
             ->name('dokumen.download-single');
 
-        // ── Revisi Anggaran ──────────────────────────────────────────────────
         Route::resource('revisi', \App\Http\Controllers\Anggaran\RevisiAnggaranController::class);
         Route::get('revisi/{revisi}/download-dokumen',
             [\App\Http\Controllers\Anggaran\RevisiAnggaranController::class, 'downloadDokumen'])
             ->name('revisi.download-dokumen');
 
-        // ── Data Anggaran — SEMUA non-resource routes WAJIB sebelum resource() ─
-        // Jika resource() didefinisikan lebih dulu, Laravel akan menangkap
-        // "ajax", "data-export", dst. sebagai nilai {data} dan mencoba
-        // route-model-binding → ModelNotFoundException → error 404/500.
         Route::get('data/ajax/subkomponen',
             [\App\Http\Controllers\Anggaran\DataAnggaranController::class, 'getSubkomponen'])
             ->name('data.ajax.subkomponen');
@@ -164,8 +146,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     // INVENTARIS
     // ════════════════════════════════════════════════════
     Route::prefix('inventaris')->name('inventaris.')->group(function () {
-
-        // Monitoring ATK
         Route::resource('monitoring-atk',
             \App\Http\Controllers\Inventaris\MonitoringAtkController::class);
         Route::get('monitoring-atk-export',
@@ -184,7 +164,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             [\App\Http\Controllers\Inventaris\MonitoringAtkController::class, 'updateStok'])
             ->name('monitoring-atk.update-stok');
 
-        // Permintaan ATK
         Route::get('permintaan-atk-data',
             [\App\Http\Controllers\Inventaris\PermintaanAtkController::class, 'data'])
             ->name('permintaan-atk.data');
@@ -203,7 +182,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             ->name('permintaan-atk.complete')
             ->middleware('role:superadmin,admin');
 
-        // Aset End User
         Route::resource('aset-end-user',
             \App\Http\Controllers\Inventaris\AsetEndUserController::class);
         Route::get('aset-end-user-export',
@@ -225,7 +203,6 @@ Route::middleware(['auth', 'has.role'])->group(function () {
             [\App\Http\Controllers\Inventaris\AsetEndUserController::class, 'kembalikan'])
             ->name('aset-end-user.kembalikan');
 
-        // Kategori
         Route::resource('kategori-atk',
             \App\Http\Controllers\Inventaris\KategoriAtkController::class);
         Route::resource('kategori-aset',
@@ -233,20 +210,17 @@ Route::middleware(['auth', 'has.role'])->group(function () {
     });
 
     // ════════════════════════════════════════════════════
-    // ADMINISTRASI — Superadmin & Admin only
+    // ADMINISTRASI
     // ════════════════════════════════════════════════════
     Route::middleware('role:superadmin,admin')->group(function () {
-
         Route::resource('users', UserManagementController::class);
         Route::post('users/{user}/assign-role',
             [RoleManagementController::class, 'assignRole'])
             ->name('users.assign-role');
-
         Route::get('roles',           [RoleManagementController::class, 'rolesIndex'])->name('roles.index');
         Route::post('roles',          [RoleManagementController::class, 'rolesStore'])->name('roles.store');
         Route::put('roles/{role}',    [RoleManagementController::class, 'rolesUpdate'])->name('roles.update');
         Route::delete('roles/{role}', [RoleManagementController::class, 'rolesDestroy'])->name('roles.destroy');
-
         Route::get('permissions',
             [RoleManagementController::class, 'permissionsIndex'])
             ->name('permissions.index');
